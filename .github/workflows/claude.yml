@@ -1,0 +1,51 @@
+name: Claude on request
+
+# Answers when a repo member writes @claude in an issue, PR, or review comment.
+# Read-only: it replies in the thread, it never commits.
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  claude:
+    # Only the owner and collaborators can trigger runs (each run spends tokens).
+    if: >-
+      (
+        (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
+        (github.event_name != 'issues' && contains(github.event.comment.body, '@claude'))
+      ) &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'),
+        github.event_name == 'issues' && github.event.issue.author_association || github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      # Full history so Claude can diff and log against main.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Node lets Claude run the test suite and lint when verifying a PR.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      # Read-only allowlist: inspect git, GitHub and files, run checks.
+      # Nothing here can push code; the job token has contents: read.
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --max-turns 30
+            --allowedTools "Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git fetch:*),Bash(git branch:*),Bash(git rev-parse:*),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git blame:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh label list:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh repo view:*),Bash(gh search:*),Bash(cat:*),Bash(ls:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(find:*),Bash(sort:*),Bash(uniq:*),Bash(diff:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run lint:*),Bash(npm run typecheck:*)"
+        env:
+          GH_TOKEN: ${{ github.token }}
