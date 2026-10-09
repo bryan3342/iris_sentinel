@@ -46,6 +46,7 @@ jobs:
           claude_args: >-
             --model claude-sonnet-5-5
             --max-turns 30
+            --disallowedTools "WebFetch,WebSearch"
             --allowedTools "Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git fetch:*),Bash(git branch:*),Bash(git rev-parse:*),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git blame:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checks:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(gh label list:*),Bash(gh run view:*),Bash(gh run list:*),Bash(gh repo view:*),Bash(gh search:*),Bash(cat:*),Bash(ls:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(find:*),Bash(sort:*),Bash(uniq:*),Bash(diff:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run lint:*),Bash(npm run typecheck:*)"
         env:
           GH_TOKEN: ${{ github.token }}
