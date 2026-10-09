@@ -1,0 +1,101 @@
+name: Claude PR review and fix
+
+# Picks up every new PR: analyzes it, fixes bugs and code smells in the changed code,
+# commits the fixes to the PR branch, posts a summary, then marks the PR ready for review.
+# It never merges, never approves and never pushes anywhere but the PR's own branch.
+# Merging stays with a human.
+
+on:
+  pull_request:
+    # Not "synchronize": the agent's own pushes must not re-trigger it.
+    types: [opened, reopened]
+
+concurrency:
+  group: claude-pr-review-${{ github.event.pull_request.number }}
+  # Never cancel mid-run; a cancelled run could leave a half-pushed fix.
+  cancel-in-progress: false
+
+jobs:
+  review:
+    # Same-repo PRs from the owner or collaborators only (fork PRs get no secrets,
+    # and each run spends tokens). Never act on a PR whose branch is main.
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref != 'main' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) &&
+      github.actor != 'claude[bot]' &&
+      github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+    steps:
+      # Check out the PR branch itself (not the merge commit) so fixes can be pushed to it.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      # Neutral bot identity for fix commits.
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are the PR agent for ${{ github.repository }}, working on PR #${{ github.event.pull_request.number }}
+            (branch `${{ github.event.pull_request.head.ref }}`, base `${{ github.event.pull_request.base.ref }}`).
+            Read CLAUDE.md and docs/architecture.md first; they define the project structure and rules.
+
+            Follow these steps in order.
+
+            1. Analyze the request. Use `gh pr view` and `gh pr diff` to learn what the PR is for
+               and exactly which lines changed.
+
+            2. Look for bugs in the changed code only, judged against the project structure:
+               logic errors, unhandled failures, broken contracts between extension, companion,
+               server and packages/core, vendor SDKs leaking past their interfaces, privacy or
+               secret-handling violations, and unsafe clicks (see CLAUDE.md). Do not report
+               pre-existing issues outside the diff unless the diff makes them worse.
+
+            3. For each real bug, reason about the root cause, choose the smallest correct fix,
+               and implement it. Skip anything you are not confident is a bug; list it instead.
+
+            4. Do one code smell pass over the changed code: duplication, unclear names, dead
+               code, overlong functions, misplaced logic. Behavior must not change, and do not
+               expand scope beyond the PR.
+
+            5. If package.json exists, run `npm ci`, then `npm test --if-present`,
+               `npm run lint --if-present` and `npm run typecheck --if-present`.
+
+            6. Commit bug fixes and smell fixes as separate commits with messages
+               `fix:<short description>` and `refactor:<short description>`. No AI attribution
+               lines (no Co-Authored-By trailers, session links or "Generated with" footers).
+               Push with exactly:
+               git push origin HEAD:refs/heads/${{ github.event.pull_request.head.ref }}
+
+            7. Post ONE PR comment with `gh pr comment` containing:
+               - Bugs fixed: table of file:line, problem, fix, commit.
+               - Code smells fixed: table of file, change, commit.
+               - Found but not fixed: each item with the reason.
+               - Test results: the commands run and pass/fail counts, or "no test suite yet".
+               If nothing needed fixing, say so plainly.
+
+            8. If all checks in step 5 pass (or there is no suite), run `gh pr ready` for this PR
+               so a human can review and merge it. If checks fail and you could not fix them,
+               leave it as a draft and say why in the comment.
+
+            Hard rules: never merge, never approve, never push to any branch other than the PR
+            branch, never edit files under .github/, and never weaken a test to make it pass.
+          claude_args: >-
+            --model claude-sonnet-5-5
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git fetch:*),Bash(git rev-parse:*),Bash(git merge-base:*),Bash(git ls-files:*),Bash(git blame:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:refs/heads/${{ github.event.pull_request.head.ref }}),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checks:*),Bash(gh pr comment:*),Bash(gh pr ready:*),Bash(gh issue view:*),Bash(cat:*),Bash(ls:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(grep:*),Bash(find:*),Bash(npm ci:*),Bash(npm test:*),Bash(npm run lint:*),Bash(npm run typecheck:*)"
+        env:
+          GH_TOKEN: ${{ github.token }}
