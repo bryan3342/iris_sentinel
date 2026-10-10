@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { COMPANION_PROTOCOL_VERSION } from '@iris/protocol';
 import type { BlinkEvent, CompanionState, QualityStatus, VitalsSample } from '@iris/protocol';
 import { CompanionLink, type LinkState, type NativePort } from '../../extension/src/providers/companion/link';
-import { companionStatusText } from '../../extension/src/sidepanel/companion-status';
 
 /** Stands in for Chrome's native messaging port. */
 class FakePort implements NativePort {
@@ -149,16 +148,5 @@ describe('CompanionLink', () => {
     await link.start();
     expect(ports).toHaveLength(2);
     expect(states).toEqual(['connecting', 'connected', 'idle', 'connecting']);
-  });
-});
-
-describe('companionStatusText', () => {
-  it('tells the user how to fix a missing companion', () => {
-    expect(companionStatusText('not-installed', null)).toContain('npm run install:host');
-  });
-
-  it("adds what the companion reports once connected", () => {
-    expect(companionStatusText('connected', null)).toBe('Body signals: companion connected.');
-    expect(companionStatusText('connected', 'stopped')).toBe('Body signals: companion connected (stopped).');
   });
 });

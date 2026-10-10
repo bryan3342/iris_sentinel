@@ -1,42 +1,74 @@
-import type { CompanionState } from '@iris/protocol';
-import { companionLink, type LinkState } from '../providers/companion/link';
+import { companionLink } from '../providers/companion/link';
+import {
+  bodySignalsView,
+  initialBodySignals,
+  withLink,
+  withQuality,
+  withStatus,
+  withVitals,
+} from './body-signals';
 
-// Side panel row for the Presage companion. Opening the panel connects to the
-// companion, and closing the panel ends it, so body sensing only runs while
-// Iris is open. Fuller status (quality hints, warm-up, readings) comes later.
+// Side panel section for the Presage companion. Opening the panel connects to
+// the companion, and closing the panel ends it, so body sensing only runs while
+// Iris is open. What it shows is worked out in body-signals.ts.
 
-const LINK_TEXT: Record<LinkState, string> = {
-  idle: 'Body signals: off.',
-  unavailable: 'Body signals: only available in the installed extension.',
-  connecting: 'Body signals: connecting to the companion...',
-  connected: 'Body signals: companion connected.',
-  'not-installed': 'Body signals: companion not installed. Run npm run install:host in companion/, then reopen this panel.',
-  outdated: 'Body signals: companion is out of date. Run npm run install:host in companion/ again.',
-  disconnected: 'Body signals: companion stopped. Close and reopen this panel to try again.',
-};
-
-/** One line describing the link, plus what the companion reports once connected. */
-export function companionStatusText(link: LinkState, companion: CompanionState | null): string {
-  if (link !== 'connected' || companion === null) return LINK_TEXT[link];
-  return `Body signals: companion connected (${companion}).`;
-}
-
-/** Side panel row that connects to the companion as soon as it is shown. */
+/** Side panel section that connects to the companion as soon as it is shown. */
 export function companionPanel(): HTMLElement {
+  const section = document.createElement('section');
+  section.className = 'body-signals';
+  // Only the status line is announced to screen readers: the countdown below
+  // changes every second and would be read out constantly.
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
+  const camera = document.createElement('p');
+  const signals = document.createElement('ul');
+  const note = document.createElement('p');
+  note.className = 'note';
+  section.append(status, camera, signals, note);
+
   const link = companionLink();
-  let companion: CompanionState | null = null;
-  const render = () => (status.textContent = companionStatusText(link.state, companion));
-  link.onState((state) => {
-    if (state !== 'connected') companion = null;
+  let state = initialBodySignals(link.state);
+  let ticker: ReturnType<typeof setInterval> | null = null;
+
+  const render = () => {
+    const view = bodySignalsView(state, performance.now());
+    if (status.textContent !== view.status) status.textContent = view.status;
+    camera.textContent = view.camera ?? '';
+    camera.hidden = view.camera === null;
+    signals.replaceChildren(
+      ...view.signals.map((line) => {
+        const item = document.createElement('li');
+        item.textContent = line;
+        return item;
+      }),
+    );
+    note.textContent = view.note ?? '';
+    note.hidden = view.note === null;
+    // Tick once a second only while measuring, for the warm-up countdown and stale readings.
+    if (view.signals.length > 0 && ticker === null) ticker = setInterval(render, 1000);
+    if (view.signals.length === 0 && ticker !== null) {
+      clearInterval(ticker);
+      ticker = null;
+    }
+  };
+
+  link.onState((linkState) => {
+    state = withLink(state, linkState);
     render();
   });
-  link.onStatus((state) => {
-    companion = state;
+  link.onStatus((companion) => {
+    state = withStatus(state, companion, performance.now());
+    render();
+  });
+  link.onQuality((quality) => {
+    state = withQuality(state, quality);
+    render();
+  });
+  link.onVitals((sample) => {
+    state = withVitals(state, sample);
     render();
   });
   render();
   void link.start();
-  return status;
+  return section;
 }
