@@ -40,7 +40,7 @@ function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): strin
 
 const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
-  CONFIRM_AGAIN: 'That one may submit, pay, delete or send. Look away, then dwell on it or close both eyes for half a second again to confirm.',
+  CONFIRM_AGAIN: 'That one may submit, pay, delete or send. Look away, then dwell on it or blink twice again to confirm.',
   NEEDS_SECOND_CONFIRM: 'That one needs a second confirm. Nothing was selected.',
   STALE: 'The page changed, so nothing was selected.',
 };
@@ -96,7 +96,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
       learn: true, onLearned: () => void saveSamples(store.samples),
     }) };
     active.session.start();
-    status.textContent = 'Looking aims at the nearest number. To select it, dwell on it for a second, or close both eyes for about half a second and open them.';
+    status.textContent = 'Looking aims at the nearest number. To select it, dwell on it for a second or blink twice quickly.';
   };
   eyes.input.addEventListener('change', () => {
     stop();

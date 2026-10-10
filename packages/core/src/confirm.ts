@@ -2,15 +2,15 @@ import type { GazeSample, Unsubscribe } from '@iris/protocol';
 
 /**
  * Confirms: the user saying "yes, that one" without a click. Every confirm
- * method (dwell, long blink, and a stand-in for tests)
+ * method (dwell, double blink, and a stand-in for tests)
  * produces the same event, so whatever acts on it cannot tell them apart and
  * swapping one method for another changes nothing downstream. The event says
  * when the user confirmed; the consumer acts on the target aimed at that
- * moment, unless the event already carries one (a long blink locks its target
- * before the eyes close). Looking alone never produces one.
+ * moment, unless the event already carries one (a double blink locks its target
+ * before the first blink). Looking alone never produces one.
  */
 
-export type ConfirmSource = 'dwell' | 'long-blink' | 'stand-in';
+export type ConfirmSource = 'dwell' | 'double-blink' | 'stand-in';
 
 export interface ConfirmEvent {
   /** Timestamp in milliseconds, on the gaze samples' clock. */

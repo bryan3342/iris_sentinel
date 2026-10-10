@@ -1,4 +1,4 @@
-import { ConfirmChannel, DwellDetector, LongBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
+import { ConfirmChannel, DwellDetector, DoubleBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
 import type { GazeProvider, Point2, Unsubscribe } from '@iris/protocol';
 import { pageSelect, type SelectResult } from '../content/select';
 import type { PageMarks } from './page-marks';
@@ -51,7 +51,7 @@ const isRisky = (target: Target) => target.risky !== false; // a missing flag ne
 export class GazeSession {
   readonly confirms = new ConfirmChannel();
   private readonly dwell = new DwellDetector();
-  private readonly longBlink = new LongBlinkDetector();
+  private readonly doubleBlink = new DoubleBlinkDetector();
   private readonly gate = new SelectionGate();
   private readonly frameFor: (list: TargetList) => CalibrationFrame;
   private readonly select: Select;
@@ -83,8 +83,8 @@ export class GazeSession {
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
-        // A dwell or a deliberate long blink confirms the aimed target; both go through the gate.
-        const event = this.dwell.update(sample, aimed) ?? this.longBlink.update(sample, aimed);
+        // A dwell or a deliberate double blink confirms the aimed target; both go through the gate.
+        const event = this.dwell.update(sample, aimed) ?? this.doubleBlink.update(sample, aimed);
         if (event) this.confirms.emit(event);
         this.marks.setPending(this.gate.pending(sample.t));
       }),
@@ -97,7 +97,7 @@ export class GazeSession {
     this.stops.forEach((stop) => stop());
     this.stops = [];
     this.gate.reset();
-    this.longBlink.reset();
+    this.doubleBlink.reset();
     this.marks.setPending(null);
     this.marks.follow(null);
     this.marks.stop();
@@ -110,9 +110,9 @@ export class GazeSession {
     const waiting = this.gate.pending(this.lastT);
     const same = waiting !== null && this.samePlace(waiting, list) && isRisky(list.targets.find((t) => t.id === waiting)!);
     if (waiting !== null && !same) this.gate.reset();
-    // A long blink in progress keeps its locked target only while that number still means the same element.
-    const locked = this.longBlink.locked;
-    if (locked !== null && !this.samePlace(locked, list)) this.longBlink.reset();
+    // A double blink in progress keeps its locked target only while that number still means the same element.
+    const locked = this.doubleBlink.locked;
+    if (locked !== null && !this.samePlace(locked, list)) this.doubleBlink.reset();
     this.list = list;
     return this.aim.setTargets(list.targets, this.frameFor(list));
   }
@@ -127,7 +127,7 @@ export class GazeSession {
 
   private handle(event: ConfirmEvent): void {
     const list = this.list;
-    const id = event.target ?? this.aim.current; // a long blink brings the target it locked before the eyes closed
+    const id = event.target ?? this.aim.current; // a double blink brings the target it locked before the eyes closed
     const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = this.gate.confirm(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'confirm-again') {

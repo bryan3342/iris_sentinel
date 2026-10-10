@@ -30,8 +30,8 @@ export interface GazeSample {
   head: HeadPose;
   /**
    * Closure of the user's own left and right eye, 0 (open) to 1 (closed).
-   * Drives the long-blink confirm. Reads as open when no face is visible, so a
-   * missing face can never look like a long blink.
+   * Drives the double-blink confirm. Reads as open when no face is visible, so a
+   * missing face can never look like a double blink.
    */
   blink: { left: number; right: number };
 }

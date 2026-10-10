@@ -24,7 +24,7 @@ function choice<T extends string>(value: unknown, options: readonly T[]): T {
  * The browser actions the voice agent can ask for. Scrolling and history move the page at once;
  * summaries, descriptions and finding a target go through page understanding (Gemini) only because
  * the user asked. Nothing here clicks: a found target is outlined and numbered, and the user opens
- * it with a dwell or long blink, with a second confirm for anything risky.
+ * it with a dwell or double blink, with a second confirm for anything risky.
  */
 export function browserTools({ coordinator, marks, report }: ToolDeps): VoiceTools {
   const tool = (action: (p: Record<string, unknown>) => Promise<string>) => async (parameters: Record<string, unknown> = {}) => {
