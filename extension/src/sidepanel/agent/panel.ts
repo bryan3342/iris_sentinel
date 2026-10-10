@@ -1,26 +1,30 @@
-import { broker } from '../../page-understanding/coordinator';
+import { broker, type PageCoordinator } from '../../page-understanding/coordinator';
 import { GATEWAY } from '../../page-understanding/gateway';
 import { openMicrophone } from '../setup/microphone';
 import { elevenLabsVoice } from './elevenlabs';
+import type { PageMarks } from '../page-marks';
 import { VoiceController } from './session';
+import { browserTools } from './tools';
 
-export function conversationPanel(): HTMLElement {
+export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks }): HTMLElement {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
-  notice.textContent = 'Start sends microphone audio to ElevenLabs for conversation and plays its replies. Stop or close this panel to end the conversation. Voice browser actions are not connected yet.';
+  notice.textContent = 'Start sends microphone audio to ElevenLabs for conversation and plays its replies. Say things like "scroll down", "go to the top", "go back", "summarize this", "what is this" or "find the sign-in link". Summaries and descriptions send the visible page to Gemini and their text to the voice agent. Iris never clicks for you: look at the number and hold your gaze to open it. Stop or close this panel to end the conversation.';
   const start = document.createElement('button'); start.textContent = 'Start conversation';
   const stop = document.createElement('button'); stop.textContent = 'Stop conversation'; stop.disabled = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   status.textContent = 'Conversation off.';
+  const action = document.createElement('p'); action.setAttribute('aria-live', 'polite');
   let closed = false;
   let pending = false, active = false;
+  const tools = browserTools({ ...page, report: (said) => { action.textContent = said; } });
   const controller = new VoiceController(elevenLabsVoice, state => {
     active = state !== 'disconnected';
     start.disabled = pending || active;
     status.textContent = { connecting: 'Connecting...', listening: 'Iris is listening.', speaking: 'Iris is speaking.', disconnected: 'Conversation off.' }[state];
     stop.disabled = state === 'disconnected';
-  });
+  }, tools);
   start.addEventListener('click', () => {
     pending = true;
     start.disabled = true;
@@ -39,6 +43,6 @@ export function conversationPanel(): HTMLElement {
     void controller.stop().catch(() => { status.textContent = 'Could not stop cleanly. Close the panel.'; });
   });
   addEventListener('pagehide', () => { closed = true; void controller.stop().catch(() => {}); }, { once: true });
-  panel.append(title, notice, start, stop, status);
+  panel.append(title, notice, start, stop, status, action);
   return panel;
 }
