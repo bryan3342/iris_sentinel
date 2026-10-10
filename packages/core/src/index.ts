@@ -21,6 +21,8 @@ export type { BlinkRateOptions } from './blink-rate';
 export { Baseline, strain } from './baseline';
 export type { BaselineOptions, StrainOptions, TiredDirection } from './baseline';
 export { quantile } from './stats';
+export { combineScore, FatigueLevelTracker } from './fatigue-level';
+export type { FatigueLevelOptions, Score, ScoreOptions } from './fatigue-level';
 export { SelectionGate } from './selection';
 export { SettledAim } from './settled-aim';
 export type { GateTarget, Selection, SelectionGateOptions } from './selection';

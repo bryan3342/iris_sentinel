@@ -23,6 +23,11 @@ export class GazeAim {
     private readonly options: SnapOptions = DEFAULT_SNAP,
   ) {}
 
+  /** The latest smoothed gaze point in page pixels, or null before calibration has one. */
+  get point(): Point2 | null {
+    return this.pointer.point;
+  }
+
   /** The aimed target ID in the current list, or null. */
   get current(): number | null {
     return this.aimed;

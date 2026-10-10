@@ -4,7 +4,7 @@ import type { NumberedTarget } from '@iris/protocol';
 import { pageOverlay } from '../../extension/src/content/overlay';
 import { pageSnapshot } from '../../extension/src/page-understanding/page-helper';
 
-type Globals = typeof globalThis & { __irisUnderstandingV01?: unknown; __irisOverlayV01?: { host: HTMLElement; layer: HTMLElement } };
+type Globals = typeof globalThis & { __irisUnderstandingV01?: unknown; __irisOverlayV01?: { host: HTMLElement; layer: HTMLElement; cursor: HTMLElement } };
 const g = globalThis as Globals;
 const TARGETS: NumberedTarget[] = [
   { id: 1, role: 'link', rect: { x: 10, y: 20, width: 120, height: 30 } },
@@ -84,6 +84,45 @@ describe('page overlay', () => {
     await pageOverlay({ type: 'hold' });
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5_001);
     expect(await show(snapshot, 2)).toBe('SHOWN');
+  });
+
+  it('moves the live gaze cursor over the side panel connection, hiding it when it should not show', async () => {
+    const connects: ((port: unknown) => void)[] = [];
+    vi.stubGlobal('chrome', { runtime: { onConnect: { addListener: (l: (port: unknown) => void) => connects.push(l) } } });
+    const snapshot = pageSnapshot();
+    expect(await pageOverlay({ type: 'listen' })).toBe('SHOWN');
+    await pageOverlay({ type: 'listen' });
+    expect(connects).toHaveLength(1); // one listener, however often it is started
+    let receive: (m: unknown) => void = () => {}, drop: () => void = () => {};
+    connects[0]!({ name: 'iris.gaze-cursor', onMessage: { addListener: (l: typeof receive) => (receive = l) }, onDisconnect: { addListener: (l: typeof drop) => (drop = l) } });
+    const cursor = g.__irisOverlayV01!.cursor;
+    receive({ at: { x: 120, y: 40 } });
+    expect([cursor.hidden, cursor.style.transform]).toEqual([false, 'translate(120px, 40px)']);
+    receive({ at: null });
+    expect(cursor.hidden).toBe(true);
+    receive({ at: { x: 'left', y: 1 } });
+    expect(cursor.hidden).toBe(true);
+    receive({ at: { x: 1, y: 1 } });
+    await pageOverlay({ type: 'hold' }); // a screenshot never shows it
+    expect(cursor.hidden).toBe(true);
+    receive({ at: { x: 2, y: 2 } });
+    expect(cursor.hidden).toBe(true);
+    await pageOverlay({ type: 'release' });
+    receive({ at: { x: 3, y: 3 } });
+    expect(cursor.hidden).toBe(false);
+    drop();
+    expect(cursor.hidden).toBe(true);
+    await settle();
+    expect(pageSnapshot().revision).toBe(snapshot.revision); // moving the cursor is not a page change
+  });
+
+  it('ignores other connections', async () => {
+    const connects: ((port: unknown) => void)[] = [];
+    vi.stubGlobal('chrome', { runtime: { onConnect: { addListener: (l: (port: unknown) => void) => connects.push(l) } } });
+    await pageOverlay({ type: 'listen' });
+    const onMessage = { addListener: vi.fn() };
+    connects[0]!({ name: 'something-else', onMessage, onDisconnect: { addListener: vi.fn() } });
+    expect(onMessage.addListener).not.toHaveBeenCalled();
   });
 
   it('shows one calibration dot that a page change does not erase, without moving the page counter', async () => {

@@ -2,6 +2,7 @@ import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, type AccuracyR
 import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
+import { GazeCursor } from './gaze-cursor';
 import { GazeSession, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
 import { loadSamples, saveCheck, saveSamples, type AccuracyRecord } from './setup/calibration-storage';
@@ -70,6 +71,9 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   check.textContent = 'Check accuracy';
   const report = (outcome: Outcome) => { status.textContent = OUTCOMES[outcome]; };
   eyes.input.disabled = calibrate.disabled = check.disabled = true;
+  // The live cursor follows wherever the user looks (or points), on the page itself.
+  const cursor = new GazeCursor();
+  const onGaze = (at: Point2 | null, list: { tabId: number }) => cursor.move(list.tabId, at);
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void } | null = null;
 
@@ -80,13 +84,14 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     active?.session.stop();
     active?.stop?.();
     active = null;
+    cursor.stop();
     status.textContent = '';
   };
   /** Aims with the camera through a calibration saved in screen positions. */
   const aimWithEyes = (provider: GazeProvider, store: CalibrationStore) => {
     eyes.input.checked = true;
     active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, {
-      frameFor: screenFrame, onOutcome: report,
+      frameFor: screenFrame, onOutcome: report, onGaze,
       // Every gaze selection refines the calibration for the posture the user is in now.
       learn: true, onLearned: () => void saveSamples(store.samples),
     }) };
@@ -172,7 +177,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     eyes.input.checked = false;
     if (!mouse.input.checked) return;
     const sim = mouseGaze(targets);
-    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report }), stop: sim.stop };
+    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze }), stop: sim.stop };
     active.session.start();
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
