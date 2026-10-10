@@ -61,7 +61,7 @@ it('calibrates with dots on the page, then aims in screen positions that follow 
   const store = new CalibrationStore();
   store.setDots(samples, SCREEN);
   const highlights = () => sent.filter((c) => c.type === 'show').map((c) => (c as { highlight: number | null }).highlight);
-  const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(targets), screenFrame);
+  const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(targets), { frameFor: screenFrame });
   lookAt = targetCenter(3);
   gaze.start();
   await vi.advanceTimersByTimeAsync(1000);

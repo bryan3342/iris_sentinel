@@ -5,11 +5,12 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
 **Implementation status: v0.1 private-demo MVP.** The extension has a camera
-preview plus an explicit-request page-understanding harness. The Worker implements
+preview, gaze aiming with on-page calibration, dwell-confirmed selection of
+page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, ElevenLabs client integration, browser actions and the
-confirmation state machine below remain future work. Page understanding is built
+by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
+and the full input-mode state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
 manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
@@ -34,7 +35,7 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 - Works on normal websites. Chrome's own pages and the address bar are out of reach for extensions; voice "go to <site>" covers navigation.
 - Fatigue is presented as "you might be tired", never as a medical reading.
 - Desktop Chrome only.
-- The companion targets Apple Silicon Macs and Windows x64, the desktop platforms the Presage Node.js SDK supports and the companion installer covers. Intel Macs are not supported.
+- The companion targets Apple Silicon Macs, where the demo runs and the companion installer works today. Windows x64, which the Presage Node.js SDK also supports, is a stretch goal for the installer. Intel Macs are not supported.
 
 ---
 
@@ -72,7 +73,7 @@ flow and client tools are subsequent milestones.
 | `VitalsProvider` (HR, HRV, breathing rate) | Presage companion, simulated |
 | `VoiceAgent` (conversation, user talking on/off) | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
-| `SessionStore` | Local only, Tiger Data |
+| `SessionStore` | In memory (simulated), local only, Tiger Data through the Worker |
 
 ---
 
@@ -164,8 +165,12 @@ The local endpoint has no session authentication or rate limiting and must not
 be deployed until those protections are implemented.
 
 **Safety rule.** Every browser click requires Iris confirmation, even when the
-agent proposes it. Gemini recommends/explains only. The confirmation and browser
-action flow is separate from this server milestone; there is no click executor.
+agent proposes it. Gemini recommends/explains only; it never clicks. The one
+place Iris clicks is the page helper's select step, after a confirm passes the
+selection gate: it clicks only the exact element behind the confirmed number in
+that gaze scan, only if it is still on the page, where the user saw it and not
+covered, and a risky element only after a second confirm, checked again in the
+page itself.
 
 **v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
 sensitive rectangles and revisions. Chrome capture runs through the background
@@ -266,7 +271,7 @@ iris_sentinel/
 │   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
 │   │   ├── secrets/             # reads the Presage key from the OS keychain
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
-│   └── install/                 # registers the native messaging host (macOS, Windows)
+│   └── install/                 # registers the native messaging host (macOS; Windows is a stretch goal)
 ├── server/                      # Cloudflare Worker, holds all keys
 │   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/

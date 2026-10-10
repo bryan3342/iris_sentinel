@@ -17,6 +17,9 @@ export const COMPANION_PROTOCOL_VERSION = 1;
  */
 export const IRIS_EXTENSION_ID = 'bohipliohnmknfglnkhglngbmpiahdcn';
 
+/** Chrome's name for the companion: the extension connects with it, the installer registers it. */
+export const NATIVE_HOST_NAME = 'com.iris.companion';
+
 /** What the companion is doing. Anything but `running` means no body signals. */
 export const COMPANION_STATES = [
   'starting',

@@ -111,7 +111,7 @@ never screenshot bytes. ElevenLabs does not need to exist before this MVP.
 
 | Piece | Why it stays |
 | :--- | :--- |
-| Chrome extension (side panel, coordinator, page helper) | v0.1 capture/understanding implemented for supported visible top-document content; gaze, voice and browser actions remain future work |
+| Chrome extension (side panel, coordinator, page helper) | v0.1 capture/understanding implemented for supported visible top-document content; gaze aiming and dwell-confirmed selection implemented; voice remains future work |
 | Presage via a local Node.js companion over native messaging | No browser version of Presage exists. Its on-device processing is the privacy story. It supplies the camera-based heart rate, breathing, blink, expression and motion signals behind Iris's fatigue, focus and movement scores. Testing showed it suits slow trends, not clicks (#24). |
 | MediaPipe as the gaze (eye and head) tracker | Free and in-browser. Presage has no gaze output, so MediaPipe is the primary aiming source, not a fallback. Its eye closure also drives the long-blink confirm; Presage counts natural blinks for fatigue. |
 | Cloudflare Worker holding all keys | Gemini key remains server-side; ElevenLabs/Tiger Data integration remains future work |
