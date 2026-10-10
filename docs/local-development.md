@@ -36,9 +36,10 @@ This opens http://localhost:5173 as a full-window gaze tracking view. Allow the 
 1. Put the browser window on the monitor you will look at, ideally the one with the webcam, and make the window as large as the screen.
 2. Your camera fills the window with a red ring on each iris. Once your face is steady for about a second, calibration starts by itself: look at each dot until it disappears (9 dots near the screen edges; add `?dots=5` to the address for 5).
 3. A red circle then shows where you are looking. It holds steady while your eyes rest on one spot and jumps when you look somewhere new.
-4. Press **R** to recalibrate, for example after moving your seat or resizing the window.
+4. Click where you are looking to refine the fit. In the product a confirm gesture (breath, long blink or dwell on a numbered target) plays this role; in the playground a click stands in for it. A click far from where the tracker thinks you are looking is ignored.
+5. The calibration is saved for this screen in the page's local storage, so a reload tracks right away without the dots. Press **R** to redo the dots, for example after moving to a different screen, and **X** to forget the saved calibration.
 
-Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Calibration data stays in memory and is gone when you reload.
+Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Saved calibration data is a few hundred numbers (eye positions, head pose and dot positions), never frames, and it never leaves your computer.
 
 ## Option 2: The real extension (load unpacked)
 
@@ -59,7 +60,7 @@ After a rebuild, click the reload arrow on the Iris card in `chrome://extensions
 
 Once the camera is on, the panel shows **Eye tracking on** and:
 
-- A bright red ring around each iris and a red dot at its center, drawn on the camera preview and following your eyes frame by frame.
+- A bright red ring around each open iris and a red dot at its center, drawn on the camera preview and following your eyes frame by frame. Blinking does not disturb it; close one eye for longer than a blink and its ring disappears while the other eye keeps aiming.
 - A short fading red trail behind each iris showing where your eyes just moved. It only draws on screen; nothing is recorded.
 - A readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
 

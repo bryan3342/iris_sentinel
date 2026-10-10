@@ -1,6 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
-import { TRACE_POINTS, toGazeSample } from './eye-feature';
+import { ClosureTimer, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -18,9 +18,10 @@ async function createLandmarker(): Promise<FaceLandmarker> {
 export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
-  private lastHead: HeadPose = { yaw: 0, pitch: 0 };
+  private lastHead: HeadPose = { yaw: 0, pitch: 0, eyes: { x: 0, y: 0 }, eyeSpan: 0 };
+  private readonly closure = new ClosureTimer();
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
-  private readonly traceListeners = new Set<(points: Point2[]) => void>();
+  private readonly traceListeners = new Set<(eyes: [Point2[], Point2[]]) => void>();
 
   constructor(private readonly video: HTMLVideoElement) {}
 
@@ -39,8 +40,8 @@ export class MediaPipeGazeProvider implements GazeProvider {
     return () => this.sampleListeners.delete(listener);
   }
 
-  /** Iris center and contour points (0..1 image coordinates) for the on-screen trace. */
-  onTracePoints(listener: (points: Point2[]) => void): Unsubscribe {
+  /** Iris points per eye (user's right, then left) for the on-screen trace; empty for a closed eye. */
+  onTracePoints(listener: (eyes: [Point2[], Point2[]]) => void): Unsubscribe {
     this.traceListeners.add(listener);
     return () => this.traceListeners.delete(listener);
   }
@@ -60,23 +61,22 @@ export class MediaPipeGazeProvider implements GazeProvider {
     if (!landmarks) {
       // No face: publish a null eye so listeners do not keep aiming at the last sample.
       this.publish({ t: now, eye: null, head: this.lastHead });
-      this.traceListeners.forEach((listener) => listener([]));
+      this.traceListeners.forEach((listener) => listener([[], []]));
       return;
     }
     const blendshapes: Record<string, number> = {};
     for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
-    const sample = toGazeSample(
-      {
-        landmarks,
-        blendshapes,
-        matrix: result.facialTransformationMatrixes[0]?.data ?? [],
-        aspect: this.video.videoWidth / this.video.videoHeight,
-      },
-      now,
-    );
-    this.publish(sample);
-    const points = TRACE_POINTS.flatMap((i) => (landmarks[i] ? [landmarks[i]] : []));
-    this.traceListeners.forEach((listener) => listener(points));
+    // A blink is not a closed eye: hold the last sample and markers through it.
+    if (this.closure.blinking(blendshapes, now)) return;
+    const frame: FaceFrame = {
+      landmarks,
+      blendshapes,
+      matrix: result.facialTransformationMatrixes[0]?.data ?? [],
+      aspect: this.video.videoWidth / this.video.videoHeight,
+    };
+    this.publish(toGazeSample(frame, now));
+    const eyes = irisPoints(frame);
+    this.traceListeners.forEach((listener) => listener(eyes));
   }
 
   private publish(sample: GazeSample): void {
