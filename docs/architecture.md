@@ -249,10 +249,12 @@ iris_sentinel/
 │       │   └── setup/           # permissions, lighting, calibration, long-blink practice
 │       ├── content/             # target finder, numbered overlay, click/scroll, enlarge, screenshot
 │       └── providers/           # MediaPipe gaze, simulated sensors
-├── companion/                   # Node.js helper running Presage
+├── companion/                   # Node.js helper running Presage (its own npm project, bundled to one file)
 │   ├── src/
+│   │   ├── main.ts, host.ts     # entry point and message loop (answers only the Iris extension)
 │   │   ├── presage/             # SDK session behind FaceProvider / VitalsProvider
 │   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
+│   │   ├── secrets/             # reads the Presage key from the OS keychain
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
 │   └── install/                 # registers the native messaging host (macOS, Windows)
 ├── server/                      # Cloudflare Worker, holds all keys
