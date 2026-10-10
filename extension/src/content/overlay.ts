@@ -17,8 +17,12 @@ export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
  * draws: no clicks, focus or scrolling, and pointer events pass straight
  * through. The host is a plain div with a closed shadow root, mounted once and
  * redrawn only inside that root, so the page helper never counts a redraw as a
- * page change. A drawing is bound to one document revision and is erased by
- * the next page change. For calibration it instead shows one still dot over a
+ * page change. A drawing is bound to one document revision. When it came from
+ * a gaze scan, a page change erases it only if a numbered element moved or left
+ * the page, checked once per frame against the elements behind that scan; hover
+ * effects, ads and ticking clocks leave it in place, and a draw from a slightly
+ * older scan still lands while its elements are where they were. Any other
+ * drawing (page understanding's highlight) is erased by the next page change. For calibration it instead shows one still dot over a
  * dimmed page, at a fraction of the visible viewport. A hold clears the page and
  * refuses every 'show' until released, so a screenshot never contains numbers drawn
  * by another part of Iris (gaze keeps redrawing while it aims).
@@ -30,8 +34,9 @@ export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
  * side panel disconnects.
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
-  type Understanding = { documentToken: string; revision: number; onChange?: () => void };
-  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement; cursor: HTMLDivElement; listening?: boolean };
+  type Scan = { revision: number; entries: { el: Element }[] };
+  type Understanding = { documentToken: string; revision: number; onChange?: () => void; scans?: Scan[] };
+  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement; cursor: HTMLDivElement; listening?: boolean; drawing?: object };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay; __irisOverlayHoldV01?: number };
   const STYLE = `
       .badge { position: fixed; padding: 0 4px; font: bold 13px/18px sans-serif; color: #000;
@@ -50,7 +55,10 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     const overlay = host.__irisOverlayV01;
     const drawn = Boolean(overlay && (overlay.layer.firstChild || !overlay.cursor.hidden));
     overlay?.layer.replaceChildren();
-    if (overlay) overlay.cursor.hidden = true;
+    if (overlay) {
+      overlay.cursor.hidden = true;
+      overlay.drawing = undefined; // retires a pending frame check
+    }
     return drawn;
   };
   const mount = (): Overlay => {
@@ -109,13 +117,28 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   }
   if (command.type === 'show' && held()) return 'HELD';
   const state = host.__irisUnderstandingV01;
-  if (command.type === 'show' && (!state || state.documentToken !== command.documentToken || state.revision !== command.revision)) {
+  /** Whether every numbered element of the gaze scan at `revision` is still on the page, within 4 px of where it was drawn. */
+  const inPlace = (revision: number, targets: NumberedTarget[]): boolean => {
+    const scan = [...(state?.scans ?? [])].reverse().find((s) => s.revision === revision);
+    if (!scan) return false; // not a gaze scan: no elements to check against
+    const vv = visualViewport;
+    return targets.every((target) => {
+      const el = scan.entries[target.id - 1]?.el;
+      if (!el?.isConnected) return false;
+      const b = el.getBoundingClientRect();
+      const x = Math.max(0, b.left - (vv?.offsetLeft ?? 0)), y = Math.max(0, b.top - (vv?.offsetTop ?? 0));
+      return Math.abs(x - target.rect.x) <= 4 && Math.abs(y - target.rect.y) <= 4;
+    });
+  };
+  if (command.type === 'show' && (!state || state.documentToken !== command.documentToken ||
+    (state.revision !== command.revision && !inPlace(command.revision, command.targets)))) {
     clear();
     return 'STALE';
   }
   const overlay = mount();
   if (command.type === 'dot') {
     if (state) state.onChange = undefined; // a page change must not erase a calibration dot
+    overlay.drawing = undefined; // nor a frame check still pending from an earlier drawing
     if (!command.at) {
       overlay.layer.replaceChildren();
       return 'CLEARED';
@@ -156,6 +179,20 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   }
   // The aimed target is drawn last so neighboring badges never cover it.
   overlay.layer.replaceChildren(...drawing, ...aim);
-  state!.onChange = clear; // checked above: show requires the scanned document and revision
+  // Checked above: show requires the scanned document. On a page change, keep the drawing while
+  // its elements stay put, checked once per frame; a newer draw takes over the watch.
+  const drawn = (overlay.drawing = {});
+  let checking = false;
+  const watch = () => {
+    if (checking) return;
+    checking = true;
+    requestAnimationFrame(() => {
+      checking = false;
+      if (overlay.drawing !== drawn) return;
+      if (inPlace(command.revision, command.targets)) state!.onChange = watch;
+      else clear();
+    });
+  };
+  state!.onChange = watch;
   return 'SHOWN';
 }
