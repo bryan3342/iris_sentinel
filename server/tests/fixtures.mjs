@@ -30,3 +30,23 @@ export const input = (operation = 'find_target') => ({
 export const result = operation => operation === 'find_target' ? { operation, targetId: 7, explanation: 'The supplied icon matches.' }
   : operation === 'summarize_page' ? { operation, scope: 'visible_viewport', summary: 'Only the visible viewport: a synthetic page.' }
   : { operation, imageId: 3, description: 'A synthetic image crop.' };
+export async function setup() {
+  const sessionToken = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+  const sessionId = 'session_abcdefghijklmnop'; let now = Date.now();
+  const expiresAt = now + 900_000;
+  const env = { DEMO_SESSIONS: JSON.stringify({ [sessionId]: { tokenHash: await modules.tokenHash(sessionToken), expiresAt } }),
+    EXTENSION_ORIGIN: `chrome-extension://${'a'.repeat(32)}`,
+    ENABLE_PAGE_UNDERSTANDING: 'true', PAGE_CONTENT_APPROVED: 'true', GEMINI_MODEL: 'test-flash', GEMINI_API_KEY: 'mock-key' };
+  const gate = new modules.DemoAccess(() => now);
+  const call = async (path, body) => {
+    try {
+      if (path === '/admit') return modules.json(await gate.admit(env, body.sessionToken));
+      if (path === '/release') { gate.release(env, body); return modules.json({ ok: true }); }
+      return modules.json({ error: { code: 'NOT_FOUND' } }, 404);
+    } catch (error) { return modules.failure(error); }
+  };
+  return { env, gate, call, session: { sessionToken, expiresAt }, sessionId, advance: ms => { now += ms; } };
+}
+export const request = (data, sessionToken, extra = {}) => new Request(`https://demo.example/v0.1/page-understanding/${data.operation}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify(data), ...extra,
+});
