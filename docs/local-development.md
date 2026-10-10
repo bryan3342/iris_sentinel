@@ -58,6 +58,15 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 - A short fading red trail behind each iris showing where your eyes just moved. It only draws on screen; nothing is recorded.
 - A readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
 
+## Calibrate and see where you are looking (playground)
+
+1. Put the browser on the monitor you will look at, ideally the one with the webcam on it.
+2. Click **Calibrate**. The page goes fullscreen and shows 5 dots one at a time (center, then each corner). Look straight at each dot until it shrinks away; keep your head roughly still.
+3. A circle then follows your gaze across that screen. Expect it to land within about a button's width of where you look, not on the exact pixel.
+4. Stay in fullscreen: leaving it changes the page size and the circle drifts. Click **Recalibrate** if you move your seat or the circle drifts.
+
+The page must stay visible; Chrome pauses camera processing in hidden tabs. Calibration data is kept in memory only and is gone when you reload.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -65,4 +74,5 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 | Port 5173 already in use | Stop the other process on that port; the dev server will not pick another port. |
 | "Camera is off" in the playground | Allow the camera from the camera icon in the address bar, then reload. |
 | Camera busy | Close other apps using the webcam (video calls, other tabs). |
+| "Calibration failed" | Keep your face in view and the playground tab visible for the whole run, then try again. |
 | "Eye tracking failed to start" | Delete `extension/public/mediapipe/` and rerun the command to fetch the runtime and model again. |
