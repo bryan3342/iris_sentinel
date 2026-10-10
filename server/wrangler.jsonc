@@ -2,5 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "iris-server",
   "main": "src/index.ts",
-  "compatibility_date": "2026-04-26"
+  "compatibility_date": "2026-04-26",
+  "observability": { "enabled": false },
+  "vars": {
+    "ENABLE_PAGE_UNDERSTANDING": "false",
+    "PAGE_CONTENT_APPROVED": "false",
+    "ENABLE_LOCAL_LABELS": "false"
+  }
 }
