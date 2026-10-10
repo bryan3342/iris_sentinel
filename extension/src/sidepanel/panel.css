@@ -47,7 +47,7 @@ button {
   position: fixed;
   inset: 0;
   z-index: 2147483646;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.6);
 }
 
 .calibration-dot {
@@ -77,3 +77,4 @@ button {
   border-radius: 50%;
   pointer-events: none;
 }
+

@@ -1,21 +1,27 @@
-import { applyCalibration, PointFilter, type CalibrationModel } from '@iris/core';
+import { applyCalibration, FixationSmoother, type CalibrationModel } from '@iris/core';
 import type { GazeSample } from '@iris/protocol';
 
-/** A circle drawn where the user is looking, from calibrated and smoothed samples. */
+// Same-fixation radius: about the size of webcam gaze error on a laptop screen.
+const FIXATION_RADIUS_PX = 70;
+
+/** A circle drawn where the user is looking, from calibrated, fixation-smoothed samples. */
 export class GazeDot {
   private readonly element = document.createElement('div');
-  private readonly filter = new PointFilter({ minCutoff: 0.8, beta: 3 });
+  private readonly smoother = new FixationSmoother({ radius: FIXATION_RADIUS_PX });
 
-  constructor(private readonly model: CalibrationModel) {
+  constructor(
+    private readonly model: CalibrationModel,
+    host: HTMLElement,
+  ) {
     this.element.className = 'gaze-dot';
-    document.body.append(this.element);
+    host.append(this.element);
   }
 
   update(sample: GazeSample): void {
-    this.element.hidden = sample.eye === null;
-    if (!sample.eye) return;
-    const point = this.filter.filter(applyCalibration(this.model, sample.eye, sample.head), sample.t);
-    this.element.style.transform = `translate(${point.x * window.innerWidth}px, ${point.y * window.innerHeight}px)`;
+    if (!sample.eye) return; // hold the last position through blinks
+    const p = applyCalibration(this.model, sample.eye, sample.head);
+    const point = this.smoother.push({ x: p.x * window.innerWidth, y: p.y * window.innerHeight });
+    this.element.style.transform = `translate(${point.x}px, ${point.y}px)`;
   }
 
   remove(): void {

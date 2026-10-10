@@ -1,6 +1,4 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
-import { GazeDot } from './gaze-dot';
-import { runCalibration } from './setup/calibration';
 import { isExtensionPage, openCamera } from './setup/camera';
 import { EyeTrace } from './trace';
 
@@ -52,34 +50,6 @@ async function startTracking(
   provider.onSample((sample) => trace.addSample(sample));
   await provider.start();
   status.textContent = 'Eye tracking on. Processing stays on this computer.';
-  // The playground draws the gaze dot on its own page. Real pages need the content script.
-  if (!isExtensionPage()) root.append(calibrateButton(provider, status));
-}
-
-function calibrateButton(provider: MediaPipeGazeProvider, status: HTMLElement): HTMLButtonElement {
-  const button = document.createElement('button');
-  button.textContent = 'Calibrate';
-  let gaze: { dot: GazeDot; unsubscribe: () => void } | null = null;
-  button.addEventListener('click', async () => {
-    button.disabled = true;
-    gaze?.unsubscribe();
-    gaze?.dot.remove();
-    gaze = null;
-    // Fullscreen makes the page cover the monitor in front of the user.
-    await document.documentElement.requestFullscreen().catch(() => undefined);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    try {
-      const dot = new GazeDot(await runCalibration(provider));
-      gaze = { dot, unsubscribe: provider.onSample((sample) => dot.update(sample)) };
-      button.textContent = 'Recalibrate';
-      status.textContent = 'Calibrated. Stay in fullscreen; the circle follows your gaze.';
-    } catch {
-      status.textContent = 'Calibration failed. Keep your face in view and try again.';
-    } finally {
-      button.disabled = false;
-    }
-  });
-  return button;
 }
 
 function grantButton(): HTMLButtonElement {
