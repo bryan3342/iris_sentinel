@@ -289,15 +289,17 @@ describe('confirming with a double blink', () => {
     /** Looks at `point`, blinking twice quickly starting at `blinkAt` ms. */
     const doubleBlinkAt = (point: Point2, blinkAt: number) => (t: number) =>
       eyesOn(point, (t > blinkAt && t <= blinkAt + 150) || (t > blinkAt + 300 && t <= blinkAt + 450))(t);
-    function picking(script: (t: number) => GazeSample) {
+    function picking(script: (t: number) => GazeSample, learn = false) {
       const provider = new ScriptedEyes(script);
       const store = new CalibrationStore();
       store.setDots(simulatedCalibration(), VIEWPORT);
       const selected: number[] = [];
+      let learned = 0;
       const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
         select: async (_list, target) => { selected.push(target.id); return 'SELECTED'; },
+        learn, onLearned: () => { learned++; },
       });
-      return { provider, gaze, selected };
+      return { provider, gaze, selected, learned: () => learned };
     }
 
     it('opens with a double blink wherever the user is looking, and is marked on the page', async () => {
@@ -311,6 +313,19 @@ describe('confirming with a double blink', () => {
       await vi.advanceTimersByTimeAsync(1100);
       expect(selected).toEqual([3]);
       expect(sent.at(-1)!.command).toMatchObject({ armed: null }); // picked targets clear once selected
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('never teaches the calibration, since the eyes were not on that target', async () => {
+      const { provider, gaze, selected, learned } = picking(doubleBlinkAt(away, 1000), true);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(selected).toEqual([3]);
+      expect(learned()).toBe(0);
       gaze.stop();
       provider.stop();
     });

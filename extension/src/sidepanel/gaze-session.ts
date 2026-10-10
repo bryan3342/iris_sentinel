@@ -153,15 +153,17 @@ export class GazeSession {
     const list = this.list;
     // A target picked by voice is what a double blink confirms, wherever the user is looking; otherwise a
     // double blink brings the target it locked before the eyes closed, and a dwell the aimed one.
-    const id = event.source === 'double-blink' && this.armed ? this.armed.id : event.target === undefined ? this.aim.current : event.target;
+    const byVoice = event.source === 'double-blink' && this.armed !== null;
+    const id = byVoice ? this.armed!.id : event.target === undefined ? this.aim.current : event.target;
     const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = this.gate.confirm(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'confirm-again') {
       this.marks.setPending(outcome.target);
       this.options.onOutcome?.('CONFIRM_AGAIN');
     }
-    if (outcome.kind === 'select' && list && target && this.options.learn) {
+    if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice) {
       // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
+      // Never for a voice pick: the eyes were not on that target, so it would teach the aim a wrong offset.
       const center = { x: target.rect.x + target.rect.width / 2, y: target.rect.y + target.rect.height / 2 };
       if (this.aim.learn(center)) this.options.onLearned?.();
     }
