@@ -6,6 +6,7 @@ import { abortable, failure, HttpError, json, readJson } from './http';
 import { GeminiMultimodal } from './multimodal';
 import { validatePng } from './png';
 import { FakePageUnderstanding } from './fake-page-understanding';
+import { ElevenLabsAgentSession, type AgentSessionProvider } from './routes/agent-token/index';
 
 const MAX_BODY_BYTES = 64 * 1024;
 const invalidInput = () => new ServiceError(400, "Invalid target selection input.");
@@ -35,7 +36,7 @@ async function readInput(request: Request): Promise<FindTargetInput> {
   return { request: input.request, targets: input.targets.map(({ id, label, role }) => ({ id, label, role })) };
 }
 
-export function createWorker(provider?: PageUnderstanding, multimodal?: MultimodalPageUnderstanding, gate = new DemoAccess()) {
+export function createWorker(provider?: PageUnderstanding, multimodal?: MultimodalPageUnderstanding, gate = new DemoAccess(), agent: AgentSessionProvider = new ElevenLabsAgentSession()) {
   return { async fetch(request: Request, env: Env = {}): Promise<Response> {
     if (new URL(request.url).pathname === "/health" && request.method === "GET") {
       return json({ status: "ok", service: "iris-server" });
@@ -58,6 +59,15 @@ export function createWorker(provider?: PageUnderstanding, multimodal?: Multimod
           return respond(json(null, 200, { 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': 'Authorization, Content-Type' }));
         }
         if (request.method !== 'POST') throw new HttpError(405, 'USE_POST');
+        if (path === '/v0.1/agent-token') {
+          if (env.ENABLE_VOICE_AGENT !== 'true') throw new HttpError(503, 'VOICE_DISABLED');
+          const authorization = request.headers.get('Authorization');
+          if (!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) throw new HttpError(401, 'UNAUTHENTICATED');
+          lease = await abortable(gate.admit(env, authorization.slice(7)), deadline);
+          const ingestion = AbortSignal.any([deadline, AbortSignal.timeout(LIMITS.ingestionMs)]);
+          object(await readJson(request, 1024, ingestion), []);
+          return respond(json(await abortable(agent.createSession(env, deadline), deadline)));
+        }
         if (env.ENABLE_PAGE_UNDERSTANDING !== 'true') throw new HttpError(503, 'DISABLED');
         const ingestion = AbortSignal.any([deadline, AbortSignal.timeout(LIMITS.ingestionMs)]);
         const operation = path.slice('/v0.1/page-understanding/'.length);

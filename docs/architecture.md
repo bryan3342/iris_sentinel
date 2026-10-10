@@ -8,7 +8,7 @@ Track and technology choices behind this design are in [tracks.md](tracks.md).
 preview plus an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, ElevenLabs, browser actions and the
+by this change. Presage companion, ElevenLabs client integration, browser actions and the
 confirmation state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
@@ -39,6 +39,16 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 ---
 
 ## 2. Technologies / Services
+
+**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object and an
+operator-issued demo bearer token, then returns `{ signedUrl }` for the
+server-configured ElevenLabs agent. It requests a single-use conversation
+signature. `ENABLE_VOICE_AGENT` is independent of page understanding and defaults
+to false. The existing origin checks, in-memory demo rate budget and concurrency
+lease apply to minting; they do not cap conversation duration or global spend.
+The response is not cached. API keys stay in Worker secrets; signed URLs must
+remain in memory and must never be logged. The extension connection, microphone
+flow and client tools are subsequent milestones.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |

@@ -12,3 +12,7 @@ PAGE_UNDERSTANDING_PROVIDER=synthetic
 EXTENSION_ORIGIN=chrome-extension://replace_with_32_letter_extension_id
 # Operator-provisioned JSON: session ID -> {tokenHash, expiresAt}. No raw tokens.
 DEMO_SESSIONS={}
+# Voice sessions are independent of page understanding and disabled by default.
+ENABLE_VOICE_AGENT=false
+ELEVENLABS_API_KEY=replace_with_your_key
+ELEVENLABS_AGENT_ID=agent_replace_with_your_agent_id

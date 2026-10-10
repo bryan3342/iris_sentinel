@@ -5,6 +5,7 @@
   "compatibility_date": "2026-04-26",
   "observability": { "enabled": false },
   "vars": {
+    "ENABLE_VOICE_AGENT": "false",
     "ENABLE_PAGE_UNDERSTANDING": "false",
     "PAGE_CONTENT_APPROVED": "false",
     "ENABLE_LOCAL_LABELS": "false"

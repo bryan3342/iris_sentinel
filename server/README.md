@@ -2,7 +2,7 @@
 
 The Worker implements authenticated, bounded viewport screenshot understanding,
 target recommendations, summaries and local-image-crop descriptions. It has no
-ElevenLabs integration or browser actions. Gemini only recommends or explains;
+browser actions. A separate ElevenLabs session endpoint is described below. Gemini only recommends or explains;
 every future click requires Iris confirmation in a separate milestone.
 
 The feature is disabled by default. See the
@@ -200,3 +200,17 @@ direct adapter/route tests and an actual database-free local Worker test
 using synthetic images with **all external requests blocked**. This runtime test
 opens a loopback listener. It does not read `.dev.vars` or call Gemini.
 The dry-run build compiles only; do not remove `--dry-run` without separate approval.
+
+## ElevenLabs session endpoint
+
+`POST /v0.1/agent-token` takes `{}` as JSON and the existing demo bearer token.
+Enable `ENABLE_VOICE_AGENT=true`, configure `ELEVENLABS_AGENT_ID`, and put
+`ELEVENLABS_API_KEY` in ignored `.dev.vars` locally or a Worker secret in deployment.
+The agent must require authentication. Use the same provisioned `DEMO_SESSIONS`
+and exact `EXTENSION_ORIGIN` as the private page-understanding demo.
+Success returns `{ "signedUrl": "wss://..." }` with `Cache-Control: no-store`.
+The URL is a credential for one conversation; do not log, save or share it.
+Minting shares the per-instance demo budget (2/minute, 10/session); this does not
+limit the resulting conversation's duration or spend. No automatic retries occur.
+`npm test` exercises mocked ElevenLabs responses without keys or paid API calls.
+This milestone supplies credentials only; the extension voice UI follows later.
