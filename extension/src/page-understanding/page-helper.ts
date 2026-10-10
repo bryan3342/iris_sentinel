@@ -47,7 +47,10 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
     try { return !/^https?:$/.test(new URL(el.href, location.href).protocol); } catch { return true; }
   };
   // onChange is set by Iris's own overlay (content/overlay.ts) to erase its drawing on the next page change.
-  type State = { documentToken: string; revision: number; onChange?: () => void };
+  // scans keeps the elements behind the last few gaze scans, so a confirmed target number can be
+  // selected exactly as it was scanned (content/select.ts). Elements never leave the page.
+  type Scan = { revision: number; entries: { el: Element; risky: boolean }[] };
+  type State = { documentToken: string; revision: number; onChange?: () => void; scans?: Scan[] };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: State; __irisOverlayV01?: { host: Element } };
   const overlay = () => host.__irisOverlayV01?.host;
   if (!host.__irisUnderstandingV01) {
@@ -73,6 +76,7 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
     offsetLeft: vv?.offsetLeft ?? 0, offsetTop: vv?.offsetTop ?? 0,
     scale: vv?.scale ?? 1, scrollX, scrollY };
   const targets: (NumberedTarget & { risky?: boolean })[] = [], masks: Rect[] = [], images: { id: number; rect: Rect }[] = [];
+  const entries: { el: Element; risky: boolean }[] = [];
   let blocked = viewport.scale !== 1, targetsTruncated = false, nextTarget = 1, nextImage = 1, scanned = 0;
   const rectOf = (el: Element, padding = 0): Rect | undefined => {
     const style = getComputedStyle(el);
@@ -112,13 +116,19 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
       const top = root.elementFromPoint(centerX, centerY);
       if (!top || !(el === top || el.contains(top))) continue;
       if (targets.length >= 100) { targetsTruncated = true; continue; }
-      if (targetsOnly) { targets.push({ id: nextTarget++, role, rect, risky: risky(el, role) }); continue; }
+      if (targetsOnly) {
+        const entry = { el, risky: risky(el, role) };
+        entries.push(entry);
+        targets.push({ id: nextTarget++, role, rect, risky: entry.risky });
+        continue;
+      }
       // Avoid nested editable values and text derived from sensitive descendants.
       const label = (el.getAttribute('aria-label') || (!el.querySelector('input, textarea, [contenteditable], select') ? el.textContent : '') || '').trim().slice(0, 200);
       targets.push({ id: nextTarget++, role, rect, ...(label ? { label } : {}) });
     }
   };
   walk(document);
+  if (targetsOnly) state.scans = [...(state.scans ?? []), { revision: state.revision, entries }].slice(-3);
   if (targetsOnly) return { documentToken: state.documentToken, revision: state.revision, viewport, targets, targetsTruncated };
   if (masks.length > 1000) blocked = true;
   return { documentToken: state.documentToken, revision: state.revision, viewport, targets, targetsTruncated, images, masks, blocked };

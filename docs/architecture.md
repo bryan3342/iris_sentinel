@@ -5,11 +5,12 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
 **Implementation status: v0.1 private-demo MVP.** The extension has a camera
-preview plus an explicit-request page-understanding harness. The Worker implements
+preview, gaze aiming with on-page calibration, dwell-confirmed selection of
+page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, ElevenLabs, browser actions and the
-confirmation state machine below remain future work. Page understanding is built
+by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
+and the full input-mode state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
 manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
@@ -154,8 +155,12 @@ The local endpoint has no session authentication or rate limiting and must not
 be deployed until those protections are implemented.
 
 **Safety rule.** Every browser click requires Iris confirmation, even when the
-agent proposes it. Gemini recommends/explains only. The confirmation and browser
-action flow is separate from this server milestone; there is no click executor.
+agent proposes it. Gemini recommends/explains only; it never clicks. The one
+place Iris clicks is the page helper's select step, after a confirm passes the
+selection gate: it clicks only the exact element behind the confirmed number in
+that gaze scan, only if it is still on the page, where the user saw it and not
+covered, and a risky element only after a second confirm, checked again in the
+page itself.
 
 **v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
 sensitive rectangles and revisions. Chrome capture runs through the background

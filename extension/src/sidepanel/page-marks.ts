@@ -17,6 +17,7 @@ export class PageMarks {
   private users = 0;
   private list: TargetList | null = null;
   private aim: number | null = null;
+  private pending: number | null = null;
   private drawnTab: number | null = null;
   private stopListening: (() => void) | null = null;
   private aimFor: ((list: TargetList) => number | null) | null = null;
@@ -35,6 +36,18 @@ export class PageMarks {
     this.stopListening = null;
     this.targets.stop();
     this.setList(null);
+  }
+
+  /** The list currently drawn, which the aim's target IDs belong to. */
+  get current(): TargetList | null {
+    return this.list;
+  }
+
+  /** Marks a risky target that waits for its second confirm, or nothing. */
+  setPending(id: number | null): void {
+    if (id === this.pending) return;
+    this.pending = id;
+    this.draw();
   }
 
   /** Lets gaze pick the aim for each new list, so a refresh is drawn once, already aimed. Null stops it. */
@@ -63,6 +76,6 @@ export class PageMarks {
   private draw(): void {
     const list = this.list;
     if (!list) return;
-    send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim });
+    send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim, pending: this.pending });
   }
 }
