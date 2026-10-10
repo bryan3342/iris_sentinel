@@ -1,4 +1,4 @@
-import { PageCoordinator, broker } from '../page-understanding/coordinator';
+import { PageCoordinator, broker, type AimedTarget } from '../page-understanding/coordinator';
 import type { Operation } from '@iris/protocol';
 import { gatewayUrl } from '../page-understanding/session';
 import type { PageMarks } from './page-marks';
@@ -18,6 +18,7 @@ const HINTS: Record<string, string> = {
   TIMEOUT: 'The request timed out.', REQUEST_IN_FLIGHT: 'A request is already running.',
   RATE_LIMITED: 'This session allows two requests a minute and ten in total. Wait a minute, or use a new token.',
   NO_TARGETS: 'No links or buttons are visible on this page.',
+  NO_AIMED_TARGET: 'Rest your eyes, or the mouse stand-in, on a numbered target for a moment first.',
   LIST_IMAGES_FIRST: 'List the visible image numbers first.', IMAGE_NOT_FOUND: 'No visible image has that number.',
   DISABLED: SETUP, NOT_CONFIGURED: SETUP, CONTENT_NOT_APPROVED: SETUP, FORBIDDEN: SETUP,
   UPSTREAM_UNAVAILABLE: 'Gemini is busy or over quota. Wait, then try again.',
@@ -47,8 +48,8 @@ export function understandingPanel(marks: PageMarks): HTMLElement {
     });
     return el;
   };
-  const inspect = async (operation: Operation) => {
-    const response = await coordinator.inspect({ gateway: gateway.value, operation, request: request.value, imageId: Number(imageId.value) });
+  const inspect = async (operation: Operation, aimed?: AimedTarget | null) => {
+    const response = await coordinator.inspect({ gateway: gateway.value, operation, request: request.value, imageId: Number(imageId.value), aimed });
     const result = response.result.result;
     output.textContent = result.operation === 'find_target' ? `${result.targetId === null ? 'No clear match.' : `Recommended target ${result.targetId}.${response.highlighted ? ' It is highlighted on the page.' : ''} Iris confirmation is required before any future click.`} ${result.explanation}${response.targetsTruncated ? ' Target list was limited to 100.' : ''}`
       : result.operation === 'summarize_page' ? result.summary
@@ -67,6 +68,11 @@ export function understandingPanel(marks: PageMarks): HTMLElement {
     output.textContent = 'Demo session entered. It stays in memory and expires on the server within 15 minutes.';
   }), request,
   button('Send viewport to find target', () => inspect('find_target')),
+  // The target gaze rested on, not one it passed over while reaching for this button.
+  button('What is this? (the target I rested on)', () => {
+    const aimed = marks.aimed;
+    return inspect('describe_target', aimed && { documentToken: aimed.list.documentToken, id: aimed.target.id, rect: aimed.target.rect });
+  }),
   button('Send viewport to summarize', () => inspect('summarize_page')),
   button('List visible image numbers', async () => {
     const images = await coordinator.images(); output.textContent = images.length ? `Visible image numbers: ${images.map(i => i.id).join(', ')}` : 'No visible images.';

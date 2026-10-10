@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { assertSameSnapshot, eligibleTab, maskPixels, prepareImage, validateSnapshot, validateTargets } from '../../extension/src/page-understanding/capture';
+import { assertSameSnapshot, eligibleTab, maskPixels, prepareImage, targetCrop, validateSnapshot, validateTargets } from '../../extension/src/page-understanding/capture';
 import type { PageSnapshot } from '../../extension/src/page-understanding/page-helper';
 
 const snapshot = (): PageSnapshot => ({ documentToken: 'abcdefghijklmnop', revision: 1,
@@ -43,7 +43,7 @@ describe('capture safety', () => {
     vi.stubGlobal('document', { createElement: vi.fn().mockReturnValueOnce(source).mockReturnValueOnce(output) });
     const s = snapshot();
     s.targets = [{ id: 2, role: 'button', rect: { x: 120, y: 10, width: 40, height: 20 } }, { id: 3, role: 'button', rect: { x: 20, y: 10, width: 40, height: 20 } }];
-    await prepareImage('data:image/png;base64,AAAA', s, { x: 100, y: 0, width: 100, height: 100 }, true);
+    await prepareImage('data:image/png;base64,AAAA', s, { x: 100, y: 0, width: 100, height: 100 }, 'numbers');
     expect(fillText).toHaveBeenCalledOnce();
     expect(fillText).toHaveBeenCalledWith('2', 22, 11);
   });
@@ -58,6 +58,25 @@ describe('capture safety', () => {
     expect(destDraw).toHaveBeenCalledWith(source, 200, 0, 200, 200, 0, 0, 200, 200);
     expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(destDraw.mock.invocationCallOrder[0]!);
     expect(close).toHaveBeenCalledOnce(); expect(source.width).toBe(0); expect(output.width).toBe(0);
+  });
+});
+describe('aimed target crop', () => {
+  const viewport = { width: 1000, height: 600, offsetLeft: 0, offsetTop: 0, scale: 1, scrollX: 0, scrollY: 0 };
+  it('gives a small target room around it, centered', () => {
+    expect(targetCrop({ x: 490, y: 290, width: 20, height: 20 }, viewport)).toEqual({ x: 380, y: 220, width: 240, height: 160 });
+  });
+  it('keeps the crop inside the viewport, and never smaller than a large target', () => {
+    expect(targetCrop({ x: 0, y: 590, width: 20, height: 10 }, viewport)).toEqual({ x: 0, y: 440, width: 240, height: 160 });
+    expect(targetCrop({ x: 100, y: 100, width: 400, height: 200 }, viewport)).toEqual({ x: 84, y: 84, width: 432, height: 232 });
+  });
+  it('outlines the target inside the crop so the model knows which one is meant', async () => {
+    const strokeRect = vi.fn();
+    const source = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn(), fillRect: vi.fn() }) };
+    const output = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn(), strokeRect }), toDataURL: () => 'data:image/png;base64,AAAA' };
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 200, height: 100, close: vi.fn() })));
+    vi.stubGlobal('document', { createElement: vi.fn().mockReturnValueOnce(source).mockReturnValueOnce(output) });
+    await prepareImage('data:image/png;base64,AAAA', snapshot(), { x: 100, y: 0, width: 100, height: 100 }, { outline: { x: 120, y: 10, width: 40, height: 20 } });
+    expect(strokeRect).toHaveBeenCalledWith(17, 7, 46, 26);
   });
 });
 describe('target risk flags', () => {

@@ -1,5 +1,11 @@
+import { SettledAim } from '@iris/core';
 import { pageOverlay, type OverlayCommand } from '../content/overlay';
 import type { LiveTargetList, TargetList } from './target-list';
+
+/** An aimed target together with the gaze scan its number belongs to. */
+export interface Aimed { list: TargetList; target: TargetList['targets'][number] }
+const sameTarget = (a: Aimed, b: Aimed) => a.list.tabId === b.list.tabId && a.list.documentToken === b.list.documentToken &&
+  a.target.id === b.target.id && Math.abs(a.target.rect.x - b.target.rect.x) <= 4 && Math.abs(a.target.rect.y - b.target.rect.y) <= 4;
 
 function send(tabId: number, command: OverlayCommand): void {
   // A failed draw is retried by the next refresh; a failed erase is undone by the next page change.
@@ -21,8 +27,9 @@ export class PageMarks {
   private drawnTab: number | null = null;
   private stopListening: (() => void) | null = null;
   private aimFor: ((list: TargetList) => number | null) | null = null;
+  private readonly settled = new SettledAim<Aimed>(sameTarget);
 
-  constructor(private readonly targets: LiveTargetList) {}
+  constructor(private readonly targets: LiveTargetList, private readonly now = () => performance.now()) {}
 
   start(): void {
     if (this.users++ > 0) return;
@@ -36,11 +43,17 @@ export class PageMarks {
     this.stopListening = null;
     this.targets.stop();
     this.setList(null);
+    this.settled.reset();
   }
 
   /** The list currently drawn, which the aim's target IDs belong to. */
   get current(): TargetList | null {
     return this.list;
+  }
+
+  /** The target the user last rested on, not one the aim merely passed over, or null. */
+  get aimed(): Aimed | null {
+    return this.settled.get(this.now());
   }
 
   /** Marks a risky target that waits for its second confirm, or nothing. */
@@ -80,6 +93,8 @@ export class PageMarks {
 
   private draw(): void {
     const list = this.list;
+    const target = list?.targets.find((t) => t.id === this.aim);
+    this.settled.update(list && target ? { list, target } : null, this.now());
     if (!list) return;
     send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim, pending: this.pending });
   }

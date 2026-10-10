@@ -171,7 +171,10 @@ there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.
 Only the visible viewport is understood; summaries deterministically disclose
 this. Describe-image sends a locally masked crop for a revision-bound image ID,
-never a URL to fetch. Unsupported frames/custom controls/video/animations and
+never a URL to fetch. "What is this?" connects gaze to Gemini: it sends a masked
+crop around the target gaze last rested on, outlined, and shows Gemini's short
+description; gaze and page understanding number targets identically, so the
+aimed number is checked against a fresh snapshot before anything is sent. Unsupported frames/custom controls/video/animations and
 pinch zoom fail closed; detectable capture races and stale results are discarded.
 
 ### 3.3 Data handling rules

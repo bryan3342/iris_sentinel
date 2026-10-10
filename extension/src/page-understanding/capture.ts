@@ -1,4 +1,4 @@
-import { LIMITS, object, token, validateBinding, validateRect, type ImageInput, type NumberedTarget, type Rect } from '@iris/protocol';
+import { LIMITS, object, token, validateBinding, validateRect, type ImageInput, type NumberedTarget, type Rect, type Viewport } from '@iris/protocol';
 import type { PageSnapshot, PageTargets } from './page-helper';
 
 export function eligibleTab(tab: { incognito?: boolean; url?: string; pendingUrl?: string }): boolean {
@@ -48,8 +48,18 @@ export function maskPixels(context: CanvasRenderingContext2D, masks: Rect[], sca
     context.fillRect(x, y, Math.ceil((rect.x + rect.width) * scaleX) - x, Math.ceil((rect.y + rect.height) * scaleY) - y);
   }
 }
+/** The aimed target with room around it: at least 240 x 160 CSS pixels centered on it, inside the viewport. Small icons need context. */
+export function targetCrop(target: Rect, viewport: Viewport): Rect {
+  const width = Math.min(viewport.width, Math.max(240, target.width + 32));
+  const height = Math.min(viewport.height, Math.max(160, target.height + 32));
+  const x = Math.min(viewport.width - width, Math.max(0, target.x + target.width / 2 - width / 2));
+  const y = Math.min(viewport.height - height, Math.max(0, target.y + target.height / 2 - height / 2));
+  return { x, y, width, height };
+}
+/** What Iris draws on the outgoing image: every target's number, or an outline around the one target asked about. */
+export type ImageMark = 'numbers' | { outline: Rect };
 /** Local bitmap processing only. No URLs fetched from page/model data. */
-export async function prepareImage(dataUrl: string, snapshot: PageSnapshot, crop?: Rect, numbered = false): Promise<ImageInput> {
+export async function prepareImage(dataUrl: string, snapshot: PageSnapshot, crop?: Rect, mark?: ImageMark): Promise<ImageInput> {
   if (!dataUrl.startsWith('data:image/png;base64,') || dataUrl.length > 32 * 1024 * 1024) throw new Error('INVALID_CAPTURE');
   const binary = atob(dataUrl.slice('data:image/png;base64,'.length));
   const bitmap = await createImageBitmap(new Blob([Uint8Array.from(binary, c => c.charCodeAt(0))], { type: 'image/png' }));
@@ -69,9 +79,14 @@ export async function prepareImage(dataUrl: string, snapshot: PageSnapshot, crop
       output.width = Math.max(1, Math.floor(sourceWidth * factor)); output.height = Math.max(1, Math.floor(sourceHeight * factor));
       const dest = output.getContext('2d'); if (!dest) throw new Error('CAPTURE_UNAVAILABLE');
       dest.drawImage(canvas, rect.x * sx, rect.y * sy, sourceWidth, sourceHeight, 0, 0, output.width, output.height);
-      if (numbered) {
-        // Map viewport coordinates into the (possibly cropped) output bitmap.
-        const tx = output.width / rect.width, ty = output.height / rect.height;
+      // Map viewport coordinates into the (possibly cropped) output bitmap.
+      const tx = output.width / rect.width, ty = output.height / rect.height;
+      if (mark !== undefined && mark !== 'numbers') {
+        const o = mark.outline;
+        dest.strokeStyle = '#ff00ff'; dest.lineWidth = 4;
+        dest.strokeRect((o.x - rect.x) * tx - 3, (o.y - rect.y) * ty - 3, o.width * tx + 6, o.height * ty + 6);
+      }
+      if (mark === 'numbers') {
         dest.font = 'bold 14px sans-serif'; dest.textBaseline = 'top';
         for (const target of snapshot.targets) {
           const left = (target.rect.x - rect.x) * tx, top = (target.rect.y - rect.y) * ty;
