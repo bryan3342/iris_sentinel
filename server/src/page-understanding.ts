@@ -5,7 +5,8 @@ export interface Selection { targetId: number | null }
 export interface PageUnderstanding {
   findTarget(input: FindTargetInput, signal?: AbortSignal): Promise<Selection>;
 }
-export interface Env {
+import type { AccessEnv } from './access';
+export interface Env extends AccessEnv {
   GEMINI_API_KEY?: string; GEMINI_MODEL?: string; EXTENSION_ORIGIN?: string;
   ENABLE_PAGE_UNDERSTANDING?: string; PAGE_CONTENT_APPROVED?: string; ENABLE_LOCAL_LABELS?: string;
   PAGE_UNDERSTANDING_PROVIDER?: string;
