@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point2 } from '@iris/protocol';
-import { ClosureTimer, type FaceFrame, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
+import { ClosureTimer, type FaceFrame, holdThroughBlink, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -211,5 +211,13 @@ describe('ClosureTimer', () => {
     expect(timer.blinking(shut, 700)).toBe(false);
     expect(timer.blinking(open, 800)).toBe(false);
     expect(timer.blinking({ eyeBlinkLeft: 0.9 }, 900)).toBe(true);
+  });
+});
+
+describe('holdThroughBlink', () => {
+  it('keeps the last eye reading and head still while reporting the closed lids, so blinks can be counted', () => {
+    const last = { t: 100, eye: { x: 0.1, y: -0.2 }, head: { yaw: 0.1, pitch: 0, eyes: { x: 0.5, y: 0.5 }, eyeSpan: 0.2 }, blink: { left: 0.02, right: 0.03 } };
+    const held = holdThroughBlink(last, { eyeBlinkLeft: 0.92, eyeBlinkRight: 0.88 }, 133);
+    expect(held).toEqual({ ...last, t: 133, blink: { left: 0.92, right: 0.88 } });
   });
 });

@@ -247,8 +247,8 @@ describe('selecting with gaze', () => {
   });
 });
 
-describe('confirming with a long blink', () => {
-  /** A camera stand-in that plays a script of samples every 33 ms, closed eyes included. */
+describe('confirming with a double blink', () => {
+  /** A camera stand-in that plays a script of samples every 33 ms, blinks included. */
   class ScriptedEyes implements GazeProvider {
     private readonly listeners = new Set<(s: GazeSample) => void>();
     private timer: ReturnType<typeof setInterval> | null = null;
@@ -258,11 +258,14 @@ describe('confirming with a long blink', () => {
     stop() { if (this.timer) clearInterval(this.timer); }
   }
 
-  it('selects the target aimed before the eyes closed, even if the reading lands elsewhere on opening', async () => {
+  it('selects the target aimed before two quick blinks, at once, even if the reading lands elsewhere after', async () => {
     const lookingAt = (id: number) => (t: number): GazeSample => ({ t, eye: eyeFor(centerOf(id)), head: SIMULATED_HEAD, blink: { left: 0.05, right: 0.05 } });
-    const closed = (t: number): GazeSample => ({ t, eye: null, head: SIMULATED_HEAD, blink: { left: 0.9, right: 0.9 } });
-    // Aim at 1 for 600 ms (short of a dwell), close both eyes for 700 ms, then open with the reading on 2.
-    const provider = new ScriptedEyes((t) => (t <= 600 ? lookingAt(1)(t) : t <= 1300 ? closed(t) : lookingAt(2)(t)));
+    // During a quick blink the camera holds the last eye reading and reports the closed lids.
+    const blinkingAt = (id: number) => (t: number): GazeSample => ({ ...lookingAt(id)(t), blink: { left: 0.9, right: 0.9 } });
+    // Glance at 3, aim at 1 for 450 ms (short of a dwell), blink twice, then the reading lands on 2.
+    const script = (t: number) => (t <= 200 ? lookingAt(3) : t <= 650 ? lookingAt(1) : t <= 800 ? blinkingAt(1)
+      : t <= 950 ? lookingAt(1) : t <= 1100 ? blinkingAt(1) : lookingAt(2))(t);
+    const provider = new ScriptedEyes(script);
     const store = new CalibrationStore();
     store.setDots(simulatedCalibration(), VIEWPORT);
     const selected: number[] = [];
@@ -271,11 +274,86 @@ describe('confirming with a long blink', () => {
     });
     gaze.start();
     await provider.start();
-    await vi.advanceTimersByTimeAsync(1250);
-    expect(selected).toEqual([]); // eyes still closed: nothing yet
+    await vi.advanceTimersByTimeAsync(1050);
+    expect(selected).toEqual([]); // one blink so far: nothing yet
     await vi.advanceTimersByTimeAsync(150);
-    expect(selected).toEqual([1]); // the locked target, on opening, long before a dwell could finish
+    expect(selected).toEqual([1]); // the locked target, the moment the eyes open after the second blink
     gaze.stop();
     provider.stop();
+  });
+
+  describe('a target picked by voice', () => {
+    const away = { x: 0.5, y: 0.95 }; // far from every target: nothing is aimed
+    const eyesOn = (point: Point2, blinking: boolean) => (t: number): GazeSample =>
+      ({ t, eye: eyeFor(point), head: SIMULATED_HEAD, blink: blinking ? { left: 0.9, right: 0.9 } : { left: 0.05, right: 0.05 } });
+    /** Looks at `point`, blinking twice quickly starting at `blinkAt` ms. */
+    const doubleBlinkAt = (point: Point2, blinkAt: number) => (t: number) =>
+      eyesOn(point, (t > blinkAt && t <= blinkAt + 150) || (t > blinkAt + 300 && t <= blinkAt + 450))(t);
+    function picking(script: (t: number) => GazeSample, learn = false) {
+      const provider = new ScriptedEyes(script);
+      const store = new CalibrationStore();
+      store.setDots(simulatedCalibration(), VIEWPORT);
+      const selected: number[] = [];
+      let learned = 0;
+      const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+        select: async (_list, target) => { selected.push(target.id); return 'SELECTED'; },
+        learn, onLearned: () => { learned++; },
+      });
+      return { provider, gaze, selected, learned: () => learned };
+    }
+
+    it('opens with a double blink wherever the user is looking, and is marked on the page', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 1000));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500); // the page's targets have arrived
+      expect(gaze.arm(99)).toBe(false); // no such number
+      expect(gaze.arm(3)).toBe(true);
+      expect(sent.at(-1)!.command).toMatchObject({ type: 'show', armed: 3 });
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(selected).toEqual([3]);
+      expect(sent.at(-1)!.command).toMatchObject({ armed: null }); // picked targets clear once selected
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('never teaches the calibration, since the eyes were not on that target', async () => {
+      const { provider, gaze, selected, learned } = picking(doubleBlinkAt(away, 1000), true);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(selected).toEqual([3]);
+      expect(learned()).toBe(0);
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('expires after ten seconds, so a later double blink opens nothing', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 11_000));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      await vi.advanceTimersByTimeAsync(11_200);
+      expect(selected).toEqual([]);
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('is dropped when a page change moves that number to another place', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 1500));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      targets = TARGETS.map((t) => (t.id === 3 ? { ...t, rect: { ...t.rect, y: 400 } } : t));
+      revision++;
+      await vi.advanceTimersByTimeAsync(1300);
+      expect(selected).toEqual([]);
+      gaze.stop();
+      provider.stop();
+    });
   });
 });

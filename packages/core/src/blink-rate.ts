@@ -5,7 +5,7 @@ import type { ConfirmEvent } from './confirm';
  * Natural blinks per minute over a rolling window, one of the fatigue clues:
  * blink rate rises as people tire. Presage misses some blinks, but the rate is
  * only ever compared with the same user's own baseline, so a steady undercount
- * cancels out. A blink close to a long-blink confirm is dropped, so confirming
+ * cancels out. A blink close to a double-blink confirm is dropped, so confirming
  * never reads as tiredness. Nothing counts until the camera view is reported
  * `ok`, and the window starts over whenever it stops being `ok`. Blink times
  * stay in memory only.
@@ -16,9 +16,9 @@ export interface BlinkRateOptions {
   windowMs?: number;
   /** How long the view must have been `ok` before a rate is reported, in milliseconds. */
   minCoverageMs?: number;
-  /** A blink this long before a long-blink confirm is dropped, in milliseconds. */
+  /** A blink this long before a double-blink confirm is dropped, in milliseconds; both blinks of the pair come before it. */
   confirmBeforeMs?: number;
-  /** A blink this long after a long-blink confirm is dropped, in milliseconds. Presage reports a blink after the eyes reopen. */
+  /** A blink this long after a double-blink confirm is dropped, in milliseconds. Presage reports a blink after the eyes reopen. */
   confirmAfterMs?: number;
 }
 
@@ -34,7 +34,7 @@ export class BlinkRateMeter {
   /** Start of the current stretch of `ok` view, or null while the view is not `ok`. */
   private since: number | null = null;
 
-  constructor({ windowMs = 60_000, minCoverageMs = 30_000, confirmBeforeMs = 500, confirmAfterMs = 2_000 }: BlinkRateOptions = {}) {
+  constructor({ windowMs = 60_000, minCoverageMs = 30_000, confirmBeforeMs = 900, confirmAfterMs = 2_000 }: BlinkRateOptions = {}) {
     this.windowMs = windowMs;
     this.minCoverageMs = minCoverageMs;
     this.confirmBeforeMs = confirmBeforeMs;
@@ -46,9 +46,9 @@ export class BlinkRateMeter {
     this.blinks = [...this.keepRecent(this.blinks, blink.t), blink.t];
   }
 
-  /** Only long-blink confirms matter: a dwell or stand-in confirm involves no blink. */
+  /** Only double-blink confirms matter: a dwell or stand-in confirm involves no blink. */
   addConfirm(event: ConfirmEvent): void {
-    if (event.source !== 'long-blink') return;
+    if (event.source !== 'double-blink') return;
     this.confirms = [...this.keepRecent(this.confirms, event.t), event.t];
   }
 

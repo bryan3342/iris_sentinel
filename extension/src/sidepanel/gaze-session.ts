@@ -1,4 +1,4 @@
-import { ConfirmChannel, DwellDetector, LongBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
+import { ConfirmChannel, DwellDetector, DoubleBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
 import type { GazeProvider, Point2, Unsubscribe } from '@iris/protocol';
 import { pageSelect, type SelectResult } from '../content/select';
 import type { PageMarks } from './page-marks';
@@ -35,6 +35,7 @@ export interface GazeSessionOptions {
   onGaze?: (at: Point2 | null, list: TargetList) => void;
 }
 
+const ARM_MS = 10_000; // how long a target picked by voice waits for the user's confirm
 const isRisky = (target: Target) => target.risky !== false; // a missing flag never reads as safe
 
 /**
@@ -51,12 +52,14 @@ const isRisky = (target: Target) => target.risky !== false; // a missing flag ne
 export class GazeSession {
   readonly confirms = new ConfirmChannel();
   private readonly dwell = new DwellDetector();
-  private readonly longBlink = new LongBlinkDetector();
+  private readonly doubleBlink = new DoubleBlinkDetector();
   private readonly gate = new SelectionGate();
   private readonly frameFor: (list: TargetList) => CalibrationFrame;
   private readonly select: Select;
   private list: TargetList | null = null;
   private lastT = 0;
+  /** A target the voice agent picked, until the user confirms it, it expires, or the page moves it. */
+  private armed: { id: number; until: number } | null = null;
   private stops: Unsubscribe[] = [];
 
   constructor(
@@ -80,11 +83,12 @@ export class GazeSession {
     this.stops = [
       this.provider.onSample((sample) => {
         this.lastT = sample.t;
+        if (this.armed && sample.t > this.armed.until) this.disarm();
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
-        // A dwell or a deliberate long blink confirms the aimed target; both go through the gate.
-        const event = this.dwell.update(sample, aimed) ?? this.longBlink.update(sample, aimed);
+        // A dwell or a deliberate double blink confirms the aimed target; both go through the gate.
+        const event = this.dwell.update(sample, aimed) ?? this.doubleBlink.update(sample, aimed);
         if (event) this.confirms.emit(event);
         this.marks.setPending(this.gate.pending(sample.t));
       }),
@@ -97,7 +101,8 @@ export class GazeSession {
     this.stops.forEach((stop) => stop());
     this.stops = [];
     this.gate.reset();
-    this.longBlink.reset();
+    this.doubleBlink.reset();
+    this.disarm();
     this.marks.setPending(null);
     this.marks.follow(null);
     this.marks.stop();
@@ -110,11 +115,30 @@ export class GazeSession {
     const waiting = this.gate.pending(this.lastT);
     const same = waiting !== null && this.samePlace(waiting, list) && isRisky(list.targets.find((t) => t.id === waiting)!);
     if (waiting !== null && !same) this.gate.reset();
-    // A long blink in progress keeps its locked target only while that number still means the same element.
-    const locked = this.longBlink.locked;
-    if (locked !== null && !this.samePlace(locked, list)) this.longBlink.reset();
+    // A double blink in progress keeps its locked target only while that number still means the same element.
+    const locked = this.doubleBlink.locked;
+    if (locked !== null && !this.samePlace(locked, list)) this.doubleBlink.reset();
+    if (this.armed && !this.samePlace(this.armed.id, list)) this.disarm();
     this.list = list;
     return this.aim.setTargets(list.targets, this.frameFor(list));
+  }
+
+  /**
+   * The voice agent picked target `id` of the current scan: it is marked on the page, and the user's next
+   * double blink opens it wherever they are looking (a dwell on it works too). It stays picked for ten
+   * seconds, until a page change moves it, or until something is selected. Nothing clicks from this alone.
+   * Returns false when the current scan has no such target.
+   */
+  arm(id: number): boolean {
+    if (!this.list?.targets.some((t) => t.id === id)) return false;
+    this.armed = { id, until: this.lastT + ARM_MS };
+    this.marks.setArmed(id);
+    return true;
+  }
+
+  private disarm(): void {
+    this.armed = null;
+    this.marks.setArmed(null);
   }
 
   /** Whether target `id` in the new scan is the same element, in the same place, as in the current one. */
@@ -127,18 +151,23 @@ export class GazeSession {
 
   private handle(event: ConfirmEvent): void {
     const list = this.list;
-    const id = event.target ?? this.aim.current; // a long blink brings the target it locked before the eyes closed
+    // A target picked by voice is what a double blink confirms, wherever the user is looking; otherwise a
+    // double blink brings the target it locked before the eyes closed, and a dwell the aimed one.
+    const byVoice = event.source === 'double-blink' && this.armed !== null;
+    const id = byVoice ? this.armed!.id : event.target === undefined ? this.aim.current : event.target;
     const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = this.gate.confirm(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'confirm-again') {
       this.marks.setPending(outcome.target);
       this.options.onOutcome?.('CONFIRM_AGAIN');
     }
-    if (outcome.kind === 'select' && list && target && this.options.learn) {
+    if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice) {
       // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
+      // Never for a voice pick: the eyes were not on that target, so it would teach the aim a wrong offset.
       const center = { x: target.rect.x + target.rect.width / 2, y: target.rect.y + target.rect.height / 2 };
       if (this.aim.learn(center)) this.options.onLearned?.();
     }
+    if (outcome.kind === 'select') this.disarm();
     if (outcome.kind === 'select' && list && target) {
       void this.select(list, target, isRisky(target)).then(
         (result) => this.options.onOutcome?.(result),

@@ -82,7 +82,7 @@ Sources: the hackknight.org public API (sponsors) and the Hack Knight Fall 2026 
 
 Plain text-to-speech stays as a backup for fixed lines (like "Opening...") in case the agent connection fails.
 
-**Rule kept:** every browser click needs Iris confirmation (dwell or long blink),
+**Rule kept:** every browser click needs Iris confirmation (dwell or double blink),
 including ordinary links. Gemini and voice-tool output cannot grant confirmation.
 Future voice tools call the existing coordinator and return bounded text/IDs,
 never screenshot bytes. ElevenLabs does not need to exist before this MVP.
@@ -113,7 +113,7 @@ never screenshot bytes. ElevenLabs does not need to exist before this MVP.
 | :--- | :--- |
 | Chrome extension (side panel, coordinator, page helper) | v0.1 capture/understanding implemented for supported visible top-document content; gaze aiming and dwell-confirmed selection implemented; voice remains future work |
 | Presage via a local Node.js companion over native messaging | No browser version of Presage exists. Its on-device processing is the privacy story. It supplies the camera-based heart rate, breathing, blink, expression and motion signals behind Iris's fatigue, focus and movement scores. Testing showed it suits slow trends, not clicks (#24). |
-| MediaPipe as the gaze (eye and head) tracker | Free and in-browser. Presage has no gaze output, so MediaPipe is the primary aiming source, not a fallback. Its eye closure also drives the long-blink confirm; Presage counts natural blinks for fatigue. |
+| MediaPipe as the gaze (eye and head) tracker | Free and in-browser. Presage has no gaze output, so MediaPipe is the primary aiming source, not a fallback. Its eye closure also drives the double-blink confirm; Presage counts natural blinks for fatigue. |
 | Cloudflare Worker holding all keys | Gemini key remains server-side; ElevenLabs/Tiger Data integration remains future work |
 
 ### E. Sponsors with no fit
@@ -124,6 +124,6 @@ Bloomberg, Diameter Capital, WAGMI-Connect, Canva, NordVPN family and Red Bull h
 
 ## 3. Feature fixes still needed (independent of technology)
 
-1. **Fast setup:** a 5-dot calibration (not 9) and a long-blink practice bubble, plus a default resting profile so Iris works before a personal baseline exists.
+1. **Fast setup:** a 5-dot calibration (not 9) and a double-blink practice bubble, plus a default resting profile so Iris works before a personal baseline exists.
 2. **Visible "why":** a side-panel feed of what Iris noticed and what it changed, for example "Blink rate up 40%, slowing clicks". Users always know why Iris changed its pace, and the Presage signals stay visible.
 3. **Signal simulation:** a developer-only switch that injects fake gaze, eye closure, blink, vitals and fatigue events through the same provider interface, so every feature can be built and tested without a camera.

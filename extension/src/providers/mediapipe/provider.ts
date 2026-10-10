@@ -1,6 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
-import { ClosureTimer, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
+import { ClosureTimer, holdThroughBlink, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -19,6 +19,8 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
   private lastHead: HeadPose = { yaw: 0, pitch: 0, eyes: { x: 0, y: 0 }, eyeSpan: 0 };
+  /** The last sample with an eye reading, held through blinks. */
+  private lastSeen: GazeSample | null = null;
   private readonly closure = new ClosureTimer();
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
   private readonly traceListeners = new Set<(eyes: [Point2[], Point2[]]) => void>();
@@ -60,15 +62,19 @@ export class MediaPipeGazeProvider implements GazeProvider {
     const landmarks = result.faceLandmarks[0];
     if (!landmarks) {
       // No face: publish a null eye so listeners do not keep aiming at the last
-      // sample, and open eyes so a missing face never reads as a long blink.
+      // sample, and open eyes so a missing face never reads as a double blink.
       this.publish({ t: now, eye: null, head: this.lastHead, blink: { left: 0, right: 0 } });
       this.traceListeners.forEach((listener) => listener([[], []]));
       return;
     }
     const blendshapes: Record<string, number> = {};
     for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
-    // A blink is not a closed eye: hold the last sample and markers through it.
-    if (this.closure.blinking(blendshapes, now)) return;
+    // A blink is not a closed eye: hold the last eye reading and the markers through it, but report
+    // the closure so a double blink can be seen.
+    if (this.closure.blinking(blendshapes, now)) {
+      if (this.lastSeen) this.publish(holdThroughBlink(this.lastSeen, blendshapes, now));
+      return;
+    }
     const frame: FaceFrame = {
       landmarks,
       blendshapes,
@@ -82,6 +88,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
 
   private publish(sample: GazeSample): void {
     this.lastHead = sample.head;
+    if (sample.eye) this.lastSeen = sample;
     this.sampleListeners.forEach((listener) => listener(sample));
   }
 }
