@@ -97,8 +97,8 @@ Plain text-to-speech stays as a backup for fixed lines (like "Opening...") in ca
 | Piece | Why it stays |
 | :--- | :--- |
 | Chrome extension (side panel, coordinator, page helper) | Already locked; works on real sites |
-| Presage via a local Node.js companion over native messaging | No browser version of Presage exists. Its on-device processing is the privacy story. |
-| MediaPipe as the eye and head tracking fallback | Free, in-browser, covers us if Presage's eye data is too slow for pointing |
+| Presage via a local Node.js companion over native messaging | No browser version of Presage exists. Its on-device processing is the privacy story. It supplies the camera-based heart rate, breathing, blink, expression and motion signals behind Iris's fatigue, focus and movement scores. |
+| MediaPipe as the gaze (eye and head) tracker | Free and in-browser. Presage has no gaze output, so MediaPipe is the primary aiming source, not a fallback. Presage stays the only blink source. |
 | Cloudflare Worker holding all keys | Now holds Gemini, ElevenLabs, and optionally Tiger Data keys |
 
 ### E. Sponsors with no fit

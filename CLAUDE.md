@@ -28,11 +28,13 @@ Guardrails are listed in `docs/claude-automation.md`.
 1. **Privacy.** Video and face landmarks never leave the laptop. Heart, breathing and
    blink data stay in memory. Page screenshots go to Gemini only on a user request
    and are never stored. Flag any code that sends, logs or persists these.
-2. **Secrets.** All API keys live in Worker secrets (`server/`). The extension and
-   companion hold none. No keys in code, logs or test fixtures.
+2. **Secrets.** All API keys live in Worker secrets (`server/`). The extension holds
+   none. The only exception is the Presage key, which the companion reads from the
+   OS keychain at runtime and holds in memory. No keys in code, logs or test fixtures.
 3. **Vendor isolation.** Vendor SDKs (Presage, ElevenLabs, Gemini, MediaPipe, Tiger
-   Data) are used only behind their neutral interfaces (`FaceProvider`,
-   `VitalsProvider`, `VoiceAgent`, `PageUnderstanding`, `SessionStore`).
+   Data) are used only behind their neutral interfaces (`GazeProvider`,
+   `FaceProvider`, `VitalsProvider`, `VoiceAgent`, `PageUnderstanding`,
+   `SessionStore`).
    `packages/core/` must not import any vendor SDK.
 4. **Click safety.** Nothing clicks from gaze alone. Anything that submits, pays or
    deletes needs an explicit confirm (breath, blink or dwell), even when the voice
