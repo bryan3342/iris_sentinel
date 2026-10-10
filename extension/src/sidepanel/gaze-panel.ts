@@ -155,6 +155,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
       }
       status.textContent = 'Look at each dot until it moves. This takes about 16 seconds.';
       const samples = await checkOnPage(provider, list);
+      if (samples.length === 0) throw new Error('no gaze samples'); // an empty check would read as 0 px error
       const result = measureAccuracy(store.model, samples, screenSize());
       const checks = await saveCheck({ at: Date.now(), report: result, frame: screenSize(), samples });
       if (mine !== generation) return;
