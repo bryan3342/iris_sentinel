@@ -85,12 +85,17 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/off
                  │
                  ▼
-        Page helper: numbered overlay, snap aim to nearest target, click, scroll,
+        Side panel: snap each gaze point to the nearest numbered target
+                    (gaze points stay in the extension; the page hears only
+                    "target N is aimed")
+                 │
+                 ▼
+        Page helper: numbered overlay, highlight aimed target, click, scroll,
                      enlarge text and targets when fatigue rises
 ```
 
 **Who owns what.**
-- **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`.
+- **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`. Snapping runs in the side panel next to the gaze provider, so raw gaze points never reach the page. Rollout steps are in [gaze-integration.md](gaze-integration.md).
 - **Confirms:** a dwell or a long blink, never Presage. The long blink comes from MediaPipe's per-eye closure: a closure under 400 ms is an ordinary blink, and only a closure held well past that confirms. Voice requests pick a target but never confirm it.
 - **Blink rate:** Presage only. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events for the fatigue score. MediaPipe answers "did the user close their eyes on purpose", Presage answers "how often is the user blinking", so the two never compete. Core drops a Presage blink that coincides with a confirm, so confirms do not count as fatigue.
 - **Talking:** the ElevenLabs agent, which hears the microphone. Presage's talking flag is not used. With no voice session open, Iris has no talking signal; fatigue readings get slightly noisier, and no confirm depends on it.
