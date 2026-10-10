@@ -74,7 +74,7 @@ export class LiveTargetList {
     }
     const [scan] = await chrome.scripting.executeScript({ target: { tabId }, func: pageSnapshot, args: ['targets'] });
     if (scan?.frameId !== 0) return null;
-    return { tabId, window: { left, top }, ...validateTargets(scan.result) };
+    return { tabId, window: { left, top }, ...validateTargets(scan.result, true) };
   }
 
   private publish(list: TargetList | null): void {

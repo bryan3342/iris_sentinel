@@ -10,15 +10,18 @@ export function eligibleTab(tab: { incognito?: boolean; url?: string; pendingUrl
   } catch { return false; }
 }
 /** Validates what a page reported about its targets. Shared by page understanding and gaze. */
-export function validateTargets(value: unknown): PageTargets {
+export function validateTargets(value: unknown, gaze = false): PageTargets {
   const s = object(value, ['documentToken', 'revision', 'viewport', 'targets', 'targetsTruncated']);
   const b = validateBinding({ tabToken: 'abcdefghijklmnop', documentToken: s.documentToken, revision: s.revision, captureId: 'abcdefghijklmnop', viewport: s.viewport });
   if (!Array.isArray(s.targets) || s.targets.length > 100 || typeof s.targetsTruncated !== 'boolean') throw new Error('INVALID_SNAPSHOT');
   const ids = new Set<number>();
   const targets = s.targets.map(value => {
-    const t = object(value, ['id', 'role', 'rect'], ['label']);
-    if (!['link', 'button'].includes(t.role as string) || (t.label !== undefined && (typeof t.label !== 'string' || !t.label.trim() || t.label.length > 200))) throw new Error('INVALID_SNAPSHOT');
-    return { id: positiveId(t.id, ids), role: t.role as NumberedTarget['role'], rect: validateRect(t.rect, b.viewport), ...(t.label === undefined ? {} : { label: t.label as string }) };
+    // Gaze targets carry a risk flag and no label; page understanding's carry neither flag nor anything new.
+    const t = gaze ? object(value, ['id', 'role', 'rect', 'risky']) : object(value, ['id', 'role', 'rect'], ['label']);
+    if (!['link', 'button'].includes(t.role as string) || (t.label !== undefined && (typeof t.label !== 'string' || !t.label.trim() || t.label.length > 200)) ||
+      (gaze && typeof t.risky !== 'boolean')) throw new Error('INVALID_SNAPSHOT');
+    return { id: positiveId(t.id, ids), role: t.role as NumberedTarget['role'], rect: validateRect(t.rect, b.viewport),
+      ...(t.label === undefined ? {} : { label: t.label as string }), ...(gaze ? { risky: t.risky as boolean } : {}) };
   });
   return { documentToken: token(s.documentToken), revision: b.revision, viewport: b.viewport, targets, targetsTruncated: s.targetsTruncated };
 }
