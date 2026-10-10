@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CalibrationStore, GazeAim, GazePointer } from '@iris/core';
-import type { Point2 } from '@iris/protocol';
+import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
 import type { OverlayCommand } from '../../extension/src/content/overlay';
-import { scripted, simulatedCalibration, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
+import { eyeFor, scripted, SIMULATED_HEAD, simulatedCalibration, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
 import { GazeSession, type Outcome } from '../../extension/src/sidepanel/gaze-session';
 import { PageMarks } from '../../extension/src/sidepanel/page-marks';
 import { LiveTargetList } from '../../extension/src/sidepanel/target-list';
@@ -242,6 +242,39 @@ describe('selecting with gaze', () => {
     await vi.advanceTimersByTimeAsync(1500);
     expect(selected).toEqual([]);
     expect(outcomes).toEqual(['CONFIRM_AGAIN', 'CONFIRM_AGAIN']);
+    gaze.stop();
+    provider.stop();
+  });
+});
+
+describe('confirming with a long blink', () => {
+  /** A camera stand-in that plays a script of samples every 33 ms, closed eyes included. */
+  class ScriptedEyes implements GazeProvider {
+    private readonly listeners = new Set<(s: GazeSample) => void>();
+    private timer: ReturnType<typeof setInterval> | null = null;
+    constructor(private readonly frame: (t: number) => GazeSample) {}
+    onSample(listener: (s: GazeSample) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
+    async start() { let t = 0; this.timer = setInterval(() => { t += 33; this.listeners.forEach((l) => l(this.frame(t))); }, 33); }
+    stop() { if (this.timer) clearInterval(this.timer); }
+  }
+
+  it('selects the target aimed before the eyes closed, even if the reading lands elsewhere on opening', async () => {
+    const lookingAt = (id: number) => (t: number): GazeSample => ({ t, eye: eyeFor(centerOf(id)), head: SIMULATED_HEAD, blink: { left: 0.05, right: 0.05 } });
+    const closed = (t: number): GazeSample => ({ t, eye: null, head: SIMULATED_HEAD, blink: { left: 0.9, right: 0.9 } });
+    // Aim at 1 for 600 ms (short of a dwell), close both eyes for 700 ms, then open with the reading on 2.
+    const provider = new ScriptedEyes((t) => (t <= 600 ? lookingAt(1)(t) : t <= 1300 ? closed(t) : lookingAt(2)(t)));
+    const store = new CalibrationStore();
+    store.setDots(simulatedCalibration(), VIEWPORT);
+    const selected: number[] = [];
+    const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+      select: async (_list, target) => { selected.push(target.id); return 'SELECTED'; },
+    });
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1250);
+    expect(selected).toEqual([]); // eyes still closed: nothing yet
+    await vi.advanceTimersByTimeAsync(150);
+    expect(selected).toEqual([1]); // the locked target, on opening, long before a dwell could finish
     gaze.stop();
     provider.stop();
   });
