@@ -41,6 +41,16 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 
 ## 2. Technologies / Services
 
+**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object and an
+operator-issued demo bearer token, then returns `{ signedUrl }` for the
+server-configured ElevenLabs agent. It requests a single-use conversation
+signature. `ENABLE_VOICE_AGENT` is independent of page understanding and defaults
+to false. The existing origin checks, in-memory demo rate budget and concurrency
+lease apply to minting; they do not cap conversation duration or global spend.
+The response is not cached. API keys stay in Worker secrets; signed URLs must
+remain in memory and must never be logged. The extension connection, microphone
+flow and client tools are subsequent milestones.
+
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
 | Client | Chrome extension, Manifest V3, TypeScript | Side panel (UI, voice agent, gaze tracking), background coordinator, page helper injected into each tab |

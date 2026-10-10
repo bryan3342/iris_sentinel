@@ -6,7 +6,8 @@ export interface PageUnderstanding {
   findTarget(input: FindTargetInput, signal?: AbortSignal): Promise<Selection>;
 }
 import type { AccessEnv } from './access';
-export interface Env extends AccessEnv {
+import type { AgentEnv } from './routes/agent-token/index';
+export interface Env extends AccessEnv, AgentEnv {
   GEMINI_API_KEY?: string; GEMINI_MODEL?: string; EXTENSION_ORIGIN?: string;
   ENABLE_PAGE_UNDERSTANDING?: string; PAGE_CONTENT_APPROVED?: string; ENABLE_LOCAL_LABELS?: string;
   PAGE_UNDERSTANDING_PROVIDER?: string;
