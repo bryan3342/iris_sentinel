@@ -4,7 +4,7 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
-**Implementation status — v0.1 private-demo MVP.** The extension has a camera
+**Implementation status: v0.1 private-demo MVP.** The extension has a camera
 preview plus an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
