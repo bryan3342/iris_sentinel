@@ -3,7 +3,6 @@ import type { Operation } from '@iris/protocol';
 import { describeFailure, failureCode } from './failures';
 import type { PageMarks } from './page-marks';
 
-
 export function understandingPanel(marks: PageMarks, coordinator: PageCoordinator): HTMLElement {
   const panel = document.createElement('section'); panel.className = 'understanding';
   const title = document.createElement('h2'); title.textContent = 'Page understanding';
