@@ -3,13 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node ../scripts/setup-mediapipe.mjs",
     "dev": "vite",
+    "predev:ext": "node ../scripts/setup-mediapipe.mjs",
     "dev:ext": "vite build --watch",
+    "prebuild": "node ../scripts/setup-mediapipe.mjs",
     "build": "vite build"
   },
   "dependencies": {
     "@iris/core": "*",
-    "@iris/protocol": "*"
+    "@iris/protocol": "*",
+    "@mediapipe/tasks-vision": "^1.1.0"
   },
   "devDependencies": {
     "@types/chrome": "^0.3.5",

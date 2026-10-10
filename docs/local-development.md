@@ -16,6 +16,8 @@ From the repository root:
 npm install
 ```
 
+The first `npm run dev`, `npm run dev:ext` or `npm run build` also prepares eye tracking: it copies the MediaPipe runtime from `node_modules` and downloads the face model (about 4 MB) into `extension/public/mediapipe/`, checking its SHA-256. Later runs reuse the file. This folder is not committed.
+
 ## Run the tests
 
 ```sh
@@ -48,6 +50,10 @@ Open http://localhost:5173 in Chrome and allow the camera when asked. The server
 
 After a rebuild, click the reload arrow on the Iris card in `chrome://extensions` and reopen the panel.
 
+## What you should see
+
+Once the camera is on, the panel shows **Eye tracking on** and a live readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -55,3 +61,4 @@ After a rebuild, click the reload arrow on the Iris card in `chrome://extensions
 | Port 5173 already in use | Stop the other process on that port; the dev server will not pick another port. |
 | "Camera is off" in the playground | Allow the camera from the camera icon in the address bar, then reload. |
 | Camera busy | Close other apps using the webcam (video calls, other tabs). |
+| "Eye tracking failed to start" | Delete `extension/public/mediapipe/` and rerun the command to fetch the runtime and model again. |
