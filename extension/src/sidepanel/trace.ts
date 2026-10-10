@@ -14,7 +14,7 @@ export class EyeTrace {
   readonly readout = document.createElement('p');
   private trails: Point2[][] = [[], []];
 
-  constructor() {
+  constructor(private readonly video: HTMLVideoElement) {
     this.overlay.className = 'trace-overlay';
   }
 
@@ -30,9 +30,16 @@ export class EyeTrace {
       this.trails = [[], []];
       return;
     }
-    const toPixels = (p: Point2): Point2 => ({ x: p.x * canvas.width, y: p.y * canvas.height });
+    // Match the video's object-fit: cover crop (fullscreen), which is a no-op in the panel.
+    const vw = this.video.videoWidth || canvas.width;
+    const vh = this.video.videoHeight || canvas.height;
+    const fit = Math.max(canvas.width / vw, canvas.height / vh);
+    const [dw, dh] = [vw * fit, vh * fit];
+    const [ox, oy] = [(canvas.width - dw) / 2, (canvas.height - dh) / 2];
+    const toPixels = (p: Point2): Point2 => ({ x: ox + p.x * dw, y: oy + p.y * dh });
+    const size = Math.max(scale, dw / 500); // grow the markers with the picture
     ctx.shadowColor = `rgb(${RED})`;
-    ctx.shadowBlur = 8 * scale;
+    ctx.shadowBlur = 8 * size;
 
     for (let eye = 0; eye < 2; eye++) {
       const [center, ...contour] = points.slice(eye * POINTS_PER_IRIS, (eye + 1) * POINTS_PER_IRIS).map(toPixels);
@@ -43,19 +50,19 @@ export class EyeTrace {
       trail.forEach((p, i) => {
         ctx.fillStyle = `rgba(${RED}, ${((i + 1) / trail.length) * 0.6})`;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 1.5 * scale, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, 1.5 * size, 0, Math.PI * 2);
         ctx.fill();
       });
 
       const radius = contour.reduce((sum, p) => sum + Math.hypot(p.x - center.x, p.y - center.y), 0) / contour.length;
       ctx.strokeStyle = `rgb(${RED})`;
-      ctx.lineWidth = 2 * scale;
+      ctx.lineWidth = 2 * size;
       ctx.beginPath();
       ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
       ctx.stroke();
       ctx.fillStyle = `rgb(${RED})`;
       ctx.beginPath();
-      ctx.arc(center.x, center.y, 2.5 * scale, 0, Math.PI * 2);
+      ctx.arc(center.x, center.y, 2.5 * size, 0, Math.PI * 2);
       ctx.fill();
     }
   }

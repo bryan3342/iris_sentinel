@@ -43,7 +43,7 @@ async function startTracking(
 ): Promise<void> {
   status.textContent = 'Loading eye tracking...';
   const provider = new MediaPipeGazeProvider(video);
-  const trace = new EyeTrace();
+  const trace = new EyeTrace(video);
   preview.append(trace.overlay);
   root.append(trace.readout);
   provider.onTracePoints((points) => trace.drawPoints(points));
