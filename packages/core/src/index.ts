@@ -11,3 +11,5 @@ export type { SnapOptions, SnapTarget } from './snap';
 export { GazePointer, viewportFrame } from './gaze-pointer';
 export type { CalibrationFrame, GazePointerOptions } from './gaze-pointer';
 export { DEFAULT_SNAP, GazeAim } from './gaze-aim';
+export { ConfirmChannel, DwellDetector } from './confirm';
+export type { ConfirmEvent, ConfirmSource, DwellOptions } from './confirm';

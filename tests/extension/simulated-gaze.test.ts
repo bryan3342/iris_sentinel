@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyCalibration, CalibrationStore, FixationSmoother, GazeAim, GazePointer, viewportFrame, type SnapTarget } from '@iris/core';
+import { applyCalibration, CalibrationStore, DwellDetector, FixationSmoother, GazeAim, GazePointer, viewportFrame, type ConfirmEvent, type SnapTarget } from '@iris/core';
 import type { GazeSample, Point2 } from '@iris/protocol';
 import { DOT_LAYOUTS } from '../../extension/src/sidepanel/setup/calibration';
 import { eyeFor, scripted, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
@@ -134,5 +134,31 @@ describe('simulated gaze through calibration and smoothing', () => {
     // After a short settle, each look holds one steady aim on the intended target.
     expect(new Set(aims.filter((a) => a.t >= 300 && a.t < 1000).map((a) => a.aim))).toEqual(new Set([3]));
     expect(new Set(aims.filter((a) => a.t >= 1300).map((a) => a.aim))).toEqual(new Set([6]));
+  });
+
+  it('dwells once on the target a jittery simulated user rests on, and not while moving between targets', async () => {
+    const store = new CalibrationStore();
+    await calibrate(store);
+    const targets: SnapTarget[] = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, rect: { x: 100 + i * 160, y: 300, width: 140, height: 32 } }));
+    const center = (t: SnapTarget): Point2 => ({ x: (t.rect.x + t.rect.width / 2) / VIEWPORT.width, y: (t.rect.y + t.rect.height / 2) / VIEWPORT.height });
+    // A glance at target 2 shorter than the dwell, then a rest on target 6.
+    const provider = new SimulatedGazeProvider(
+      scripted([{ at: center(targets[1]!), ms: 600 }, { at: center(targets[5]!), ms: 2500 }]),
+      { noise: 0.02, seed: 8 },
+    );
+    const aim = new GazeAim(new GazePointer(store));
+    aim.setTargets(targets, viewportFrame(VIEWPORT));
+    const dwell = new DwellDetector();
+    const confirms: { event: ConfirmEvent; aim: number | null }[] = [];
+    provider.onSample((s) => {
+      const aimed = aim.update(s);
+      const event = dwell.update(s, aimed);
+      if (event) confirms.push({ event, aim: aimed });
+    });
+    await provider.start();
+    vi.advanceTimersByTime(3100);
+    expect(confirms).toHaveLength(1);
+    expect(confirms[0]!.aim).toBe(6);
+    expect(confirms[0]!.event.t).toBeGreaterThanOrEqual(1600);
   });
 });
