@@ -26,9 +26,12 @@ export const input = (operation = 'find_target') => ({
   image: { mimeType: 'image/png', width: 2, height: 2, data: png() },
   ...(operation === 'find_target' ? { request: 'Find the icon', targets: [{ id: 7, role: 'button', rect: { x: 0, y: 0, width: 1, height: 1 } }], targetsTruncated: false } : {}),
   ...(operation === 'describe_image' ? { imageId: 3, sourceRect: { x: 0, y: 0, width: 2, height: 2 } } : {}),
+  ...(operation === 'describe_target' ? { targets: [{ id: 5, role: 'link', rect: { x: 0, y: 0, width: 1, height: 1 }, label: 'More information' }],
+    targetId: 5, sourceRect: { x: 0, y: 0, width: 2, height: 2 } } : {}),
 });
 export const result = operation => operation === 'find_target' ? { operation, targetId: 7, explanation: 'The supplied icon matches.' }
   : operation === 'summarize_page' ? { operation, scope: 'visible_viewport', summary: 'Only the visible viewport: a synthetic page.' }
+  : operation === 'describe_target' ? { operation, targetId: 5, description: 'A link to more information.' }
   : { operation, imageId: 3, description: 'A synthetic image crop.' };
 export async function setup() {
   const sessionToken = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');

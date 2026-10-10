@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { modules as m } from './modules.mjs';
 import { input, result } from './fixtures.mjs';
-for (const operation of ['find_target', 'summarize_page', 'describe_image']) {
+for (const operation of m.OPERATIONS) {
   test(`${operation}: direct adapter sends inline PNG and validates output`, async () => {
     let calls = 0;
     const adapter = new m.GeminiMultimodal({ GEMINI_API_KEY: 'mock', GEMINI_MODEL: 'test-model' }, async function (url, options) {

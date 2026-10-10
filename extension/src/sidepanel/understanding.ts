@@ -51,7 +51,9 @@ export function understandingPanel(marks: PageMarks): HTMLElement {
     const response = await coordinator.inspect({ gateway: gateway.value, operation, request: request.value, imageId: Number(imageId.value) });
     const result = response.result.result;
     output.textContent = result.operation === 'find_target' ? `${result.targetId === null ? 'No clear match.' : `Recommended target ${result.targetId}.${response.highlighted ? ' It is highlighted on the page.' : ''} Iris confirmation is required before any future click.`} ${result.explanation}${response.targetsTruncated ? ' Target list was limited to 100.' : ''}`
-      : result.operation === 'summarize_page' ? result.summary : `Visible image crop ${result.imageId}: ${result.description}`;
+      : result.operation === 'summarize_page' ? result.summary
+      : result.operation === 'describe_target' ? `Target ${result.targetId}: ${result.description}`
+      : `Visible image crop ${result.imageId}: ${result.description}`;
   };
   const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', () => coordinator.cancel());
   panel.append(title, notice, gateway, button('Allow gateway access', async () => {

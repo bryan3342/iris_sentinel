@@ -15,6 +15,7 @@ This protocol recommends or explains. It contains no browser action operation.
 | `find_target` | `request`, `targets`, `targetsTruncated` | `operation`, `targetId` (supplied ID or null), `explanation` |
 | `summarize_page` | none | `operation`, `scope: "visible_viewport"`, `summary` |
 | `describe_image` | `imageId`, `sourceRect` | `operation`, same `imageId`, `description` |
+| `describe_target` | `targets` (exactly one), `targetId` (that target's ID), `sourceRect` | `operation`, same `targetId`, `description` |
 
 All requests require `protocolVersion: "0.1"`, `requestId`, `operation`,
 `binding`, and one `image`. Unknown fields, including URLs/selectors/actions,
@@ -49,6 +50,9 @@ No data URL, image URL, multipart upload, or server image fetching is supported.
 For `describe_image`, the extension must first list visible image IDs and bind
 that list to the same snapshot. It crops the masked viewport using `sourceRect`;
 only the visible portion is described. Image bytes contain no target overlay.
+For `describe_target`, `sourceRect` is a masked crop around the one supplied
+target, outlined in the image so the model knows which element is meant. The
+description is at most 1500 characters. Nothing is clicked.
 
 ## Limits and errors
 
