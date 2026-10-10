@@ -2,7 +2,7 @@ import { CalibrationStore, GazeAim, GazePointer } from '@iris/core';
 import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
-import { GazeSession } from './gaze-session';
+import { GazeSession, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
 import { loadSamples, saveSamples } from './setup/calibration-storage';
 import { calibrateOnPage, screenFrame } from './setup/page-calibration';
@@ -26,10 +26,18 @@ function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; 
   return { provider, store, stop: () => { clearInterval(timer); provider.stop(); } };
 }
 
+const OUTCOMES: Record<Outcome, string> = {
+  SELECTED: 'Selected.',
+  CONFIRM_AGAIN: 'That one may submit, pay, delete or send. Look away, then dwell on it again to confirm.',
+  NEEDS_SECOND_CONFIRM: 'That one needs a second confirm. Nothing was selected.',
+  STALE: 'The page changed, so nothing was selected.',
+};
+
 /**
- * Side panel controls for aiming at page targets with gaze: calibrating on the
- * page, aiming with the camera, or, for development, the mouse standing in for
- * the eyes. One at a time. Looking only aims; nothing is clicked.
+ * Side panel controls for gaze: calibrating on the page, aiming with the
+ * camera, or, for development, the mouse standing in for the eyes. One at a
+ * time. Looking aims; a dwell (one second on a target) confirms and selects it,
+ * and a risky target needs a second confirm.
  */
 export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element: HTMLElement; useCamera(provider: GazeProvider): void } {
   const section = document.createElement('section');
@@ -47,6 +55,10 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   const mouse = toggle('Developer: the mouse stands in for the eyes');
   const calibrate = document.createElement('button');
   calibrate.textContent = 'Calibrate on this page';
+  const standIn = document.createElement('button');
+  standIn.textContent = 'Developer: confirm now';
+  standIn.addEventListener('click', () => active?.session.confirmNow());
+  const report = (outcome: Outcome) => { status.textContent = OUTCOMES[outcome]; };
   eyes.input.disabled = calibrate.disabled = true;
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void } | null = null;
@@ -63,9 +75,9 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   /** Aims with the camera through a calibration saved in screen positions. */
   const aimWithEyes = (provider: GazeProvider, store: CalibrationStore) => {
     eyes.input.checked = true;
-    active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, screenFrame) };
+    active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, { frameFor: screenFrame, onOutcome: report }) };
     active.session.start();
-    status.textContent = 'Looking aims at the nearest number. Nothing is clicked.';
+    status.textContent = 'Looking aims at the nearest number. Dwell on it for a second to select it.';
   };
   eyes.input.addEventListener('change', () => {
     stop();
@@ -114,12 +126,12 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     eyes.input.checked = false;
     if (!mouse.input.checked) return;
     const sim = mouseGaze(targets);
-    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks), stop: sim.stop };
+    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report }), stop: sim.stop };
     active.session.start();
     void sim.provider.start();
-    status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Nothing is clicked.';
+    status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
   });
-  section.append(calibrate, eyes.label, mouse.label, status);
+  section.append(calibrate, eyes.label, mouse.label, standIn, status);
   return {
     element: section,
     useCamera(provider) {
