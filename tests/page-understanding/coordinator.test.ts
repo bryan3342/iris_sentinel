@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PageSnapshot } from '../../extension/src/page-understanding/page-helper';
 import { PageCoordinator } from '../../extension/src/page-understanding/coordinator';
+import { prepareImage } from '../../extension/src/page-understanding/capture';
 
 vi.mock('../../extension/src/page-understanding/capture', async () => ({
   ...await vi.importActual('../../extension/src/page-understanding/capture'),
@@ -21,6 +22,7 @@ beforeEach(() => {
     if (message.type === 'iris.page.cancel') return { ok: true, value: null };
     return { ok: true, value: { protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
       result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Synthetic crop.' }
+        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Synthetic target.' }
         : { operation: 'find_target', targetId: 1, explanation: 'Synthetic match.' } } };
   });
   vi.stubGlobal('chrome', {
@@ -81,11 +83,56 @@ it('an invented model ID is rejected at the client boundary', async () => {
   });
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow();
 });
-it('clears the overlay before capture and highlights only the validated target afterwards', async () => {
+it('holds the overlay clear during capture and highlights only the validated target afterwards', async () => {
   const response = await new PageCoordinator().inspect(find);
   expect(response.highlighted).toBe(true);
-  expect(events).toEqual(['overlay.clear', 'iris.page.capture', 'iris.page.understand', 'overlay.show',
+  expect(events).toEqual(['overlay.hold', 'iris.page.capture', 'overlay.release', 'iris.page.understand', 'overlay.show',
     JSON.stringify([current.documentToken, current.revision, 1])]);
   overlayReply = 'STALE'; events = [];
   expect((await new PageCoordinator().inspect(find)).highlighted).toBe(false);
+});
+it('lets Iris redraw its own marks once the screenshot is taken', async () => {
+  const afterCapture = vi.fn(() => events.push('afterCapture'));
+  await new PageCoordinator({ afterCapture }).inspect(find);
+  expect(events.slice(0, 4)).toEqual(['overlay.hold', 'iris.page.capture', 'overlay.release', 'afterCapture']);
+});
+const fire = (name: 'onActivated' | 'onUpdated' | 'onFocusChanged', ...args: unknown[]) => {
+  const source = name === 'onFocusChanged' ? (globalThis as any).chrome.windows : (globalThis as any).chrome.tabs;
+  source[name].addListener.mock.calls.forEach(([listener]: [(...a: unknown[]) => void]) => listener(...args));
+};
+it.each([
+  ['another tab loads', 'onUpdated', [7, { status: 'loading' }]],
+  ['a tab in another window opens', 'onActivated', [{ tabId: 7, windowId: 2 }]],
+  ['the same window regains focus', 'onFocusChanged', [1]],
+] as const)('keeps the request when %s', async (_name, event, args) => {
+  const previous = send.getMockImplementation()!;
+  send.mockImplementation(async message => { if (message.type === 'iris.page.understand') fire(event, ...args); return previous(message); });
+  expect((await new PageCoordinator().inspect(find)).result.result.operation).toBe('find_target');
+});
+it.each([
+  ['the examined tab updates', 'onUpdated', [1, { status: 'loading' }]],
+  ['another tab in its window becomes active', 'onActivated', [{ tabId: 7, windowId: 1 }]],
+  ['another window takes focus', 'onFocusChanged', [2]],
+] as const)('cancels the request when %s', async (_name, event, args) => {
+  const previous = send.getMockImplementation()!;
+  send.mockImplementation(async message => { if (message.type === 'iris.page.understand') fire(event, ...args); return previous(message); });
+  await expect(new PageCoordinator().inspect(find)).rejects.toThrow('PAGE_CHANGED_OR_CANCELLED');
+});
+const aimedAt = (rect = page().targets[0]!.rect) => ({ documentToken: page().documentToken, id: 1, rect });
+const describe = { gateway: find.gateway, operation: 'describe_target' as const };
+it('describes the aimed target from an outlined crop around it, without clicking', async () => {
+  const response = await new PageCoordinator().inspect({ ...describe, aimed: aimedAt() });
+  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Synthetic target.' });
+  const sent = send.mock.calls.map(([m]) => m).find(m => m.type === 'iris.page.understand').input;
+  expect([sent.targets, sent.targetId, sent.sourceRect]).toEqual([[page().targets[0]], 1, { x: 0, y: 0, width: 2, height: 2 }]);
+  expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: page().targets[0]!.rect }]);
+  expect(events).not.toContain('overlay.show');
+});
+it('sends nothing without an aimed target, or once the aimed target has moved', async () => {
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: null })).rejects.toThrow('NO_AIMED_TARGET');
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: aimedAt({ x: 10, y: 0, width: 1, height: 1 }) }))
+    .rejects.toThrow('PAGE_CHANGED');
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: { ...aimedAt(), documentToken: 'other_document_abcdefgh' } }))
+    .rejects.toThrow('PAGE_CHANGED');
+  expect(events).not.toContain('iris.page.capture');
 });

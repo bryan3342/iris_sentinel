@@ -1,10 +1,12 @@
-import { LIMITS, validateInput, validateResult, type Operation, type PageResult } from '@iris/protocol';
+import { LIMITS, validateInput, validateResult, type NumberedTarget, type Operation, type PageResult, type Rect } from '@iris/protocol';
 import { pageOverlay, type OverlayCommand, type OverlayResult } from '../content/overlay';
-import { assertSameSnapshot, eligibleTab, prepareImage, validateSnapshot } from './capture';
+import { assertSameSnapshot, eligibleTab, prepareImage, targetCrop, validateSnapshot } from './capture';
 import { pageSnapshot, type PageSnapshot } from './page-helper';
 import { gatewayUrl } from './session';
 
-export interface DemoRequest { gateway: string; operation: Operation; request?: string; imageId?: number }
+/** The target gaze rested on, as numbered in the gaze scan. */
+export interface AimedTarget { documentToken: string; id: number; rect: Rect }
+export interface DemoRequest { gateway: string; operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null }
 export interface BrokerReply { ok: boolean; value?: unknown; code?: string }
 export async function broker(message: unknown): Promise<unknown> {
   const reply: BrokerReply = await chrome.runtime.sendMessage(message);
@@ -24,14 +26,27 @@ async function snapshot(tabId: number): Promise<PageSnapshot> {
   if (result.blocked) throw new Error('UNSUPPORTED_PAGE');
   return result;
 }
+/** The aimed target in this snapshot: same document, same number, still where gaze saw it. Numbering matches the gaze scan. */
+function aimedTarget(aimed: AimedTarget | null | undefined, snapshot: PageSnapshot): NumberedTarget {
+  if (!aimed) throw new Error('NO_AIMED_TARGET');
+  const target = snapshot.targets.find(t => t.id === aimed.id);
+  if (aimed.documentToken !== snapshot.documentToken || !target ||
+    Math.abs(target.rect.x - aimed.rect.x) > 4 || Math.abs(target.rect.y - aimed.rect.y) > 4) throw new Error('PAGE_CHANGED');
+  return target;
+}
 async function overlay(tabId: number, command: OverlayCommand): Promise<OverlayResult | undefined> {
   const results = await chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [command] });
   return results[0]?.result as OverlayResult | undefined;
+}
+export interface CoordinatorOptions {
+  /** Called once the screenshot is taken, so whatever Iris drew before it can be drawn again. */
+  afterCapture?: () => void;
 }
 /** Iris coordinator. UI owns temporary canvases; background owns sessions and HTTP. */
 export class PageCoordinator {
   private pending?: { requestId: string; controller: AbortController };
   private imageList?: { tabId: number; snapshot: PageSnapshot };
+  constructor(private readonly options: CoordinatorOptions = {}) {}
   cancel(): void {
     if (!this.pending) return;
     this.pending.controller.abort();
@@ -43,15 +58,21 @@ export class PageCoordinator {
     this.pending = { requestId, controller };
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(LIMITS.requestMs)]);
     let interval: ReturnType<typeof setInterval> | undefined;
+    let tab: chrome.tabs.Tab | undefined;
     const invalidate = () => this.cancel();
+    // Only a change to the examined tab or its window cancels; other tabs and windows may change freely.
+    const activated = (info: chrome.tabs.OnActivatedInfo) => { if (tab && info.windowId === tab.windowId && info.tabId !== tab.id) invalidate(); };
+    const updated = (updatedId: number) => { if (tab && updatedId === tab.id) invalidate(); };
+    const focused = (windowId: number) => { if (tab && windowId !== tab.windowId) invalidate(); };
     const abort = () => { void broker({ type: 'iris.page.cancel', requestId }).catch(() => {}); };
-    chrome.tabs.onActivated.addListener(invalidate);
-    chrome.tabs.onUpdated.addListener(invalidate);
-    chrome.windows.onFocusChanged.addListener(invalidate);
+    chrome.tabs.onActivated.addListener(activated);
+    chrome.tabs.onUpdated.addListener(updated);
+    chrome.windows.onFocusChanged.addListener(focused);
     signal.addEventListener('abort', abort, { once: true });
     try {
       const gateway = gatewayUrl(request.gateway);
-      const tab = await activeTab(), tabId = tab.id!;
+      tab = await activeTab();
+      const tabId = tab.id!, url = tab.url;
       const before = await snapshot(tabId);
       if (request.operation === 'describe_image') {
         if (this.imageList?.tabId !== tabId) throw new Error('LIST_IMAGES_FIRST');
@@ -60,24 +81,35 @@ export class PageCoordinator {
       if (request.operation === 'find_target' && !before.targets.length) throw new Error('NO_TARGETS');
       const selected = request.operation === 'describe_image' ? before.images.find(i => i.id === request.imageId) : undefined;
       if (request.operation === 'describe_image' && !selected) throw new Error('IMAGE_NOT_FOUND');
-      // Gemini sees the page itself, never Iris's own numbers or highlight.
-      await overlay(tabId, { type: 'clear' });
-      const captured = await broker({ type: 'iris.page.capture', tabId, windowId: tab.windowId });
+      const aimed = request.operation === 'describe_target' ? aimedTarget(request.aimed, before) : undefined;
+      const crop = selected?.rect ?? (aimed && targetCrop(aimed.rect, before.viewport));
+      // Gemini sees the page itself, never Iris's own numbers or highlight. The hold stops gaze
+      // from drawing them again until the screenshot is taken.
+      await overlay(tabId, { type: 'hold' });
+      let captured: unknown;
+      try {
+        captured = await broker({ type: 'iris.page.capture', tabId, windowId: tab.windowId });
+      } finally {
+        await overlay(tabId, { type: 'release' }).catch(() => undefined);
+        this.options.afterCapture?.();
+      }
       signal.throwIfAborted();
       if (typeof captured !== 'string') throw new Error('INVALID_CAPTURE');
       const check = async () => {
         const current = await activeTab();
-        if (current.id !== tabId || current.url !== tab.url) throw new Error('PAGE_CHANGED');
+        if (current.id !== tabId || current.url !== url) throw new Error('PAGE_CHANGED');
         assertSameSnapshot(before, await snapshot(tabId)); signal.throwIfAborted();
       };
       await check();
-      const image = await prepareImage(captured, before, selected?.rect, request.operation === 'find_target');
+      const image = await prepareImage(captured, before, crop,
+        request.operation === 'find_target' ? 'numbers' : aimed && { outline: aimed.rect });
       await check();
       const input = validateInput({ protocolVersion: '0.1', requestId, operation: request.operation,
         binding: { tabToken: crypto.randomUUID(), documentToken: before.documentToken, revision: before.revision,
           captureId: crypto.randomUUID(), viewport: before.viewport }, image,
         ...(request.operation === 'find_target' ? { request: request.request, targets: before.targets, targetsTruncated: before.targetsTruncated } : {}),
         ...(selected ? { imageId: selected.id, sourceRect: selected.rect } : {}),
+        ...(aimed && crop ? { targets: [aimed], targetId: aimed.id, sourceRect: crop } : {}),
       });
       // No overlapping snapshot checks. Changes cancel HTTP, not just result display.
       let checking = false;
@@ -98,9 +130,9 @@ export class PageCoordinator {
       throw error;
     } finally {
       if (interval) clearInterval(interval);
-      chrome.tabs.onActivated.removeListener(invalidate);
-      chrome.tabs.onUpdated.removeListener(invalidate);
-      chrome.windows.onFocusChanged.removeListener(invalidate);
+      chrome.tabs.onActivated.removeListener(activated);
+      chrome.tabs.onUpdated.removeListener(updated);
+      chrome.windows.onFocusChanged.removeListener(focused);
       signal.removeEventListener('abort', abort);
       this.pending = undefined;
     }

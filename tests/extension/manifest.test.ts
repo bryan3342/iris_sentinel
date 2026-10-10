@@ -22,4 +22,8 @@ describe('extension manifest', () => {
   it('may talk to the native messaging companion', () => {
     expect(manifest.permissions).toContain('nativeMessaging');
   });
+
+  it('may keep the demo session and calibrations in extension storage', () => {
+    expect(manifest.permissions).toContain('storage');
+  });
 });

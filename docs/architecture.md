@@ -5,11 +5,12 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
 **Implementation status: v0.1 private-demo MVP.** The extension has a camera
-preview plus an explicit-request page-understanding harness. The Worker implements
+preview, gaze aiming with on-page calibration, dwell-confirmed selection of
+page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, ElevenLabs client integration, browser actions and the
-confirmation state machine below remain future work. Page understanding is built
+by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
+and the full input-mode state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
 manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
@@ -34,7 +35,7 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 - Works on normal websites. Chrome's own pages and the address bar are out of reach for extensions; voice "go to <site>" covers navigation.
 - Fatigue is presented as "you might be tired", never as a medical reading.
 - Desktop Chrome only.
-- The companion targets Apple Silicon Macs and Windows x64, the desktop platforms the Presage Node.js SDK supports and the companion installer covers. Intel Macs are not supported.
+- The companion targets Apple Silicon Macs, where the demo runs and the companion installer works today. Windows x64, which the Presage Node.js SDK also supports, is a stretch goal for the installer. Intel Macs are not supported.
 
 ---
 
@@ -72,7 +73,7 @@ flow and client tools are subsequent milestones.
 | `VitalsProvider` (HR, HRV, breathing rate) | Presage companion, simulated |
 | `VoiceAgent` (conversation, user talking on/off) | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
-| `SessionStore` | Local only, Tiger Data |
+| `SessionStore` | In memory (simulated), local only, Tiger Data through the Worker |
 
 ---
 
@@ -113,7 +114,7 @@ Presage was tested on the demo laptop before these choices were made (#24). Its 
 
 **Camera sharing.** The companion and the side panel each open the webcam. Both must run at once. This was verified on the demo laptop (#24) and is checked on every other target machine. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 
-**Companion messages.** Defined in `packages/protocol/src/companion.ts`, and every message is validated on arrival on both sides. The extension sends `start` and `stop`. The companion sends `hello` (its protocol version, checked by the extension), `status` (running, key missing, offline, credits exhausted and so on), `quality` (camera view problems with a hint to show), `vitals` (pulse, breathing rate and HRV, each with confidence and a stable flag, about once a second) and `blink` (each natural blink's length). Messages carry no timestamps; the receiver stamps them, so the two programs' clocks never need to agree.
+**Companion messages.** Defined in `packages/protocol/src/companion.ts`, and every message is validated on arrival on both sides. The extension sends `start` and `stop`. The companion sends `hello` (its protocol version, checked by the extension), `status` (running, key missing, offline, credits exhausted and so on), `quality` (camera view problems with a hint to show), `vitals` (pulse, breathing rate and HRV, each with confidence and a stable flag, about once a second) and `blink` (each natural blink's length). Messages carry no timestamps; the receiver stamps them, so the two programs' clocks never need to agree. The side panel holds the connection (`extension/src/providers/companion/`), next to the gaze session that will use the signals. Opening the panel starts the companion, and closing the panel closes the port, which ends the companion and Presage with it, so body sensing never runs in the background. A dropped connection is not retried on its own, since every new session repeats Presage's warm-up and uses credits.
 
 **MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. In the extension the dots are drawn over the browsing tab and each is saved in screen positions, its place on the page plus the window's position, so moving the window or resizing the side panel needs no new dots; a side panel on the left that gets resized, or page zoom other than 100%, does, and confirms absorb small errors. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still. The missing position is not a blink signal; the long-blink confirm reads the per-eye closure carried in each sample instead. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
 
@@ -152,31 +153,28 @@ confirmation-gated target proposal. A future `click_target(n)` tool may only
 enqueue an Iris confirmation request; it may never execute directly. Page and
 model text are untrusted, and tool results never include screenshot bytes.
 
-**Local milestone:** `POST /gemini/find-target` accepts a text request and numbered
-target labels, calls Gemini through the server's `PageUnderstanding.findTarget`
-interface, and returns a validated target ID or null for no clear match. Local
-testing uses `wrangler dev` on localhost in one terminal and `curl` in another.
-Keys stay in the ignored server `.dev.vars` bindings. Labels are sent only when
-the tester submits a request; inputs and model responses are not logged or
-stored. This milestone has no screenshot input, browser client, or click action.
-This compatibility milestone precedes the authenticated v0.1 implementation.
-The local endpoint has no session authentication or rate limiting and must not
-be deployed until those protections are implemented.
-
 **Safety rule.** Every browser click requires Iris confirmation, even when the
-agent proposes it. Gemini recommends/explains only. The confirmation and browser
-action flow is separate from this server milestone; there is no click executor.
+agent proposes it. Gemini recommends/explains only; it never clicks. The one
+place Iris clicks is the page helper's select step, after a confirm passes the
+selection gate: it clicks only the exact element behind the confirmed number in
+that gaze scan, only if it is still on the page, where the user saw it and not
+covered, and a risky element only after a second confirm, checked again in the
+page itself.
 
 **v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
-sensitive rectangles and revisions. Chrome capture runs through the background
-broker. The side-panel coordinator owns transient mask/crop canvases, capture
-consistency checks and plain-text results. The background owns runtime-only demo session tokens and authenticated HTTP. It rejects broker
+sensitive rectangles and revisions, and numbers targets exactly as the gaze scan
+does. Chrome capture runs through the background broker; during capture the
+overlay is held clear, so gaze cannot draw Iris's numbers into the screenshot. The side-panel coordinator owns transient mask/crop canvases, capture
+consistency checks and plain-text results. The background owns demo session tokens, kept in Chrome's memory-only session storage so they survive the idle worker restarting, and authenticated HTTP. It rejects broker
 messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
 there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.
 Only the visible viewport is understood; summaries deterministically disclose
 this. Describe-image sends a locally masked crop for a revision-bound image ID,
-never a URL to fetch. Unsupported frames/custom controls/video/animations and
+never a URL to fetch. "What is this?" connects gaze to Gemini: it sends a masked
+crop around the target gaze last rested on, outlined, and shows Gemini's short
+description; gaze and page understanding number targets identically, so the
+aimed number is checked against a fresh snapshot before anything is sent. Unsupported frames/custom controls/video/animations and
 pinch zoom fail closed; detectable capture races and stale results are discarded.
 
 ### 3.3 Data handling rules
@@ -253,12 +251,12 @@ iris_sentinel/
 │   └── tracks.md                # track and technology analysis
 ├── extension/                   # Chrome extension (Manifest V3)
 │   └── src/
-│       ├── background/          # coordinator, input mode state, native messaging link
+│       ├── background/          # coordinator, input mode state
 │       ├── sidepanel/
 │       │   ├── agent/           # ElevenLabs agent session and client tool definitions
 │       │   └── setup/           # permissions, lighting, calibration, long-blink practice
 │       ├── content/             # target finder, numbered overlay, click/scroll, enlarge, screenshot
-│       └── providers/           # MediaPipe gaze, simulated sensors
+│       └── providers/           # MediaPipe gaze, simulated sensors, companion link (native messaging)
 ├── companion/                   # Node.js helper running Presage (its own npm project, bundled to one file)
 │   ├── src/
 │   │   ├── main.ts, host.ts     # entry point and message loop (answers only the Iris extension)
@@ -266,7 +264,7 @@ iris_sentinel/
 │   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
 │   │   ├── secrets/             # reads the Presage key from the OS keychain
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
-│   └── install/                 # registers the native messaging host (macOS, Windows)
+│   └── install/                 # registers the native messaging host (macOS; Windows is a stretch goal)
 ├── server/                      # Cloudflare Worker, holds all keys
 │   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/

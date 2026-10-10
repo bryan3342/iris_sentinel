@@ -16,9 +16,21 @@ for (const [name, mutate] of [
   ['unexpected operation input', d => { d.imageId = 1; }],
 ]) test(`protocol rejects ${name}`, () => { const d = input(); mutate(d); assert.throws(() => m.validateInput(d)); });
 
+for (const [name, mutate] of [
+  ['a second target', d => { d.targets.push({ ...d.targets[0], id: 6 }); }],
+  ['a target ID that is not the supplied target', d => { d.targetId = 6; }],
+  ['a missing crop', d => { delete d.sourceRect; }],
+  ['a crop with the wrong shape', d => { d.sourceRect.width = 1; }],
+  ['find-target fields', d => { d.request = 'Find'; }],
+]) test(`describe_target rejects ${name}`, () => {
+  const d = input('describe_target'); assert.doesNotThrow(() => m.validateInput(input('describe_target'))); mutate(d);
+  assert.throws(() => m.validateInput(d));
+});
+
 test('null selection is valid; wrong image ID, unknown result fields and oversized text are invalid', () => {
   assert.equal(m.validateUnderstanding({ ...result('find_target'), targetId: null }, input()).targetId, null);
   assert.throws(() => m.validateUnderstanding({ ...result('describe_image'), imageId: 4 }, input('describe_image')));
+  assert.throws(() => m.validateUnderstanding({ ...result('describe_target'), targetId: 6 }, m.validateInput(input('describe_target'))));
   assert.throws(() => m.validateUnderstanding({ ...result('summarize_page'), url: 'https://evil' }, input('summarize_page')));
   assert.throws(() => m.validateUnderstanding({ ...result('summarize_page'), summary: 'x'.repeat(2001) }, input('summarize_page')));
 });

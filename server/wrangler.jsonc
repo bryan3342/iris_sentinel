@@ -7,7 +7,6 @@
   "vars": {
     "ENABLE_VOICE_AGENT": "false",
     "ENABLE_PAGE_UNDERSTANDING": "false",
-    "PAGE_CONTENT_APPROVED": "false",
-    "ENABLE_LOCAL_LABELS": "false"
+    "PAGE_CONTENT_APPROVED": "false"
   }
 }

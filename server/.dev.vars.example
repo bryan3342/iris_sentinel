@@ -1,8 +1,6 @@
 # Copy this file to .dev.vars and replace the placeholder locally.
 GEMINI_API_KEY=replace_with_your_key
 GEMINI_MODEL=gemini-3.8-flash
-# Legacy labels-only curl checks, localhost only (each successful call spends quota).
-ENABLE_LOCAL_LABELS=true
 # v0.1 stays disabled until the operator provisions access.
 ENABLE_PAGE_UNDERSTANDING=false
 PAGE_CONTENT_APPROVED=false

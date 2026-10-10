@@ -1,10 +1,12 @@
 import type { NumberedTarget, Point2 } from '@iris/protocol';
 
 export type OverlayCommand =
-  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null }
+  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; pending?: number | null }
   | { type: 'clear' }
+  | { type: 'hold' }
+  | { type: 'release' }
   | { type: 'dot'; at: Point2 | null };
-export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
+export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
 
 /**
  * Draws target numbers and one highlight over the page. Runs in Chrome's
@@ -14,18 +16,26 @@ export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
  * redrawn only inside that root, so the page helper never counts a redraw as a
  * page change. A drawing is bound to one document revision and is erased by
  * the next page change. For calibration it instead shows one still dot over a
- * dimmed page, at a fraction of the visible viewport.
+ * dimmed page, at a fraction of the visible viewport. A hold clears the page and
+ * refuses every 'show' until released, so a screenshot never contains numbers drawn
+ * by another part of Iris (gaze keeps redrawing while it aims).
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
   type Understanding = { documentToken: string; revision: number; onChange?: () => void };
   type Overlay = { host: HTMLDivElement; layer: HTMLDivElement };
-  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay };
+  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay; __irisOverlayHoldV01?: number };
   const clear = () => {
     const drawn = Boolean(host.__irisOverlayV01?.layer.firstChild);
     host.__irisOverlayV01?.layer.replaceChildren();
     return drawn;
   };
-  if (command.type === 'clear') {
+  if (command.type === 'release') {
+    delete host.__irisOverlayHoldV01;
+    return 'CLEARED';
+  }
+  if (command.type === 'clear' || command.type === 'hold') {
+    // A hold lapses after 5 seconds on its own, in case the side panel closes before releasing it.
+    if (command.type === 'hold') host.__irisOverlayHoldV01 = Date.now() + 5_000;
     // Wait until the erased overlay has been painted, so a screenshot taken next never contains it.
     // A tab that is not visible never paints, so the wait is capped instead of hanging.
     if (clear()) {
@@ -36,6 +46,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     }
     return 'CLEARED';
   }
+  if (command.type === 'show' && (host.__irisOverlayHoldV01 ?? 0) > Date.now()) return 'HELD';
   const state = host.__irisUnderstandingV01;
   if (command.type === 'show' && (!state || state.documentToken !== command.documentToken || state.revision !== command.revision)) {
     clear();
@@ -52,6 +63,8 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
         background: #ffeb3b; border: 1px solid #000; border-radius: 3px; }
       .badge.aimed { font-size: 16px; line-height: 22px; background: #fff; }
       .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }
+      .aim.again { border: 4px dashed #b00020; outline-color: #fff; }
+      .again-note { position: fixed; padding: 2px 6px; font: bold 13px/18px sans-serif; color: #fff; background: #b00020; border-radius: 3px; }
       .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); }
       .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
         background: #2dd4bf; border: 3px solid #fff; }`;
@@ -80,11 +93,19 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   const drawing: HTMLElement[] = [], aim: HTMLElement[] = [];
   for (const target of command.targets) {
     const aimed = target.id === command.highlight;
-    if (aimed) {
+    const waiting = target.id === command.pending; // a risky target waiting for its second confirm
+    if (aimed || waiting) {
       const box = document.createElement('div');
-      box.className = 'aim';
+      box.className = waiting ? 'aim again' : 'aim';
       Object.assign(box.style, { left: left(target.rect.x), top: top(target.rect.y), width: `${target.rect.width}px`, height: `${target.rect.height}px` });
       aim.push(box);
+    }
+    if (waiting) {
+      const note = document.createElement('div');
+      note.className = 'again-note';
+      note.textContent = 'Look away and back to confirm';
+      Object.assign(note.style, { left: left(target.rect.x), top: top(target.rect.y + target.rect.height + 4) });
+      aim.push(note);
     }
     const badge = document.createElement('div');
     badge.className = aimed ? 'badge aimed' : 'badge';

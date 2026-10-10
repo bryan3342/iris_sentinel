@@ -1,31 +1,10 @@
 // @vitest-environment happy-dom
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it } from 'vitest';
 import { pageSnapshot } from '../../extension/src/page-understanding/page-helper';
-
-// happy-dom has no layout. Each element's box comes from its data-box attribute
-// ("x y width height"), and hit testing returns the innermost element whose box contains the point.
-const box = (el: Element) => (el.getAttribute('data-box') ?? '').split(' ').map(Number);
-function rectOf(this: Element): DOMRect {
-  const [x = 0, y = 0, width = 0, height = 0] = box(this);
-  return { left: x, top: y, right: x + width, bottom: y + height, x, y, width, height, toJSON() {} } as DOMRect;
-}
-function hit(this: Document | ShadowRoot, px: number, py: number): Element | null {
-  const inside = [...this.querySelectorAll('[data-box]')].filter((el) => {
-    const [x = 0, y = 0, w = 0, h = 0] = box(el);
-    return px >= x && px <= x + w && py >= y && py <= y + h;
-  });
-  return inside.at(-1) ?? null;
-}
+import { fakeLayout } from '../helpers/fake-layout';
 
 beforeEach(() => {
-  vi.stubGlobal('visualViewport', { width: 800, height: 600, offsetLeft: 0, offsetTop: 0, scale: 1, addEventListener() {} });
-  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(rectOf);
-  vi.spyOn(Element.prototype, 'getAnimations').mockReturnValue([]);
-  // happy-dom computes no styles; Chrome's defaults for a visible element.
-  vi.stubGlobal('getComputedStyle', () => ({ display: 'block', visibility: 'visible', opacity: '1' }));
-  Object.assign(document, { elementFromPoint: hit });
-  Object.assign(ShadowRoot.prototype, { elementFromPoint: hit });
-  delete (globalThis as { __irisUnderstandingV01?: unknown }).__irisUnderstandingV01;
+  fakeLayout();
   document.body.innerHTML = `
     <a href="/one" data-box="10 10 100 20">Account settings</a>
     <button data-box="10 40 80 20">Send</button>
@@ -84,3 +63,18 @@ it('treats links without a usable address, and mixed harmless and risky names, a
   expect(pageSnapshot('targets').targets.map((t) => t.risky)).toEqual([true, true]);
 });
 
+
+it('numbers targets the same way for gaze and page understanding', () => {
+  // A layout-less custom element (like display: contents) still holds targets, and an editable link is never a target.
+  document.body.innerHTML = `
+    <a href="/one" data-box="10 10 100 20">One</a>
+    <x-group></x-group>
+    <a href="/edit" contenteditable data-box="10 70 100 20">Editable</a>
+    <button data-box="10 100 80 20">Last</button>`;
+  document.querySelector('x-group')!.attachShadow({ mode: 'open' }).innerHTML = '<button data-box="10 40 60 20">Inside</button>';
+  const page = pageSnapshot();
+  const shape = (targets: { id: number; rect: { y: number } }[]) => targets.map((t) => [t.id, t.rect.y]);
+  expect(page.blocked).toBe(false);
+  expect(shape(page.targets)).toEqual([[1, 10], [2, 40], [3, 100]]);
+  expect(shape(pageSnapshot('targets').targets)).toEqual(shape(page.targets));
+});
