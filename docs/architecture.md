@@ -247,7 +247,7 @@ iris_sentinel/
 │   │   └── detectors/           # breath hold, blink segmenter, long blink, talking gate
 │   └── install/                 # registers the native messaging host (macOS, Windows)
 ├── server/                      # Cloudflare Worker, holds all keys
-│   ├── db/                      # Tiger Data schema (SQL) and dev seed
+│   ├── db/                      # Tiger Data schema (SQL)
 │   └── src/
 │       └── routes/
 │           ├── agent-token/     # signed ElevenLabs agent session
