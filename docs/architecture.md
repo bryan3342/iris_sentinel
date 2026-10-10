@@ -1,6 +1,6 @@
 # Iris: Architecture
 
-Iris is a Chrome extension that lets people with severe motor impairments browse real websites hands-free. Users aim with their eyes (or head), confirm with a breath hold, a long blink or a dwell, and speak requests to a voice agent. Iris watches for fatigue through the camera and adapts its pace before the user gives up.
+Iris is a Chrome extension that lets people with severe motor impairments browse real websites hands-free. Users aim with their eyes (or head), confirm with a dwell or a long blink, and speak requests to a voice agent. Iris watches for fatigue through the camera and adapts its pace before the user gives up.
 
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
@@ -25,7 +25,7 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 | Idea | How |
 | :--- | :--- |
 | Aim at real targets, not pixels | The extension reads the page, numbers every link and button, and snaps focus to the nearest one. |
-| Separate aiming from clicking | Eyes aim. A breath hold (a webcam version of the sip-and-puff switches quadriplegic users already rely on), a long blink or a dwell confirms. |
+| Separate aiming from clicking | Eyes aim. A dwell or a long blink confirms. |
 | Say what you want | A voice agent maps "open the history section" to the right target, summarizes pages and describes images. |
 | Adapt to fatigue | Body signals (blink rate, heart rate variability, breathing) plus behavior (more "go back" actions, shakier aim) drive a fatigue score. Iris slows down, enlarges targets, then offers to read aloud. |
 | Private by default | All camera processing happens on the laptop. No video ever leaves the machine. |
@@ -43,10 +43,10 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
 | Client | Chrome extension, Manifest V3, TypeScript | Side panel (UI, voice agent, gaze tracking), background coordinator, page helper injected into each tab |
-| Vitals and face sensing | **Presage SmartSpectra** (Node.js SDK) in a local companion | Live breathing waveform, heart rate, heart rate variability, blinks, talking detection, facial expressions and a motion warning. Runs on-device. Presage has no gaze output and no fatigue, focus or movement score; Iris computes those. |
+| Vitals and face sensing | **Presage SmartSpectra** (Node.js SDK) in a local companion | Heart rate, heart rate variability, breathing rate and waveform, natural blinks, facial expressions and a motion warning, used for slow trends (fatigue, focus), never for confirms. Runs on-device. Presage has no gaze output and no fatigue, focus or movement score; Iris computes those. |
 | Companion link | Chrome native messaging | Chrome starts the companion and only Iris's extension can reach it. No open network port. |
-| Gaze (where the user looks) | MediaPipe Face Landmarker (in the side panel) | Primary aiming source. Eye and head landmarks are mapped to a screen point through the 5-dot calibration. The WebAssembly runtime and model are bundled with the extension. |
-| Voice | **ElevenLabs Agents** with client tools | Hands-free conversation with turn-taking; calls Iris actions as tools |
+| Gaze (where the user looks) | MediaPipe Face Landmarker (in the side panel) | Primary aiming source. Eye and head landmarks are mapped to a screen point through the 5-dot calibration. Its per-eye closure drives the long-blink confirm. The WebAssembly runtime and model are bundled with the extension. |
+| Voice | **ElevenLabs Agents** with client tools | Hands-free conversation with turn-taking; calls Iris actions as tools; tells Iris when the user is talking |
 | Fixed voice lines | ElevenLabs text-to-speech | Backup for short system lines if the agent connection fails |
 | Page understanding | **Gemini API** (Flash models, image input) | Matches spoken requests to numbered targets using a screenshot plus the target list, summarizes pages, describes images |
 | API gateway | Cloudflare Worker | Holds every API key; mints the ElevenLabs agent session; proxies Gemini |
@@ -57,10 +57,10 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 
 | Interface | Implementations |
 | :--- | :--- |
-| `GazeProvider` (where the user looks) | MediaPipe, simulated |
-| `FaceProvider` (blinks, talking, expressions, motion warning, face points) | Presage companion, simulated |
+| `GazeProvider` (where the user looks, eye closure for the long-blink confirm) | MediaPipe, simulated |
+| `FaceProvider` (blink events for blink rate, expressions, motion warning, face points) | Presage companion, simulated |
 | `VitalsProvider` (breathing wave, HR, HRV) | Presage companion, simulated |
-| `VoiceAgent` | ElevenLabs Agents |
+| `VoiceAgent` (conversation, user talking on/off) | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
 | `SessionStore` | Local only, Tiger Data |
 
@@ -72,19 +72,17 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 
 ```
 Webcam ─> Iris Companion (Node.js, Presage SDK)
-            ├─ breathing waveform ─> BreathHoldDetector ──────────┐
-            ├─ blink frames ───────> BlinkSegmenter ─> blink events (with duration)
-            │                          └─ LongBlinkDetector ──────┤ confirm events
-            ├─ talking on/off ─────> pauses confirms while talking│
-            └─ HR, HRV, breathing rate, blink events,             │
-               expressions, motion warning, face points           │
-                 │ native messaging (small JSON events, no video) │
-                 ▼                                                ▼
+            ├─ blink frames ───> BlinkSegmenter ─> blink events (for blink rate)
+            └─ HR, HRV, breathing rate, expressions, motion warning, quality hints
+                 │ native messaging (small JSON events, no video)
+                 ▼
         Background coordinator ── input mode state machine ── click(target)
-          ├─ FatigueEngine, FocusEngine, movement (packages/core) │
-          ▲                                                       ▼
-          │ gaze points (screen coordinates)
+          ├─ FatigueEngine, FocusEngine, movement (packages/core)
+          ├─ LongBlinkDetector, dwell timer (packages/core) ─> confirm events
+          ▲
+          │ gaze points (screen coordinates), eye closure, user talking on/off
 Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
+Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/off
                  │
                  ▼
         Page helper: numbered overlay, snap aim to nearest target, click, scroll,
@@ -93,14 +91,18 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 
 **Who owns what.**
 - **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`.
-- **Blinks:** Presage only. MediaPipe's blink detection is not used, so the two can never disagree. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events with a duration. Long blinks become confirm events; every blink event also feeds the fatigue score, which leaves out the long blinks used as confirms.
+- **Confirms:** a dwell or a long blink, never Presage. The long blink comes from MediaPipe's per-eye closure: a closure under 400 ms is an ordinary blink, and only a closure held well past that confirms. Voice requests pick a target but never confirm it.
+- **Blink rate:** Presage only. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events for the fatigue score. MediaPipe answers "did the user close their eyes on purpose", Presage answers "how often is the user blinking", so the two never compete. Core drops a Presage blink that coincides with a confirm, so confirms do not count as fatigue.
+- **Talking:** the ElevenLabs agent, which hears the microphone. Presage's talking flag is not used. With no voice session open, Iris has no talking signal; fatigue readings get slightly noisier, and no confirm depends on it.
 - **Fatigue, focus and movement:** computed by Iris in the background coordinator from Presage signals plus behavior that only the extension sees. Presage provides the raw signals, not these scores.
 
-**Camera sharing.** The companion and the side panel each open the webcam. Both must run at once; this is verified on every target machine before building on it. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
+Presage was tested on the demo laptop before these choices were made (#24). Its blink flag reports every blink at about the same length however long the eyes stay closed, and it missed 4 of 10 prompted blinks. Its talking flag was on more often during silence than during speech. Normal pauses between breaths at rest lasted as long as deliberate breath holds. Presage expects a still, quiet user, and its readings degrade when talking, blinking and breathing changes happen together, so it is used for slow trends only.
 
-**MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still; this is not a blink signal and never drives a confirm. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
+**Camera sharing.** The companion and the side panel each open the webcam. Both must run at once. This was verified on the demo laptop (#24) and is checked on every other target machine. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 
-**Fatigue score.** Combines slow body signals (blink rate up, heart rate variability down, breathing rate) with behavior (back-after-click rate, aim steadiness, time to click). It is computed against the user's own resting baseline, uses hysteresis so it does not flicker, and is paused while the user is talking.
+**MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still. The missing position is not a blink signal; the long-blink confirm reads the per-eye closure carried in each sample instead. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
+
+**Fatigue score.** Combines slow body signals (blink rate up, heart rate variability down, breathing rate) with behavior (back-after-click rate, aim steadiness, time to click). It is computed against the user's own resting baseline, uses hysteresis so it does not flicker, and is paused while the voice agent hears the user talking.
 
 | Fatigue level | Iris response |
 | :--- | :--- |
@@ -113,7 +115,7 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 
 **Focus score.** Combines how steady the gaze is on the page, blink pattern, movement level and Presage facial expressions. Like fatigue, it is computed against the user's own baseline and is never shown as a medical reading.
 
-**Presage signal limits** (from the SmartSpectra docs). Readings carry a confidence value and only become trustworthy after a warm-up: 12 seconds for pulse, 30 seconds for breathing, 60 seconds for heart rate variability. Breathing needs the upper chest in view and a still camera, and talking distorts it. Iris ignores readings below their stable threshold, pauses breathing-based signals while the user talks, and uses these signals for slow trends (fatigue, focus), not instant actions. The breath-hold confirm is the one exception and is checked on the demo laptop before it is relied on; long blink and dwell are always available.
+**Presage signal limits** (from the SmartSpectra docs, confirmed on the demo laptop in #24). Readings carry a confidence value and only become trustworthy after a warm-up: 12 seconds for pulse, 30 seconds for breathing, 60 seconds for heart rate variability. Breathing needs the upper chest in view and a still camera, and talking distorts it. Iris ignores readings below their stable threshold, pauses breathing-based signals while the voice agent hears the user talking, and uses these signals only for slow trends (fatigue, focus), never for confirms.
 
 ### 3.2 Voice request flow
 
@@ -125,7 +127,7 @@ User speaks ─> ElevenLabs Agent (side panel, signed session from Worker)
                       └─ authenticated Worker /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
                  └─ highlights target 12, asks for confirm
-User confirms (breath / blink / dwell) ─> page helper clicks target 12
+User confirms (dwell / long blink) ─> page helper clicks target 12
 Agent: "Opening History."
 ```
 
@@ -197,7 +199,7 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 **Principles**
 1. **Targets, not pixels.** Aim always snaps to a real, numbered page element.
 2. **Aim and confirm are separate.** No click happens from looking alone.
-3. **One intent at a time.** An input mode state machine (`idle → aiming → confirming → listening → acting → speaking`) keeps eyes, breath, blinks and voice from colliding.
+3. **One intent at a time.** An input mode state machine (`idle → aiming → confirming → listening → acting → speaking`) keeps eyes, blinks, dwell and voice from colliding.
 4. **Sensors are plugins.** Every sensor publishes normalized events through its interface; a simulated provider plugs in the same way for development without a camera.
 5. **Show the why.** A side-panel feed tells the user what Iris noticed and what it changed ("Blink rate up 40%, slowing clicks").
 
@@ -206,7 +208,7 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 | To... | Default | Alternatives |
 | :--- | :--- | :--- |
 | Aim | Eyes | Head pointing |
-| Confirm | Breath hold (about 2s) | Long blink, dwell |
+| Confirm | Dwell | Long blink |
 | Scroll | Look at the top or bottom edge band | Voice |
 | Navigate by intent | Voice request | Aim and confirm |
 | Read | Voice "read this" | Read zone |
@@ -215,7 +217,7 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 1. Camera and microphone permission, requested once from an extension tab page (a side panel may not show the permission prompt); the side panel then reuses the grant.
 2. Lighting check.
 3. 5-dot calibration inside the page.
-4. Breath-hold practice.
+4. Long-blink practice (optional; dwell works without it).
 5. A default resting profile is used until a personal baseline has built up.
 
 ---
@@ -238,13 +240,14 @@ iris_sentinel/
 │       ├── background/          # coordinator, input mode state, native messaging link
 │       ├── sidepanel/
 │       │   ├── agent/           # ElevenLabs agent session and client tool definitions
-│       │   └── setup/           # permissions, lighting, calibration, breath practice
+│       │   └── setup/           # permissions, lighting, calibration, long-blink practice
 │       ├── content/             # target finder, numbered overlay, click/scroll, enlarge, screenshot
 │       └── providers/           # MediaPipe gaze, simulated sensors
 ├── companion/                   # Node.js helper running Presage
 │   ├── src/
 │   │   ├── presage/             # SDK session behind FaceProvider / VitalsProvider
-│   │   └── detectors/           # breath hold, blink segmenter, long blink, talking gate
+│   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
+│   │   └── detectors/           # blink segmenter (blink events for blink rate)
 │   └── install/                 # registers the native messaging host (macOS, Windows)
 ├── server/                      # Cloudflare Worker, holds all keys
 │   └── src/
