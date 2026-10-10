@@ -82,10 +82,11 @@ Webcam ─> Iris Companion (Node.js, Presage SDK)
           ▲
           │ gaze points (screen coordinates), eye closure, user talking on/off
 Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
+                     ─> snap aim to nearest target (packages/core)
 Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/off
-                 │
+                 │ aimed target number only
                  ▼
-        Page helper: numbered overlay, snap aim to nearest target, click, scroll,
+        Page helper: numbered overlay, click, scroll,
                      enlarge text and targets when fatigue rises
 ```
 
@@ -98,7 +99,7 @@ Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/of
 
 Presage was tested on the demo laptop before these choices were made (#24). Its blink flag reports every blink at about the same length however long the eyes stay closed, and it missed 4 of 10 prompted blinks. Its talking flag was on more often during silence than during speech. Normal pauses between breaths at rest lasted as long as deliberate breath holds. Presage expects a still, quiet user, and its readings degrade when talking, blinking and breathing changes happen together, so it is used for slow trends only.
 
-**Page targets for gaze.** The side panel keeps the active tab's numbered targets current: four times a second it reads the page's change counter, and rescans only when the tab, the document or the counter moves. Gaze uses a targets-only scan of links and buttons that carries positions but no labels and none of the screenshot blocking rules, since nothing from it leaves the extension; page understanding keeps its full scan. Numbers and the aimed target are drawn by an overlay that only draws, is erased by any page change, and is never in a screenshot.
+**Page targets for gaze.** The side panel keeps the active tab's numbered targets current: four times a second it reads the page's change counter, and rescans only when the tab, the document or the counter moves. Gaze uses a targets-only scan of links and buttons that carries positions but no labels and none of the screenshot blocking rules, since nothing from it leaves the extension; page understanding keeps its full scan. Snapping runs in the side panel, next to the tracker: each smoothed gaze point snaps to the nearest target in the current list, and the page is messaged only when the aimed target changes, so gaze points never reach the page. Numbers and the aimed target are drawn by an overlay that only draws, is erased by any page change, and is never in a screenshot.
 
 **Camera sharing.** The companion and the side panel each open the webcam. Both must run at once. This was verified on the demo laptop (#24) and is checked on every other target machine. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 

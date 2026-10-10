@@ -1,3 +1,4 @@
+import type { CalibrationSample } from '@iris/core';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
 
 // A camera-free GazeProvider for development and tests. A look source says
@@ -22,6 +23,12 @@ export const SIMULATED_HEAD: HeadPose = { yaw: 0, pitch: 0, eyes: { x: 0.5, y: 0
 /** The simulated eye: a fixed linear map from screen point to eye feature, which calibration learns. */
 export function eyeFor(point: Point2): Point2 {
   return { x: (point.x - 0.5) * 0.8, y: (point.y - 0.5) * 0.6 };
+}
+
+/** A perfect 9-dot calibration for the simulated eye, so a simulated user aims without running the dots. */
+export function simulatedCalibration(): CalibrationSample[] {
+  const dots = [0.05, 0.5, 0.95].flatMap((y) => [0.05, 0.5, 0.95].map((x) => ({ x, y })));
+  return dots.flatMap((target) => [0, 1, 2].map(() => ({ eye: eyeFor(target), head: SIMULATED_HEAD, target })));
 }
 
 /** A look source that plays `steps` in order and holds the last one. */
