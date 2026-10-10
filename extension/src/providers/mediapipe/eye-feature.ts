@@ -15,8 +15,9 @@ export interface FaceFrame {
 }
 
 // Corners are listed image-left first. "Right" is the user's right eye.
-const RIGHT_EYE = { iris: 468, cornerA: 33, cornerB: 133 };
-const LEFT_EYE = { iris: 473, cornerA: 362, cornerB: 263 };
+// Iris lists the center then its four contour points; averaging them steadies the center.
+const RIGHT_EYE = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133 };
+const LEFT_EYE = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263 };
 
 const BLINK_CLOSED = 0.5;
 const TALKING_JAW_OPEN = 0.15;
@@ -27,10 +28,14 @@ function eyeOffset(frame: FaceFrame, eye: typeof RIGHT_EYE): Point2 | null {
     const p = frame.landmarks[i];
     return p ? { x: p.x * frame.aspect, y: p.y } : null;
   };
-  const iris = at(eye.iris);
+  const irisPoints = eye.iris.map(at).filter((p): p is Point2 => p !== null);
   const a = at(eye.cornerA);
   const b = at(eye.cornerB);
-  if (!iris || !a || !b) return null;
+  if (irisPoints.length === 0 || !a || !b) return null;
+  const iris = {
+    x: irisPoints.reduce((sum, p) => sum + p.x, 0) / irisPoints.length,
+    y: irisPoints.reduce((sum, p) => sum + p.y, 0) / irisPoints.length,
+  };
   const ax = b.x - a.x;
   const ay = b.y - a.y;
   const lengthSq = ax * ax + ay * ay;
@@ -56,11 +61,16 @@ export function toFaceSample(frame: FaceFrame, t: number): FaceSample {
   const closed = blink.left > BLINK_CLOSED && blink.right > BLINK_CLOSED;
   const right = eyeOffset(frame, RIGHT_EYE);
   const left = eyeOffset(frame, LEFT_EYE);
+  // Up/down from landmarks is weak (the lids hide the iris), so blend in the
+  // model's own look-down minus look-up scores, averaged over both eyes.
+  const b = frame.blendshapes;
+  const lookDown =
+    ((b.eyeLookDownLeft ?? 0) + (b.eyeLookDownRight ?? 0) - (b.eyeLookUpLeft ?? 0) - (b.eyeLookUpRight ?? 0)) / 2;
   // Image x grows toward the user's left, so flip it: positive x is the user's right.
   const eye =
     closed || !right || !left
       ? null
-      : { x: -(right.x + left.x) / 2, y: (right.y + left.y) / 2 };
+      : { x: -(right.x + left.x) / 2, y: ((right.y + left.y) / 2 + lookDown) / 2 };
   return {
     t,
     eye,

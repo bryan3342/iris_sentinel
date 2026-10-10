@@ -8,12 +8,16 @@ const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 function frame(irisShift: Point2 = { x: 0, y: 0 }, blendshapes: Record<string, number> = {}): FaceFrame {
   const landmarks: Point2[] = Array.from({ length: 478 }, () => ({ x: 0.5, y: 0.5 }));
   const place = (i: number, x: number, y: number) => (landmarks[i] = { x, y });
+  const placeIris = (center: number, x: number, y: number) => {
+    place(center, x, y);
+    [[0.005, 0], [0, -0.005], [-0.005, 0], [0, 0.005]].forEach(([dx, dy], k) => place(center + 1 + k, x + dx!, y + dy!));
+  };
   place(33, 0.3, 0.4); // user's right eye, outer corner
   place(133, 0.4, 0.4); // user's right eye, inner corner
-  place(468, 0.35 + irisShift.x, 0.4 + irisShift.y);
+  placeIris(468, 0.35 + irisShift.x, 0.4 + irisShift.y);
   place(362, 0.6, 0.4); // user's left eye, inner corner
   place(263, 0.7, 0.4); // user's left eye, outer corner
-  place(473, 0.65 + irisShift.x, 0.4 + irisShift.y);
+  placeIris(473, 0.65 + irisShift.x, 0.4 + irisShift.y);
   return { landmarks, blendshapes, matrix: IDENTITY, aspect: 1 };
 }
 
@@ -30,6 +34,13 @@ describe('toFaceSample', () => {
 
   it('reports positive y when the irises sit below the eye corners', () => {
     expect(toFaceSample(frame({ x: 0, y: 0.01 }), 0).eye?.y).toBeGreaterThan(0);
+  });
+
+  it('blends look-down scores into the vertical position', () => {
+    const down = toFaceSample(frame(undefined, { eyeLookDownLeft: 0.6, eyeLookDownRight: 0.6 }), 0);
+    const up = toFaceSample(frame(undefined, { eyeLookUpLeft: 0.6, eyeLookUpRight: 0.6 }), 0);
+    expect(down.eye?.y).toBeGreaterThan(0);
+    expect(up.eye?.y).toBeLessThan(0);
   });
 
   it('drops the eye position while both eyes are closed', () => {
