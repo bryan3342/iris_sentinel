@@ -1,4 +1,4 @@
-import { fitCalibration, type CalibrationModel, type CalibrationSample } from '@iris/core';
+import type { CalibrationSample } from '@iris/core';
 import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
 
 const grid = (positions: number[]) => positions.flatMap((y) => positions.map((x) => ({ x, y })));
@@ -46,15 +46,15 @@ async function presentDots(
   }
 }
 
-/** Fits a calibration from where the eyes were at each dot. Samples stay in memory only. */
+/** Collects where the eyes were at each dot. The caller hands the samples to a CalibrationStore. */
 export async function runCalibration(
   provider: GazeProvider,
   host: HTMLElement,
   dotCount: 5 | 9,
-): Promise<CalibrationModel> {
+): Promise<CalibrationSample[]> {
   const samples: CalibrationSample[] = [];
   await presentDots(host, provider, DOT_LAYOUTS[dotCount], (target, s) => {
     if (s.eye) samples.push({ eye: s.eye, head: s.head, target });
   });
-  return fitCalibration(samples);
+  return samples;
 }
