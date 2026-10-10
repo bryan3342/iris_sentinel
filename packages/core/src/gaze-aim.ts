@@ -1,0 +1,49 @@
+import type { GazeSample } from '@iris/protocol';
+import type { Viewport } from './calibration';
+import type { GazePointer } from './gaze-pointer';
+import { snapToTarget, type SnapOptions, type SnapTarget } from './snap';
+
+/**
+ * Which page target the user is aiming at. Each smoothed gaze point snaps to
+ * the current target list. The aim holds while the eyes are closed or the face
+ * is lost. Target IDs are only valid for the scan they came from, so a new list
+ * re-snaps from the last gaze point instead of carrying an old ID over.
+ */
+
+// Webcam gaze error is about 100 px on a laptop screen, so a target counts as
+// aimed up to that far from the point, and a neighbor must be clearly closer to take over.
+export const DEFAULT_SNAP: SnapOptions = { maxDistance: 100, hysteresis: 30 };
+
+export class GazeAim {
+  private targets: readonly SnapTarget[] = [];
+  private viewport: Viewport | null = null;
+  private aimed: number | null = null;
+
+  constructor(
+    private readonly pointer: GazePointer,
+    private readonly options: SnapOptions = DEFAULT_SNAP,
+  ) {}
+
+  /** The aimed target ID in the current list, or null. */
+  get current(): number | null {
+    return this.aimed;
+  }
+
+  /** Replaces the list (a fresh scan of the page); returns the aim within it. */
+  setTargets(targets: readonly SnapTarget[], viewport: Viewport): number | null {
+    this.targets = targets;
+    this.viewport = viewport;
+    const point = this.pointer.point;
+    this.aimed = point ? snapToTarget(point, targets, null, this.options) : null;
+    return this.aimed;
+  }
+
+  /** Feeds one gaze sample; returns the aim after it. */
+  update(sample: GazeSample): number | null {
+    if (!this.viewport) return null;
+    const point = this.pointer.update(sample, this.viewport);
+    if (!sample.eye || !point) return this.aimed;
+    this.aimed = snapToTarget(point, this.targets, this.aimed, this.options);
+    return this.aimed;
+  }
+}
