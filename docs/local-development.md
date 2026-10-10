@@ -7,6 +7,7 @@ Everything below runs on your own computer. Camera video is processed in the bro
 - Node.js 20 or newer (includes npm)
 - Google Chrome 116 or newer
 - A webcam (optional for the playground, see [Without a camera](#without-a-camera))
+- For the Presage companion on macOS: Apple's command line tools, to build its small app (`xcode-select --install`)
 
 ## Install
 
@@ -78,9 +79,9 @@ The companion is the small Node.js program that runs Presage on this computer, b
    npm run install:host
    ```
 
-   This copies the companion to `~/Library/Application Support/Iris/companion/`, out of the repository, which macOS may protect if it sits in `~/Desktop`, together with the Presage SDK it runs (about 95 MB, this Mac's native files only). It writes a launcher that calls Node by its full path, since Chrome starts programs with almost no `PATH`, and registers it with Chrome as `com.iris.companion`, which only the Iris extension ID may start. Run `npm run install:host` again after pulling companion changes.
+   This copies the companion to `~/Library/Application Support/Iris/companion/`, out of the repository, which macOS may protect if it sits in `~/Desktop`, together with the Presage SDK it runs (about 110 MB, this Mac's native files only). It builds a small app around it, `~/Library/Application Support/Iris/Iris Companion.app`, because Chrome does not share its own camera permission with the programs it starts and macOS only asks for the camera on behalf of an app. The app's launcher calls Node by its full path, since Chrome starts programs with almost no `PATH`. Finally it registers the app with Chrome as `com.iris.companion`, which only the Iris extension ID may start. Run `npm run install:host` again after pulling companion changes.
 
-3. Open the Iris side panel. It connects to the companion, which starts Presage: the status moves from **(starting)** to **Body signals: companion connected (running)** within a few seconds, and the camera light stays on. Readings settle over the first minute. Closing the panel ends the companion and Presage with it.
+3. Open the Iris side panel. It connects to the companion, which starts Presage. The first time, macOS asks whether **"Iris Companion" would like to access the camera**: choose **Allow**. Reinstalling rebuilds the app, so macOS may ask again. The status then moves from **(starting)** to **Body signals: companion connected (running)** within a few seconds, and the camera light stays on. Readings settle over the first minute. Closing the panel ends the companion and Presage with it.
 
 4. To check Presage on its own, without Chrome, run `npm run check:presage` in `companion/`. It measures for 60 seconds (pass another number of seconds after `--`), shows camera hints, and reports which signals arrived, never the readings themselves. It turns on the camera and uses about a minute of Presage credit. Pulse settles after about 12 seconds, breathing after about 30 and HRV after about 60.
 
@@ -106,5 +107,5 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 | "Specified native messaging host not found" | The companion is not registered: run `npm run install:host` in `companion/`. |
 | "Body signals: companion connected (key-missing)" | Store the Presage key: `security add-generic-password -U -s iris-presage -a iris -w`, then reopen the panel. |
 | "(key-invalid)", "(offline)" or "(credits-exhausted)" | Presage refused the key, could not be reached, or has no credit left. Check the key, the network or the Presage developer portal. |
-| "(camera-unavailable)" | No camera frame reached Presage within 15 seconds. Either another app holds the camera (quit it and reopen the panel), or macOS has not let the companion use the camera: Chrome does not share its own camera permission with the programs it starts. |
+| "(camera-unavailable)" | No camera frame reached Presage within 15 seconds. Either another app holds the camera (quit it and reopen the panel), or macOS has not let Iris Companion use it: turn on **Iris Companion** in System Settings, Privacy & Security, Camera, then reopen the panel. |
 | Stuck on "(starting)" | Presage waits for your face and upper chest to be in view before it measures. Lean back so your shoulders show, and keep the light in front of you. |

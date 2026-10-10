@@ -9,8 +9,7 @@ preview, gaze aiming with on-page calibration, dwell-confirmed selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, long-blink confirms, scrolling, voice browser
-tools, user-talking signals and the full input-mode state machine below remain
+by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. Long-blink confirms, user-talking signals and the full input-mode state machine below remain
 future work. Basic ElevenLabs conversation is implemented; live microphone
 testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
@@ -57,7 +56,7 @@ the side panel to the local Worker's signed-session endpoint and ElevenLabs over
 WebSocket through a neutral VoiceAgent interface. Audio worklets ship inside the
 extension. Stop and panel closure end the session, including late connections.
 Audio is sent to ElevenLabs only after Start; no transcripts are stored or logged.
-Browser client tools and user-talking signals remain subsequent milestones.
+Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
@@ -120,7 +119,7 @@ Presage was tested on the demo laptop before these choices were made (#24). Its 
 
 **Page targets for gaze.** The side panel keeps the active tab's numbered targets current: four times a second it reads the page's change counter, and rescans only when the tab, the document or the counter moves. Gaze uses a targets-only scan of links and buttons that carries positions but no labels and none of the screenshot blocking rules, since nothing from it leaves the extension; page understanding keeps its full scan. Each gaze target also says whether selecting it needs a second confirm: only an ordinary link to another web page, or a plainly harmless button outside a form, is safe; anything that may submit, pay, delete or send, and anything Iris cannot classify, is risky. The label is read inside the page to decide and is never returned. Snapping runs in the side panel, next to the tracker: each smoothed gaze point snaps to the nearest target in the current list, and the page's numbers are redrawn only when the aimed target changes. A live gaze cursor, a red ring at the smoothed gaze point, follows the user's gaze on the page whenever aiming runs: the side panel streams the point over one open connection to Iris's overlay, which moves the ring inside its closed shadow root, so page scripts cannot read where the user looks. The point never leaves the computer, and the cursor hides while the eyes are closed or the face is lost. Numbers, the aimed target and the cursor are drawn by an overlay that only draws and is never in a screenshot. Numbers stay through page changes that move nothing (hover effects, ads, ticking clocks): once per frame the overlay checks the elements behind the gaze scan, and erases the numbers only when one has moved more than 4 px or left the page; the next scan redraws them. Page understanding's highlight is erased by any page change.
 
-**Camera sharing.** The companion and the side panel each open the webcam. Both must run at once. This was verified on the demo laptop (#24) and is checked on every other target machine. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
+**Camera sharing.** The companion and the side panel each open the webcam. Both must run at once. This was verified on the demo laptop (#24) and is checked on every other target machine. On macOS, Chrome does not pass its own camera permission to the programs it starts, so the companion runs inside a small app, `Iris Companion.app`: its launcher (`companion/install/launcher.c`) starts Node as a child process, and macOS asks once whether Iris Companion may use the camera. If sharing fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 
 **Companion messages.** Defined in `packages/protocol/src/companion.ts`, and every message is validated on arrival on both sides. The extension sends `start` and `stop`. The companion sends `hello` (its protocol version, checked by the extension), `status` (running, key missing, offline, credits exhausted and so on), `quality` (camera view problems with a hint to show), `vitals` (pulse, breathing rate and HRV, each with confidence and a stable flag, about once a second) and `blink` (each natural blink's length). Messages carry no timestamps; the receiver stamps them, so the two programs' clocks never need to agree. The side panel holds the connection (`extension/src/providers/companion/`), next to the gaze session that will use the signals. Opening the panel starts the companion, and closing the panel closes the port, which ends the companion and Presage with it, so body sensing never runs in the background. A dropped connection is not retried on its own, since every new session repeats Presage's warm-up and uses credits.
 
@@ -306,7 +305,7 @@ iris_sentinel/
 │   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
 │   │   ├── secrets/             # reads the Presage key from the OS keychain
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
-│   └── install/                 # registers the native messaging host (macOS; Windows is a stretch goal)
+│   └── install/                 # builds Iris Companion.app and registers it with Chrome (macOS; Windows is a stretch goal)
 ├── server/                      # Cloudflare Worker, holds all keys
 │   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/
