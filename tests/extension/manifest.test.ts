@@ -23,7 +23,7 @@ describe('extension manifest', () => {
     expect(manifest.permissions).toContain('nativeMessaging');
   });
 
-  it('may keep the demo session and calibrations in extension storage', () => {
+  it('may keep calibrations in extension storage', () => {
     expect(manifest.permissions).toContain('storage');
   });
 });

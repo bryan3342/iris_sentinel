@@ -41,8 +41,8 @@ live-use prerequisites are in [page-understanding-readiness.md](page-understandi
 
 ## 2. Technologies / Services
 
-**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object and an
-operator-issued demo bearer token, then returns `{ signedUrl }` for the
+**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object from the
+Iris extension on this computer (or with an operator-issued token elsewhere), then returns `{ signedUrl }` for the
 server-configured ElevenLabs agent. It requests a single-use conversation
 signature. `ENABLE_VOICE_AGENT` is independent of page understanding and defaults
 to false. The existing origin checks, in-memory demo rate budget and concurrency
@@ -165,7 +165,7 @@ page itself.
 sensitive rectangles and revisions, and numbers targets exactly as the gaze scan
 does. Chrome capture runs through the background broker; during capture the
 overlay is held clear, so gaze cannot draw Iris's numbers into the screenshot. The side-panel coordinator owns transient mask/crop canvases, capture
-consistency checks and plain-text results. The background owns demo session tokens, kept in Chrome's memory-only session storage so they survive the idle worker restarting, and authenticated HTTP. It rejects broker
+consistency checks and plain-text results. The background owns HTTP to the Iris server on this computer, which holds every key; the extension holds no token or key. It rejects broker
 messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
 there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.
@@ -191,11 +191,12 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 - Google has separate data-handling/retention rules. The actual project's terms,
   logging/sharing and retention configuration must be verified before real browsing
   content is used; Iris does not promise zero provider retention.
-- Private-demo access uses operator-provisioned, participant-specific random
-  tokens with a fixed 15-minute expiry; only hashes/expiry are configured server-side.
-  Tokens are privately handed to verified participants and entered at runtime.
-  The extension embeds no vendor keys/shared reusable secrets and persists no
-  credentials. Background restarts require re-entry of the still-valid token.
+- The server runs on the user's computer, listens on the loopback address only,
+  and answers without a token only requests carrying the exact Iris extension
+  origin, which web pages cannot send. A server reached from elsewhere requires
+  operator-issued random tokens with a fixed 15-minute expiry; only hashes and
+  expiry are configured server-side. The extension embeds no vendor keys or
+  shared secrets and persists no credentials.
 - The Worker bounds inputs, outputs, streamed parsing and deadlines. Per Worker
   instance: one in-flight request/session, 2/minute/session and 10/session, with
   no automatic retries/renewal. Cold starts reset counters and different instances

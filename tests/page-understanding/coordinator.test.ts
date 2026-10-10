@@ -38,7 +38,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-const find = { gateway: 'https://demo.example', operation: 'find_target' as const, request: 'Find the icon' };
+const find = { operation: 'find_target' as const, request: 'Find the icon' };
 it('explicit requests return a validated recommendation, without an action executor', async () => {
   const coordinator = new PageCoordinator(); const response = await coordinator.inspect(find);
   expect(response.result.result.operation).toBe('find_target');
@@ -68,7 +68,7 @@ it('discards a result after the active tab changes', async () => {
 });
 it('image numbers are bound to the listed document and revision', async () => {
   const coordinator = new PageCoordinator();
-  const describe = { gateway: find.gateway, operation: 'describe_image' as const, imageId: 1 };
+  const describe = { operation: 'describe_image' as const, imageId: 1 };
   await expect(coordinator.inspect(describe)).rejects.toThrow('LIST_IMAGES_FIRST');
   await coordinator.images(); current.revision++;
   await expect(coordinator.inspect(describe)).rejects.toThrow('PAGE_CHANGED');
@@ -119,7 +119,7 @@ it.each([
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow('PAGE_CHANGED_OR_CANCELLED');
 });
 const aimedAt = (rect = page().targets[0]!.rect) => ({ documentToken: page().documentToken, id: 1, rect });
-const describe = { gateway: find.gateway, operation: 'describe_target' as const };
+const describe = { operation: 'describe_target' as const };
 it('describes the aimed target from an outlined crop around it, without clicking', async () => {
   const response = await new PageCoordinator().inspect({ ...describe, aimed: aimedAt() });
   expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Sample target.' });
