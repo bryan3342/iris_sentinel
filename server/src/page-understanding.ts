@@ -2,9 +2,15 @@ export interface Target { id: number; label: string; role: "link" | "button" }
 export interface FindTargetInput { request: string; targets: Target[] }
 export interface Selection { targetId: number | null }
 export interface PageUnderstanding {
-  findTarget(input: FindTargetInput): Promise<Selection>;
+  findTarget(input: FindTargetInput, signal?: AbortSignal): Promise<Selection>;
 }
-export interface Env { GEMINI_API_KEY?: string; GEMINI_MODEL?: string }
+import { abortable, readBytes } from './http';
+export interface Env {
+  GEMINI_API_KEY?: string; GEMINI_MODEL?: string; EXTENSION_ORIGIN?: string;
+  ENABLE_PAGE_UNDERSTANDING?: string; PAGE_CONTENT_APPROVED?: string; ENABLE_LOCAL_LABELS?: string;
+  PAGE_UNDERSTANDING_PROVIDER?: string;
+  SYNTHETIC_DELAY_MS?: string;
+}
 export class ServiceError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -12,18 +18,18 @@ export class ServiceError extends Error {
 export class GeminiPageUnderstanding implements PageUnderstanding {
   constructor(private env: Env, private send: typeof fetch = fetch) {}
 
-  async findTarget(input: FindTargetInput): Promise<Selection> {
+  async findTarget(input: FindTargetInput, cancellation?: AbortSignal): Promise<Selection> {
     const key = this.env.GEMINI_API_KEY?.trim();
     const model = this.env.GEMINI_MODEL?.trim() || "gemini-3.8-flash";
     if (!key || key === "replace_with_your_key" || !/^[a-zA-Z0-9._-]+$/.test(model)) {
       throw new ServiceError(503, "Page understanding is not configured.");
     }
-    const signal = AbortSignal.timeout(30_000);
+    const signal = AbortSignal.any([AbortSignal.timeout(30_000), ...(cancellation ? [cancellation] : [])]);
     let failureMessage = "Could not connect to Gemini. Check the Worker's network connection.";
     try {
       // Worker fetch requires its native receiver, not this provider instance.
       const send = this.send;
-      const response = await send(
+      const response = await abortable(send(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         {
           method: "POST",
@@ -43,13 +49,14 @@ export class GeminiPageUnderstanding implements PageUnderstanding {
             },
           }),
         },
-      );
+      ), signal);
       if (!response.ok) {
         throw new ServiceError(response.status === 429 || response.status >= 500 ? 503 : 502,
           "Page understanding is unavailable.");
       }
       failureMessage = "Gemini returned an unreadable API response.";
-      const result = await response.json() as {
+      const bytes = await readBytes(response.body, 256 * 1024, signal);
+      const result = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)) as {
         candidates?: { finishReason?: string; content?: { parts?: { text?: string; thought?: boolean }[] } }[];
       };
       const candidate = result.candidates?.[0];
