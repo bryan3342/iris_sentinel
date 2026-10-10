@@ -106,7 +106,13 @@ async function start(): Promise<void> {
     if (!accepted) hud.textContent += ' (Last click was too far from your gaze and was ignored.)';
   });
 
-  store = new CalibrationStore(await loadSamples(), viewport());
+  try {
+    store = new CalibrationStore(await loadSamples(), viewport());
+  } catch {
+    // Saved samples that no longer fit (wrong shape, degenerate): calibrate again.
+    void clearSamples();
+    store = new CalibrationStore();
+  }
   if (store.model) {
     showDot(provider);
     return;
