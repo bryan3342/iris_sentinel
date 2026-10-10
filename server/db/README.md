@@ -66,6 +66,8 @@ tiger db query -c "DELETE FROM fatigue_minutes WHERE session_id = '00000000-0000
 
 One fake profile with one 60-minute session per day for the last 14 days. The
 recent week scores higher than the week before, so trends are easy to see.
+Each run clears the fake profile first, so re-running on a later day moves the
+14 days forward instead of adding a second copy. Other profiles are untouched.
 
 ```sh
 tiger db query --file server/db/seed_dev.sql
@@ -74,7 +76,7 @@ tiger db query --file server/db/seed_dev.sql
 | Check | Command | Expected |
 | :--- | :--- | :--- |
 | Seed loaded | `tiger db query -c "SELECT count(*) FROM fatigue_minutes;"` | `840` (14 days x 60 minutes) |
-| Re-run is safe | Run the seed again, then the count | Still `840` |
+| Re-run is safe | Run the seed again (any day), then the count | Still `840` |
 | Time slices | `tiger db query -c "SELECT show_chunks('fatigue_minutes');"` | 2 or 3 chunks (one per week) |
 
 ## Start over (dev only)

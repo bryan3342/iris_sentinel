@@ -2,8 +2,16 @@
 --
 -- One fake profile with one 60-minute session per day for the last 14 days.
 -- The older week scores lower than the recent week, so a week-over-week chart
--- shows a clear rise. Values are deterministic (no random()), so every run
--- produces the same rows, and re-running is a no-op thanks to ON CONFLICT.
+-- shows a clear rise. Values are deterministic (no random()).
+--
+-- The days count back from today, so each run first clears the fake profile
+-- and reloads it. Re-running on any day leaves exactly 14 days (840 rows)
+-- ending yesterday, instead of piling a shifted copy on top.
+
+BEGIN;
+
+DELETE FROM fatigue_minutes
+WHERE profile_id = '00000000-0000-4000-8000-000000000001';
 
 INSERT INTO fatigue_minutes
   (minute, profile_id, session_id, fatigue_score, fatigue_level, clicks, back_after_click)
@@ -31,5 +39,6 @@ CROSS JOIN LATERAL (
            + i.minute_index * 0.5                         -- fatigue builds over the hour
            + 5 * sin(i.minute_index / 4.0)                -- small, repeatable wobble
          ))::real AS score
-) AS s
-ON CONFLICT (session_id, minute) DO NOTHING;
+) AS s;
+
+COMMIT;
