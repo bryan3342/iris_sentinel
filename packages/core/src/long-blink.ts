@@ -74,6 +74,9 @@ export class LongBlinkDetector {
   /** Forgets any closure in progress, for example when the page's targets change under it. */
   reset(): void {
     this.closed = null;
+    this.lastOpen = null;
+    this.held = null;
+    this.before = null;
   }
 
   private track(aim: number | null, t: number): void {

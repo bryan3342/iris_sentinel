@@ -9,7 +9,7 @@ preview, gaze aiming with on-page calibration, dwell-confirmed selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. Long-blink confirms, user-talking signals and the full input-mode state machine below remain
+by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. User-talking signals and the full input-mode state machine below remain
 future work. Basic ElevenLabs conversation is implemented; live microphone
 testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in

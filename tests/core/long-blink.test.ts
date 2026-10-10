@@ -82,4 +82,17 @@ describe('LongBlinkDetector', () => {
     expect(detector.locked).toBeNull();
     expect(detector.update(sample(900, 0.05), 4)).toBeNull();
   });
+
+  it('does not lock the old target again if the eyes stay closed after a reset', () => {
+    const detector = new LongBlinkDetector();
+    let t = 0;
+    for (; t < 300; t += FRAME) detector.update(sample(t, 0.05), 4);
+    detector.update(sample(t, 0.9), 4);
+    detector.reset();
+    const events = [];
+    for (t += FRAME; t < 900; t += FRAME) events.push(detector.update(sample(t, 0.9), 4));
+    expect(detector.locked).toBeNull();
+    events.push(detector.update(sample(t, 0.05), 4));
+    expect(events.filter((e) => e !== null)).toHaveLength(0);
+  });
 });
