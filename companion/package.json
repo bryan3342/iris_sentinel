@@ -1,0 +1,20 @@
+{
+  "name": "@iris/companion",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/companion.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@iris/protocol": "file:../packages/protocol"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
