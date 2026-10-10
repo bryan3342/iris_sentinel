@@ -83,11 +83,11 @@ export interface StrainOptions {
  * How far `current` has moved from `baseline` toward tired: 0 inside the
  * ignore zone or when it moved the rested way, 1 at or past `fullAt`, and
  * linear in between. The change is relative: 20 blinks a minute against a
- * baseline of 16 is a 25% rise. Null when either value is missing or the
- * baseline is not positive.
+ * baseline of 16 is a 25% rise. Null when either value is missing or not
+ * finite, or the baseline is not positive.
  */
 export function strain(current: number | null, baseline: number | null, { tiredDirection, ignoreBelow, fullAt }: StrainOptions): number | null {
-  if (current === null || baseline === null || baseline <= 0) return null;
+  if (current === null || baseline === null || !Number.isFinite(current) || !Number.isFinite(baseline) || baseline <= 0) return null;
   const change = (current - baseline) / baseline;
   const towardTired = tiredDirection === 'up' ? change : -change;
   return Math.min(Math.max((towardTired - ignoreBelow) / (fullAt - ignoreBelow), 0), 1);

@@ -85,4 +85,11 @@ describe('strain', () => {
     expect(strain(20, null, blinkRule)).toBeNull();
     expect(strain(20, 0, blinkRule)).toBeNull();
   });
+
+  it('is null, not NaN, when a value is not a finite number', () => {
+    expect(strain(Number.NaN, 16, blinkRule)).toBeNull();
+    expect(strain(Infinity, 16, blinkRule)).toBeNull();
+    expect(strain(20, Number.NaN, blinkRule)).toBeNull();
+    expect(strain(20, Infinity, blinkRule)).toBeNull();
+  });
 });
