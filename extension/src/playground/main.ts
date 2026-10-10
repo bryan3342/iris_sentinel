@@ -26,6 +26,7 @@ const dotCount = new URLSearchParams(location.search).get('dots') === '5' ? 5 : 
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
 let store = new CalibrationStore();
 let dot: GazeDot | null = null;
+let stopDot: (() => void) | null = null;
 let calibrating = false;
 
 function trackingHud(): void {
@@ -34,15 +35,19 @@ function trackingHud(): void {
 }
 
 function showDot(provider: MediaPipeGazeProvider): void {
+  stopDot?.();
   dot?.remove();
-  dot = new GazeDot(store, stage);
-  provider.onSample((sample) => dot?.update(sample));
+  const next = new GazeDot(store, stage);
+  dot = next;
+  stopDot = provider.onSample((sample) => next.update(sample));
   trackingHud();
 }
 
 async function calibrate(provider: MediaPipeGazeProvider): Promise<void> {
   if (calibrating) return;
   calibrating = true;
+  stopDot?.();
+  stopDot = null;
   dot?.remove();
   dot = null;
   hud.textContent = `Look at each dot until it disappears (${dotCount} dots).`;
@@ -86,6 +91,8 @@ async function start(): Promise<void> {
     if (k === 'x') {
       void clearSamples();
       store = new CalibrationStore();
+      stopDot?.();
+      stopDot = null;
       dot?.remove();
       dot = null;
       hud.textContent = 'Saved calibration forgotten. Press R to calibrate.';
