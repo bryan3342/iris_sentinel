@@ -61,11 +61,14 @@ export async function prepareImage(dataUrl: string, snapshot: PageSnapshot, crop
       const dest = output.getContext('2d'); if (!dest) throw new Error('CAPTURE_UNAVAILABLE');
       dest.drawImage(canvas, rect.x * sx, rect.y * sy, sourceWidth, sourceHeight, 0, 0, output.width, output.height);
       if (numbered) {
-        const tx = output.width / snapshot.viewport.width, ty = output.height / snapshot.viewport.height;
+        // Map viewport coordinates into the (possibly cropped) output bitmap.
+        const tx = output.width / rect.width, ty = output.height / rect.height;
         dest.font = 'bold 14px sans-serif'; dest.textBaseline = 'top';
         for (const target of snapshot.targets) {
-          const x = Math.min(output.width - 30, Math.max(0, target.rect.x * tx));
-          const y = Math.min(output.height - 18, Math.max(0, target.rect.y * ty));
+          const left = (target.rect.x - rect.x) * tx, top = (target.rect.y - rect.y) * ty;
+          if (left + 30 <= 0 || top + 18 <= 0 || left >= output.width || top >= output.height) continue;
+          const x = Math.min(output.width - 30, Math.max(0, left));
+          const y = Math.min(output.height - 18, Math.max(0, top));
           dest.fillStyle = '#fff'; dest.fillRect(x, y, 30, 18); dest.fillStyle = '#000'; dest.fillText(String(target.id), x + 2, y + 1);
         }
       }

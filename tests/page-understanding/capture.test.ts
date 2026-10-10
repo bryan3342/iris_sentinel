@@ -35,6 +35,18 @@ describe('capture safety', () => {
     maskPixels({ fillRect } as unknown as CanvasRenderingContext2D, snapshot().masks, 2, 2);
     expect(fillRect).toHaveBeenCalledWith(20, 4, 42, 12);
   });
+  it('places numbered labels relative to the crop and skips targets outside it', async () => {
+    const fillText = vi.fn();
+    const source = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn(), fillRect: vi.fn() }) };
+    const output = { width: 0, height: 0, getContext: () => ({ drawImage: vi.fn(), fillRect: vi.fn(), fillText }), toDataURL: () => 'data:image/png;base64,AAAA' };
+    vi.stubGlobal('createImageBitmap', vi.fn(async () => ({ width: 200, height: 100, close: vi.fn() })));
+    vi.stubGlobal('document', { createElement: vi.fn().mockReturnValueOnce(source).mockReturnValueOnce(output) });
+    const s = snapshot();
+    s.targets = [{ id: 2, role: 'button', rect: { x: 120, y: 10, width: 40, height: 20 } }, { id: 3, role: 'button', rect: { x: 20, y: 10, width: 40, height: 20 } }];
+    await prepareImage('data:image/png;base64,AAAA', s, { x: 100, y: 0, width: 100, height: 100 }, true);
+    expect(fillText).toHaveBeenCalledOnce();
+    expect(fillText).toHaveBeenCalledWith('2', 22, 11);
+  });
   it('masks before creating the supplied image crop and releases bitmaps', async () => {
     const close = vi.fn(), drawImage = vi.fn(), fillRect = vi.fn();
     const source = { width: 0, height: 0, getContext: () => ({ drawImage, fillRect }) };
