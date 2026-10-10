@@ -22,7 +22,7 @@ FROM generate_series(1, 14) AS d(day_offset)           -- 1 = yesterday, 14 = tw
 CROSS JOIN generate_series(0, 59) AS i(minute_index)   -- minutes 0..59 of the session
 CROSS JOIN LATERAL (
   -- Each session runs 18:00 to 19:00 UTC.
-  SELECT date_trunc('day', now()) - make_interval(days => d.day_offset)
+  SELECT date_trunc('day', now(), 'UTC') - make_interval(days => d.day_offset)
          + INTERVAL '18 hours' + make_interval(mins => i.minute_index) AS minute
 ) AS m
 CROSS JOIN LATERAL (
