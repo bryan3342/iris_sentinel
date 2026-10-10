@@ -29,6 +29,8 @@ export { VitalsWindow } from './vitals-window';
 export type { VitalsWindowOptions } from './vitals-window';
 export { CLUE_SETTINGS, FATIGUE_CLUES, FatigueEngine } from './fatigue';
 export type { ClueSettings, ClueState, FatigueClue, FatigueEngineOptions, FatiguePause, FatigueState } from './fatigue';
+export { explain, fatigueResponse } from './fatigue-response';
+export type { FatigueResponse } from './fatigue-response';
 export { SelectionGate } from './selection';
 export { SettledAim } from './settled-aim';
 export type { GateTarget, Selection, SelectionGateOptions } from './selection';
