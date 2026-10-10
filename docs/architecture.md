@@ -9,8 +9,7 @@ preview, gaze aiming with on-page calibration, dwell-confirmed selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, long-blink confirms, scrolling, voice browser
-tools, user-talking signals and the full input-mode state machine below remain
+by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. Long-blink confirms, user-talking signals and the full input-mode state machine below remain
 future work. Basic ElevenLabs conversation is implemented; live microphone
 testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
@@ -57,7 +56,7 @@ the side panel to the local Worker's signed-session endpoint and ElevenLabs over
 WebSocket through a neutral VoiceAgent interface. Audio worklets ship inside the
 extension. Stop and panel closure end the session, including late connections.
 Audio is sent to ElevenLabs only after Start; no transcripts are stored or logged.
-Browser client tools and user-talking signals remain subsequent milestones.
+Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
