@@ -2,6 +2,7 @@ export type { Point2, Unsubscribe } from './common';
 export {
   COMPANION_PROTOCOL_VERSION,
   CompanionMessageError,
+  IRIS_EXTENSION_ID,
   validateFromCompanion,
   validateToCompanion,
 } from './companion';
