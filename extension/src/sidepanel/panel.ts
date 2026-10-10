@@ -9,6 +9,7 @@ import { LiveTargetList } from './target-list';
 import { EyeTrace } from './trace';
 import { understandingPanel } from './understanding';
 import { microphonePanel } from './setup/microphone';
+import { conversationPanel } from './agent/panel';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -30,7 +31,7 @@ export function mountPanel(root: HTMLElement): void {
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
   if (isExtensionPage()) {
-    root.append(microphonePanel(), pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(marks), companionPanel());
+    root.append(microphonePanel(), conversationPanel(), pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(marks), companionPanel());
   }
 
   openCamera()

@@ -13,6 +13,19 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
   if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL('sidepanel.html') || sender.tab) return false;
   const handle = async (): Promise<unknown> => {
     const base = object(message, ['type'], ['tabId', 'windowId', 'input', 'requestId']);
+    if (base.type === 'iris.voice.session') {
+      object(message, ['type']);
+      const response = await fetch(`${GATEWAY}/v0.1/agent-token`, {
+        method: 'POST', signal: AbortSignal.timeout(15_000), credentials: 'omit', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      const value = object(await responseJson(response), ['signedUrl']);
+      if (typeof value.signedUrl !== 'string' || value.signedUrl.length > 4096) throw new Error('INVALID_RESPONSE');
+      const url = new URL(value.signedUrl);
+      if (url.protocol !== 'wss:' || url.host !== 'api.elevenlabs.io' || url.username || url.password || url.hash ||
+          url.pathname !== '/v1/convai/conversation' || !url.searchParams.get('conversation_signature')) throw new Error('INVALID_RESPONSE');
+      return { signedUrl: value.signedUrl };
+    }
     if (base.type === 'iris.page.cancel') {
       object(message, ['type', 'requestId']);
       if (pending?.requestId === token(base.requestId)) pending.controller.abort();

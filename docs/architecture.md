@@ -9,8 +9,10 @@ preview, gaze aiming with on-page calibration, dwell-confirmed selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
-and the full input-mode state machine below remain future work. Page understanding is built
+by this change. Presage companion, long-blink confirms, scrolling, voice browser
+tools, user-talking signals and the full input-mode state machine below remain
+future work. Basic ElevenLabs conversation is implemented; live microphone
+testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
 live-use prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
@@ -50,8 +52,12 @@ lease apply to minting; they do not cap conversation duration or global spend.
 The response is not cached. API keys stay in Worker secrets; signed URLs must
 remain in memory and must never be logged. The side panel has a microphone
 permission button that opens an extension tab, checks audio-only access and
-immediately stops all tracks without sending audio. The extension conversation
-connection and client tools are subsequent milestones.
+immediately stops all tracks without sending audio. Start/Stop conversation connects
+the side panel to the local Worker's signed-session endpoint and ElevenLabs over
+WebSocket through a neutral VoiceAgent interface. Audio worklets ship inside the
+extension. Stop and panel closure end the session, including late connections.
+Audio is sent to ElevenLabs only after Start; no transcripts are stored or logged.
+Browser client tools and user-talking signals remain subsequent milestones.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
