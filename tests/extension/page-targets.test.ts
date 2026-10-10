@@ -77,3 +77,10 @@ it('marks what selecting each target would risk, failing toward a second confirm
   ]);
 });
 
+it('treats links without a usable address, and mixed harmless and risky names, as risky', () => {
+  document.body.innerHTML = `
+    <a href="http://[" data-box="10 40 200 20">Broken address</a>
+    <button aria-label="Close" data-box="10 70 200 20">Delete</button>`;
+  expect(pageSnapshot('targets').targets.map((t) => t.risky)).toEqual([true, true]);
+});
+

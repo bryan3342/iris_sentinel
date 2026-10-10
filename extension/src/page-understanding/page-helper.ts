@@ -36,11 +36,15 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
   const riskyWords = /\b(pay|buy|purchase|order|checkout|check out|delete|remove|send|submit|confirm|sign out|log ?out|unsubscribe|transfer|donate|subscribe|cancel|place)\b/i;
   const harmlessButton = /^(close|menu|next|previous|prev|back|more|less|expand|collapse|show|show more|show less|hide|open|play|pause)$/i;
   const risky = (el: Element, role: 'link' | 'button') => {
-    const text = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('title') || '').trim().replace(/\s+/g, ' ');
-    if (el.closest('form') || riskyWords.test(text)) return true;
+    const clean = (s: string | null) => (s ?? '').trim().replace(/\s+/g, ' ');
+    const text = clean(el.getAttribute('aria-label') || el.textContent || el.getAttribute('title'));
+    // Any name that sounds risky counts, even when another name is harmless.
+    const names = [el.getAttribute('aria-label'), el.textContent, el.getAttribute('title')];
+    if (el.closest('form') || names.some(n => riskyWords.test(clean(n)))) return true;
     if (role === 'button') return !harmlessButton.test(text);
     // Only a plain link to a web page: not a download, not script, mail, phone or another app.
-    return !(el instanceof HTMLAnchorElement) || el.hasAttribute('download') || !/^https?:$/.test(new URL(el.href, location.href).protocol);
+    if (!(el instanceof HTMLAnchorElement) || !el.hasAttribute('href') || el.hasAttribute('download')) return true;
+    try { return !/^https?:$/.test(new URL(el.href, location.href).protocol); } catch { return true; }
   };
   // onChange is set by Iris's own overlay (content/overlay.ts) to erase its drawing on the next page change.
   type State = { documentToken: string; revision: number; onChange?: () => void };
