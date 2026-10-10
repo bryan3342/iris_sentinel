@@ -64,6 +64,28 @@ To try aiming on real websites before calibrating, turn on **Developer: the mous
 
 **Fixed extension ID.** Iris always loads as `bohipliohnmknfglnkhglngbmpiahdcn`, on every computer, because `manifest.json` carries a public `key` (not a secret). The companion only answers this ID. Use it wherever a setup step asks for the extension ID, for example `EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn` in `server/.dev.vars`. If you loaded Iris before the ID was fixed, Chrome sees this as a new extension: remove the old Iris card, load `extension/dist` again, and allow the camera once more.
 
+## Run the companion (macOS)
+
+The companion is the small Node.js program that runs Presage on this computer, beside Chrome. Chrome starts it when Iris connects; it opens no network port. It needs macOS (Apple Silicon for Presage) and Node 20 or newer.
+
+1. Store your Presage API key in the Keychain once. With `-w` last, the tool asks for the key, so it never lands in your shell history:
+
+   ```sh
+   security add-generic-password -U -s iris-presage -a iris -w
+   ```
+
+2. Build the companion and register it with Chrome:
+
+   ```sh
+   cd companion
+   npm ci
+   npm run install:host
+   ```
+
+   This copies the companion to `~/Library/Application Support/Iris/companion/`, out of the repository, which macOS may protect if it sits in `~/Desktop`. It writes a launcher that calls Node by its full path, since Chrome starts programs with almost no `PATH`, and registers it with Chrome as `com.iris.companion`, which only the Iris extension ID may start. Run `npm run install:host` again after pulling companion changes.
+
+3. To remove it, run `npm run uninstall:host` in `companion/`.
+
 ## What you should see
 
 Once the camera is on, the panel shows **Eye tracking on** and:
@@ -81,3 +103,4 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 | Camera busy | Close other apps using the webcam (video calls, other tabs). |
 | "Calibration needs your face in view" | Keep your face in view and the tab visible for the whole run, then press R. |
 | "Eye tracking failed to start" | Delete `extension/public/mediapipe/` and rerun the command to fetch the runtime and model again. |
+| "Specified native messaging host not found" | The companion is not registered: run `npm run install:host` in `companion/`. |

@@ -3,6 +3,7 @@ export {
   COMPANION_PROTOCOL_VERSION,
   CompanionMessageError,
   IRIS_EXTENSION_ID,
+  NATIVE_HOST_NAME,
   validateFromCompanion,
   validateToCompanion,
 } from './companion';
