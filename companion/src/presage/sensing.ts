@@ -52,7 +52,12 @@ export class PresageSensing implements Sensing {
     if (this.active) return;
     this.active = true;
     const run = ++this.run;
-    void this.begin(run, send);
+    this.begin(run, send).catch(() => {
+      // The Keychain read or the SDK constructor failed; report it and release everything.
+      if (run !== this.run) return;
+      send({ type: 'status', state: 'error' });
+      void this.stop();
+    });
   }
 
   async stop(): Promise<void> {

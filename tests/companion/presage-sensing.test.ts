@@ -134,4 +134,25 @@ describe('PresageSensing', () => {
     await start();
     expect(runs).toHaveLength(2);
   });
+
+  it('reports error, and can start again, when the key cannot be read', async () => {
+    const sent: FromCompanion[] = [];
+    let fail = true;
+    const sensing = new PresageSensing({
+      readKey: async () => {
+        if (fail) throw new Error('keychain locked');
+        return null;
+      },
+      createSession: () => {
+        throw new Error('unused');
+      },
+    });
+    sensing.start((m) => sent.push(m));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sent.at(-1)).toEqual({ type: 'status', state: 'error' });
+    fail = false;
+    sensing.start((m) => sent.push(m));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sent.at(-1)).toEqual({ type: 'status', state: 'key-missing' });
+  });
 });
