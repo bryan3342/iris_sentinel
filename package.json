@@ -3,16 +3,21 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "extension"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
+    "dev": "npm run dev -w @iris/extension",
+    "dev:ext": "npm run dev:ext -w @iris/extension",
+    "build": "npm run build -w @iris/extension",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@types/node": "^26.6.5",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

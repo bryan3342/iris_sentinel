@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Iris",
+  "version": "0.1.0",
+  "description": "Hands-free browsing with your eyes, breath and voice.",
+  "minimum_chrome_version": "116",
+  "action": { "default_title": "Open Iris" },
+  "background": { "service_worker": "background.js", "type": "module" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "permissions": ["sidePanel"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  }
+}
