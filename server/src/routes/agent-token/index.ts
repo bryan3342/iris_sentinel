@@ -15,7 +15,9 @@ export class ElevenLabsAgentSession implements AgentSessionProvider {
   constructor(private send: typeof fetch = fetch) {}
   async createSession(env: AgentEnv, cancellation: AbortSignal): Promise<AgentSession> {
     const key = env.ELEVENLABS_API_KEY?.trim(), agent = env.ELEVENLABS_AGENT_ID?.trim();
-    if (!key || key === 'replace_with_your_key' || !agent || !/^agent_[A-Za-z0-9_-]{1,100}$/.test(agent)) {
+    // Keys start with sk_ and are shown only at creation or rotation; an API key ID cannot authenticate.
+    if (!key || key.endsWith('replace_with_your_key') || !/^sk_[A-Za-z0-9]{20,}$/.test(key) ||
+        !agent || !/^agent_[A-Za-z0-9_-]{1,100}$/.test(agent)) {
       throw new HttpError(503, 'VOICE_NOT_CONFIGURED');
     }
     const signal = AbortSignal.any([cancellation, AbortSignal.timeout(10_000)]);

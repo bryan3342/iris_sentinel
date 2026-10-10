@@ -11,5 +11,7 @@ EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn
 DEMO_SESSIONS={}
 # Voice sessions are independent of page understanding and disabled by default.
 ENABLE_VOICE_AGENT=false
-ELEVENLABS_API_KEY=replace_with_your_key
+# The API key itself, shown only when created or rotated. Not the API key ID.
+ELEVENLABS_API_KEY=sk_replace_with_your_key
+# Bare agent ID. Drop any ?branchId=... suffix copied from a dashboard URL.
 ELEVENLABS_AGENT_ID=agent_replace_with_your_agent_id

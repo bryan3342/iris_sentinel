@@ -4,7 +4,9 @@ import { modules as m } from './modules.mjs';
 import { setup } from './fixtures.mjs';
 
 const signedUrl = 'wss://api.elevenlabs.io/v1/convai/conversation?agent_id=agent_test&conversation_signature=mock-signature';
-const config = { ENABLE_VOICE_AGENT: 'true', ELEVENLABS_AGENT_ID: 'agent_test', ELEVENLABS_API_KEY: 'mock-secret' };
+// Shaped like a real key (sk_ plus alphanumerics) so the configuration guard admits it. Not a credential.
+const mockKey = 'sk_mocknotarealkey00000000000000000000';
+const config = { ENABLE_VOICE_AGENT: 'true', ELEVENLABS_AGENT_ID: 'agent_test', ELEVENLABS_API_KEY: mockKey };
 const request = (token, options = {}) => new Request('https://demo.example/v0.1/agent-token', {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: '{}', ...options,
 });
@@ -17,7 +19,7 @@ test('authenticated voice route uses server configuration and works with page un
     assert.equal(upstream.pathname, '/v1/convai/conversation/get-signed-url');
     assert.equal(upstream.searchParams.get('agent_id'), 'agent_test');
     assert.equal(upstream.searchParams.get('include_conversation_id'), 'true');
-    assert.equal(options.headers['xi-api-key'], 'mock-secret');
+    assert.equal(options.headers['xi-api-key'], mockKey);
     assert.equal(options.redirect, 'error');
     assert.ok(options.signal instanceof AbortSignal);
     return Response.json({ signed_url: signedUrl, conversation_id: 'mock-conversation' });
@@ -73,7 +75,14 @@ test('cancellation retains the concurrency lease and releases the route promptly
 
 test('unconfigured provider never calls upstream', async () => {
   const provider = new m.ElevenLabsAgentSession(async () => assert.fail('No upstream call'));
-  for (const env of [{}, { ...config, ELEVENLABS_AGENT_ID: 'https://untrusted.example' }, { ...config, ELEVENLABS_API_KEY: 'replace_with_your_key' }]) {
+  for (const env of [{}, { ...config, ELEVENLABS_AGENT_ID: 'https://untrusted.example' },
+    // A dashboard URL suffix on the agent ID.
+    { ...config, ELEVENLABS_AGENT_ID: 'agent_test?branchId=agtbrch_test' },
+    { ...config, ELEVENLABS_API_KEY: 'replace_with_your_key' },
+    { ...config, ELEVENLABS_API_KEY: 'sk_replace_with_your_key' },
+    // An API key ID pasted in place of an sk_ API key, which upstream rejects with HTTP 400.
+    { ...config, ELEVENLABS_API_KEY: 'a'.repeat(64) },
+  ]) {
     await assert.rejects(provider.createSession(env, new AbortController().signal), error => error.status === 503);
   }
 });
@@ -95,7 +104,8 @@ test('upstream errors and invalid credentials are sanitized, bounded and never r
     let calls = 0;
     const provider = new m.ElevenLabsAgentSession(async (...args) => { calls++; return send(...args); });
     await assert.rejects(provider.createSession(config, new AbortController().signal), error => {
-      assert.equal(error.status, status); assert.doesNotMatch(error.message, /mock-secret|mock-signature/); return true;
+      assert.equal(error.status, status);
+      assert.doesNotMatch(error.message, /mock-secret|mock-signature|mocknotarealkey/); return true;
     });
     assert.equal(calls, 1);
   }
