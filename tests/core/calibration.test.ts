@@ -35,7 +35,7 @@ function samplesFor(noise = 0, perDot = 20): CalibrationSample[] {
 
 describe('fitCalibration', () => {
   it('recovers the screen point for each calibration dot', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     for (const dot of DOTS) {
       const point = applyCalibration(model, eyeFor(dot), LEVEL, VIEWPORT);
       expect(point.x).toBeCloseTo(dot.x, 2);
@@ -44,14 +44,14 @@ describe('fitCalibration', () => {
   });
 
   it('predicts points between the dots', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     const point = applyCalibration(model, eyeFor({ x: 0.3, y: 0.7 }), LEVEL, VIEWPORT);
     expect(point.x).toBeCloseTo(0.3, 2);
     expect(point.y).toBeCloseTo(0.7, 2);
   });
 
   it('stays close under sensor noise', () => {
-    const model = fitCalibration(samplesFor(0.02));
+    const model = fitCalibration(samplesFor(0.02), VIEWPORT);
     const point = applyCalibration(model, eyeFor({ x: 0.9, y: 0.1 }), LEVEL, VIEWPORT);
     expect(Math.abs(point.x - 0.9)).toBeLessThan(0.05);
     expect(Math.abs(point.y - 0.1)).toBeLessThan(0.05);
@@ -61,13 +61,13 @@ describe('fitCalibration', () => {
     const samples = samplesFor();
     const centerSamples = samples.filter((s) => s.target.x === 0.5);
     centerSamples.slice(0, 3).forEach((s) => (s.eye = { x: 1, y: 1 }));
-    const point = applyCalibration(fitCalibration(samples), eyeFor({ x: 0.5, y: 0.5 }), LEVEL, VIEWPORT);
+    const point = applyCalibration(fitCalibration(samples, VIEWPORT), eyeFor({ x: 0.5, y: 0.5 }), LEVEL, VIEWPORT);
     expect(point.x).toBeCloseTo(0.5, 2);
     expect(point.y).toBeCloseTo(0.5, 2);
   });
 
   it('holds the point when the head slides sideways after calibration', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     const target = { x: 0.6, y: 0.4 };
     const movedRightCm = 5;
     // The face now sits to the image left (image x grows toward the user's left),
@@ -81,7 +81,7 @@ describe('fitCalibration', () => {
   });
 
   it('holds the point when the head turns after calibration', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     const target = { x: 0.3, y: 0.7 };
     const head = { ...LEVEL, yaw: 0.15, pitch: 0.1 }; // turned to the user's left and tilted down
     // The eyes counter-turn (right and up), which a still-head fit reads as a point
@@ -95,8 +95,24 @@ describe('fitCalibration', () => {
     expect(point.y).toBeCloseTo(target.y, 2);
   });
 
+  it('fits samples taken at different head positions onto one map', () => {
+    // Half the dots were seen with the head turned left; the eyes counter-turned
+    // for each, which reads as a point further right with a still head.
+    const turned = { ...LEVEL, yaw: 0.15 };
+    const shift = (DISTANCE_CM * Math.tan(0.15) * PX_PER_CM) / VIEWPORT.width;
+    const turnedSamples: CalibrationSample[] = DOTS.flatMap((target) =>
+      Array.from({ length: 20 }, () => ({ eye: eyeFor({ x: target.x + shift, y: target.y }), head: turned, target })),
+    );
+    const model = fitCalibration([...samplesFor(), ...turnedSamples], VIEWPORT);
+    const still = applyCalibration(model, eyeFor({ x: 0.3, y: 0.7 }), LEVEL, VIEWPORT);
+    expect(still.x).toBeCloseTo(0.3, 2);
+    expect(still.y).toBeCloseTo(0.7, 2);
+    const later = applyCalibration(model, eyeFor({ x: 0.3 + shift, y: 0.7 }), turned, VIEWPORT);
+    expect(later.x).toBeCloseTo(0.3, 2);
+  });
+
   it('applies no head correction when the eye corners were not seen', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     const unknown = { ...LEVEL, yaw: 0.3, eyes: { x: 0.1, y: 0.1 }, eyeSpan: 0 };
     const point = applyCalibration(model, eyeFor({ x: 0.3, y: 0.7 }), unknown, VIEWPORT);
     expect(point.x).toBeCloseTo(0.3, 2);
@@ -104,13 +120,13 @@ describe('fitCalibration', () => {
   });
 
   it('clamps predictions to the viewport', () => {
-    const model = fitCalibration(samplesFor());
+    const model = fitCalibration(samplesFor(), VIEWPORT);
     expect(applyCalibration(model, { x: 5, y: -5 }, LEVEL, VIEWPORT)).toEqual({ x: 1, y: 0 });
   });
 
   it('rejects calibration with too few dots', () => {
     const twoDots = samplesFor().filter((s) => s.target.x === 0.5 || s.target.y === 0.1 && s.target.x === 0.1);
-    expect(() => fitCalibration(twoDots)).toThrow(/at least 3/);
+    expect(() => fitCalibration(twoDots, VIEWPORT)).toThrow(/at least 3/);
   });
 });
 
@@ -127,8 +143,8 @@ describe('fitCalibration with 9 dots', () => {
   );
 
   it('switches to curved terms and fits a curved mapping better than 5 dots', () => {
-    const nine = fitCalibration(samples);
-    const five = fitCalibration(samples.filter((s) => s.target.x === 0.5 ? s.target.y === 0.5 : s.target.y !== 0.5));
+    const nine = fitCalibration(samples, VIEWPORT);
+    const five = fitCalibration(samples.filter((s) => s.target.x === 0.5 ? s.target.y === 0.5 : s.target.y !== 0.5), VIEWPORT);
     expect(nine.quadratic).toBe(true);
     const check = { x: 0.3, y: 0.8 };
     const error = (model: typeof nine) => {
@@ -140,6 +156,6 @@ describe('fitCalibration with 9 dots', () => {
   });
 
   it('keeps a straight mapping with only 5 dots', () => {
-    expect(fitCalibration(samplesFor()).quadratic).toBe(false);
+    expect(fitCalibration(samplesFor(), VIEWPORT).quadratic).toBe(false);
   });
 });

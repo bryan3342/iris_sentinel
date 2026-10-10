@@ -32,6 +32,7 @@ export interface Viewport {
 const RIDGE = 1e-6;
 const MIN_TARGETS = 3;
 const QUADRATIC_MIN_TARGETS = 9;
+const QUADRATIC_MIN_SAMPLES = 18; // three samples per curved weight, so a few scattered confirms cannot bend the map
 const OUTLIER_KEEP = 0.8; // keep the 80% of samples per dot closest to its median
 
 // The outer eye corners are the ruler that turns image units into centimeters.
@@ -123,15 +124,26 @@ function ridgeFit(rows: number[][], targets: number[]): number[] {
   return [bias, ...weights];
 }
 
-export function fitCalibration(samples: CalibrationSample[]): CalibrationModel {
+/**
+ * Samples may come from any head position (dots are taken still, confirmed
+ * targets during use are not). Each target is first moved to where the eyes
+ * would have seen it from the median head position, so the fit maps eye
+ * position alone and `applyCalibration` adds the head shift back.
+ */
+export function fitCalibration(samples: CalibrationSample[], viewport: Viewport): CalibrationModel {
   const { kept, targets } = rejectOutliers(samples);
-  const quadratic = targets >= QUADRATIC_MIN_TARGETS;
+  const quadratic = targets >= QUADRATIC_MIN_TARGETS && kept.length >= QUADRATIC_MIN_SAMPLES;
+  const head = medianHead(kept);
   const rows = kept.map((s) => features(s.eye, quadratic));
+  const seen = kept.map((s) => {
+    const shift = headShift(head, s.head, viewport);
+    return { x: s.target.x - shift.x, y: s.target.y - shift.y };
+  });
   return {
     quadratic,
-    head: medianHead(kept),
-    x: ridgeFit(rows, kept.map((s) => s.target.x)),
-    y: ridgeFit(rows, kept.map((s) => s.target.y)),
+    head,
+    x: ridgeFit(rows, seen.map((t) => t.x)),
+    y: ridgeFit(rows, seen.map((t) => t.y)),
   };
 }
 
