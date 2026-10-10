@@ -13,7 +13,7 @@ by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
 and the full input-mode state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
-manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
+live-use prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
 
 ---
 
@@ -41,8 +41,8 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 
 ## 2. Technologies / Services
 
-**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object and an
-operator-issued demo bearer token, then returns `{ signedUrl }` for the
+**Voice milestone:** `POST /v0.1/agent-token` accepts an empty JSON object from the
+Iris extension on this computer (or with an operator-issued token elsewhere), then returns `{ signedUrl }` for the
 server-configured ElevenLabs agent. It requests a single-use conversation
 signature. `ENABLE_VOICE_AGENT` is independent of page understanding and defaults
 to false. The existing origin checks, in-memory demo rate budget and concurrency
@@ -167,7 +167,7 @@ page itself.
 sensitive rectangles and revisions, and numbers targets exactly as the gaze scan
 does. Chrome capture runs through the background broker; during capture the
 overlay is held clear, so gaze cannot draw Iris's numbers into the screenshot. The side-panel coordinator owns transient mask/crop canvases, capture
-consistency checks and plain-text results. The background owns demo session tokens, kept in Chrome's memory-only session storage so they survive the idle worker restarting, and authenticated HTTP. It rejects broker
+consistency checks and plain-text results. The background owns HTTP to the Iris server on this computer, which holds every key; the extension holds no token or key. It rejects broker
 messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
 there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.
@@ -193,14 +193,17 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 - Google has separate data-handling/retention rules. The actual project's terms,
   logging/sharing and retention configuration must be verified before real browsing
   content is used; Iris does not promise zero provider retention.
-- Private-demo access uses operator-provisioned, participant-specific random
-  tokens with a fixed 15-minute expiry; only hashes/expiry are configured server-side.
-  Tokens are privately handed to verified participants and entered at runtime.
-  The extension embeds no vendor keys/shared reusable secrets and persists no
-  credentials. Background restarts require re-entry of the still-valid token.
+- The server on the user's computer admits a request without a token only when it
+  reaches the loopback address with the exact `EXTENSION_ORIGIN`, which web pages
+  cannot send. Any other request (a server reached from elsewhere) uses
+  operator-provisioned, participant-specific random tokens with a fixed 15-minute
+  expiry; only hashes/expiry are configured server-side. Tokens are privately
+  handed to verified participants. The extension embeds no vendor keys/shared
+  reusable secrets and persists no credentials.
 - The Worker bounds inputs, outputs, streamed parsing and deadlines. Per Worker
-  instance: one in-flight request/session, 2/minute/session and 10/session, with
-  no automatic retries/renewal. Cold starts reset counters and different instances
+  instance: one in-flight request/session, 2/minute/session and 10/session for
+  token holders, and one in flight and 10/minute with no total cap for the local
+  extension, with no automatic retries/renewal. Cold starts reset counters and different instances
   enforce independently. Global concurrency/rate limits and participant daily
   quotas are deferred to the team's authentication/storage work. No database,
   Durable Object, KV binding, migration or IndexedDB is introduced by this MVP.
@@ -242,9 +245,10 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 
 The tree below includes future modules. Currently implemented page understanding
 lives in `extension/src/page-understanding/` (helper, coordinator, masking and
-session client), `server/src/{access,http,png,multimodal,fake-page-understanding}.ts`,
-and `packages/protocol/src/page-understanding.ts`. Tests include synthetic fixtures,
-direct adapters/routes, capture races and a database-free local Worker run.
+session client), `server/src/{access,http,png,multimodal}.ts`,
+and `packages/protocol/src/page-understanding.ts`. Page understanding always uses
+real Gemini; Gemini is stood in for only inside automated tests (direct adapters
+and routes, capture races and a database-free local Worker run).
 
 ```
 iris_sentinel/

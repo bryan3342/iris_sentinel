@@ -2,7 +2,7 @@ import type { GazeSample, Unsubscribe } from '@iris/protocol';
 
 /**
  * Confirms: the user saying "yes, that one" without a click. Every confirm
- * method (dwell, long blink, and a stand-in for tests and development)
+ * method (dwell, long blink, and a stand-in for tests)
  * produces the same event, so whatever acts on it cannot tell them apart and
  * swapping one method for another changes nothing downstream. The event says
  * only when the user confirmed; the consumer acts on the target aimed at that

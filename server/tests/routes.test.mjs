@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { modules as m } from './modules.mjs';
-import { input, result, setup, request } from './fixtures.mjs';
+import { input, localRequest, result, setup, request } from './fixtures.mjs';
 const provider = understand => ({ findTarget: understand, summarizePage: understand, describeImage: understand, describeTarget: understand });
 
 for (const operation of m.OPERATIONS) {
-  test(`${operation}: authenticated route validates a synthetic screenshot`, async () => {
+  test(`${operation}: authenticated route validates a screenshot`, async () => {
     const s = await setup(); let calls = 0;
     const worker = m.createWorker(provider(async data => { calls++; return result(data.operation); }));
     const response = await worker.fetch(request(input(operation), s.session.sessionToken), s.env);
@@ -15,7 +15,7 @@ for (const operation of m.OPERATIONS) {
     assert.deepEqual(m.validateResult(body, m.validateInput(input(operation))).result, expected);
     assert.equal(calls, 1);
     const persisted = JSON.stringify(s.env);
-    assert.doesNotMatch(persisted, /synthetic|image\/png|iVBOR|Find the icon/);
+    assert.doesNotMatch(persisted, /sample|image\/png|iVBOR|Find the icon/);
   });
 }test('authentication, configuration and origin denial happen before provider calls', async () => {
   const s = await setup(), worker = m.createWorker(provider(async () => assert.fail('must not call provider')));
@@ -62,8 +62,28 @@ test('timeout keeps a conservative concurrency lease and stops the route', async
   assert.equal((await response).status, 504);
   assert.equal((await s.call('/admit', { sessionToken: s.session.sessionToken })).status, 409);
 });
-test('synthetic provider never becomes an implicit deployed fallback', async () => {
-  const s = await setup();
-  const worker = m.createWorker();
-  assert.equal((await worker.fetch(request(input(), s.session.sessionToken), { ...s.env, PAGE_UNDERSTANDING_PROVIDER: 'synthetic' })).status, 503);
+
+test('the Iris extension on this computer needs no token; everything else still does', async () => {
+  const s = await setup(); let calls = 0;
+  const worker = m.createWorker(provider(async data => { calls++; return result(data.operation); }));
+  const env = { ...s.env, DEMO_SESSIONS: '{}' }; // no tokens issued at all
+  assert.equal((await worker.fetch(localRequest(input(), env.EXTENSION_ORIGIN), env)).status, 200);
+  assert.equal((await worker.fetch(localRequest(input()), env)).status, 401); // a local program without the extension origin
+  assert.equal((await worker.fetch(localRequest(input(), 'https://evil.example'), env)).status, 403); // a web page
+  const remote = new Request(`https://demo.example/v0.1/page-understanding/find_target`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Origin: env.EXTENSION_ORIGIN }, body: JSON.stringify(input()) });
+  assert.equal((await worker.fetch(remote, env)).status, 401); // not this computer
+  assert.equal(calls, 1);
+});
+test('local use allows one request at a time and ten a minute, with no total cap', async () => {
+  let now = 0;
+  const gate = new m.DemoAccess(() => now);
+  for (let minute = 0; minute < 3; minute++) {
+    for (let n = 0; n < 10; n++) gate.release(gate.admitLocal());
+    assert.throws(() => gate.admitLocal(), e => e.status === 429);
+    now += 60_001;
+  }
+  const held = gate.admitLocal();
+  assert.throws(() => gate.admitLocal(), e => e.status === 409);
+  gate.release(held); assert.ok(gate.admitLocal());
 });

@@ -2,11 +2,10 @@ import { LIMITS, validateInput, validateResult, type NumberedTarget, type Operat
 import { pageOverlay, type OverlayCommand, type OverlayResult } from '../content/overlay';
 import { assertSameSnapshot, eligibleTab, prepareImage, targetCrop, validateSnapshot } from './capture';
 import { pageSnapshot, type PageSnapshot } from './page-helper';
-import { gatewayUrl } from './session';
 
 /** The target gaze rested on, as numbered in the gaze scan. */
 export interface AimedTarget { documentToken: string; id: number; rect: Rect }
-export interface DemoRequest { gateway: string; operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null }
+export interface DemoRequest { operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null }
 export interface BrokerReply { ok: boolean; value?: unknown; code?: string }
 export async function broker(message: unknown): Promise<unknown> {
   const reply: BrokerReply = await chrome.runtime.sendMessage(message);
@@ -70,7 +69,6 @@ export class PageCoordinator {
     chrome.windows.onFocusChanged.addListener(focused);
     signal.addEventListener('abort', abort, { once: true });
     try {
-      const gateway = gatewayUrl(request.gateway);
       tab = await activeTab();
       const tabId = tab.id!, url = tab.url;
       const before = await snapshot(tabId);
@@ -118,7 +116,7 @@ export class PageCoordinator {
         checking = true;
         void check().catch(invalidate).finally(() => { checking = false; });
       }, 250);
-      const result = validateResult(await broker({ type: 'iris.page.understand', gateway, input }), input);
+      const result = validateResult(await broker({ type: 'iris.page.understand', input }), input);
       await check();
       // Drawing only; the overlay refuses if the page changed since the snapshot. Nothing clicks.
       const targetId = result.result.operation === 'find_target' ? result.result.targetId : null;

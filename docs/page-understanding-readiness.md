@@ -15,9 +15,9 @@ keys, billing identifiers or actual browsing content belong in this file.
 | $60 Gemini credits | User-reported, unverified | Remaining balance, expiry, applicable project/services |
 | Auto-reload believed off | Unverified | Actual auto-reload setting and paid fallback behavior |
 | Billing/quota ceiling | Unverified | Quotas, budget alerts, credit exhaustion behavior; budgets/limits are not a globally exact cap |
-| Trusted operator and provisioned participants | Not provisioned by this change | Privately hand each verified participant their own 15-minute token; bound session count |
-| Stable extension ID and exact gateway origin | Not provisioned by this change | Exact extension origin and trusted gateway; TLS outside localhost |
-| Chrome capture on demo machine | Manual check pending | Synthetic fixture: zoom/DPR, sensitive fields, races, cancellation, restricted/incognito blocking |
+| Who may call the server | Local only: the pinned Iris extension origin on the loopback address | Before any deployment, provision operator-issued 15-minute tokens per user and require TLS |
+| Stable extension ID | Pinned in the manifest | `EXTENSION_ORIGIN` matches `chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn` |
+| Chrome capture on demo machine | Manual check pending | Public pages: zoom/DPR, sensitive fields, races, cancellation, restricted/incognito blocking |
 | Cloudflare configuration | Local runtime tested; not deployed | Secrets server-side; no payload logging/tracing/caching/queues; No database bindings; understand per-instance/resetting limits; optional gateway host permission |
 
 Google policy reviewed on 2026-10-09:
@@ -31,11 +31,10 @@ Google policy reviewed on 2026-10-09:
   logging is a separate opt-in feature; dataset sharing can permit model
   improvement/training. Verify project settings rather than infer them from credits.
 
-Keep the default feature and content gates disabled. For local synthetic tests,
-use the explicit `synthetic` provider; it never calls Gemini and is rejected on
-non-localhost routes. Never switch a deployed synthetic configuration to real
-Gemini implicitly. A live check, if later approved, should be one deliberately
-chosen synthetic request, no retries, followed by review of actual usage.
+Keep the default feature and content gates disabled until the Google account
+checks are recorded. Page understanding has no offline or placeholder mode: every
+request goes to real Gemini, so test on public pages with no personal information
+and review actual usage afterwards.
 
 Future work: accessible confirmation/action state machine, ElevenLabs tools,
 broader iframe/custom-control support, stronger capture consistency, public

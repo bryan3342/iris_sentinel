@@ -1,14 +1,13 @@
 # Copy this file to .dev.vars and replace the placeholder locally.
 GEMINI_API_KEY=replace_with_your_key
 GEMINI_MODEL=gemini-3.8-flash
-# v0.1 stays disabled until the operator provisions access.
-ENABLE_PAGE_UNDERSTANDING=false
+ENABLE_PAGE_UNDERSTANDING=true
+# Set to true once the Google account checks in docs/gemini-live-runbook.md are recorded.
 PAGE_CONTENT_APPROVED=false
-# For no-credit synthetic checks, set to synthetic; accepted on localhost only.
-PAGE_UNDERSTANDING_PROVIDER=synthetic
-# Replace with the exact loaded extension ID; no wildcard origins.
-EXTENSION_ORIGIN=chrome-extension://replace_with_32_letter_extension_id
-# Operator-provisioned JSON: session ID -> {tokenHash, expiresAt}. No raw tokens.
+# The Iris extension (its ID is pinned in the manifest). Its requests on this computer need no token.
+EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn
+# Only for a server reached from another computer: operator-issued tokens as
+# session ID -> {tokenHash, expiresAt}. No raw tokens.
 DEMO_SESSIONS={}
 # Voice sessions are independent of page understanding and disabled by default.
 ENABLE_VOICE_AGENT=false

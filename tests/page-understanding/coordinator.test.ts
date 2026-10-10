@@ -21,9 +21,9 @@ beforeEach(() => {
     if (message.type === 'iris.page.capture') return { ok: true, value: 'data:image/png;base64,AAAA' };
     if (message.type === 'iris.page.cancel') return { ok: true, value: null };
     return { ok: true, value: { protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
-      result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Synthetic crop.' }
-        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Synthetic target.' }
-        : { operation: 'find_target', targetId: 1, explanation: 'Synthetic match.' } } };
+      result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Sample crop.' }
+        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Sample target.' }
+        : { operation: 'find_target', targetId: 1, explanation: 'Sample match.' } } };
   });
   vi.stubGlobal('chrome', {
     tabs: { query: vi.fn(async () => [{ id: tabId, windowId: 1, url: 'https://example.com' }]), onActivated: event(), onUpdated: event() },
@@ -38,7 +38,7 @@ beforeEach(() => {
   });
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
-const find = { gateway: 'https://demo.example', operation: 'find_target' as const, request: 'Find the icon' };
+const find = { operation: 'find_target' as const, request: 'Find the icon' };
 it('explicit requests return a validated recommendation, without an action executor', async () => {
   const coordinator = new PageCoordinator(); const response = await coordinator.inspect(find);
   expect(response.result.result.operation).toBe('find_target');
@@ -68,7 +68,7 @@ it('discards a result after the active tab changes', async () => {
 });
 it('image numbers are bound to the listed document and revision', async () => {
   const coordinator = new PageCoordinator();
-  const describe = { gateway: find.gateway, operation: 'describe_image' as const, imageId: 1 };
+  const describe = { operation: 'describe_image' as const, imageId: 1 };
   await expect(coordinator.inspect(describe)).rejects.toThrow('LIST_IMAGES_FIRST');
   await coordinator.images(); current.revision++;
   await expect(coordinator.inspect(describe)).rejects.toThrow('PAGE_CHANGED');
@@ -119,10 +119,10 @@ it.each([
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow('PAGE_CHANGED_OR_CANCELLED');
 });
 const aimedAt = (rect = page().targets[0]!.rect) => ({ documentToken: page().documentToken, id: 1, rect });
-const describe = { gateway: find.gateway, operation: 'describe_target' as const };
+const describe = { operation: 'describe_target' as const };
 it('describes the aimed target from an outlined crop around it, without clicking', async () => {
   const response = await new PageCoordinator().inspect({ ...describe, aimed: aimedAt() });
-  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Synthetic target.' });
+  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Sample target.' });
   const sent = send.mock.calls.map(([m]) => m).find(m => m.type === 'iris.page.understand').input;
   expect([sent.targets, sent.targetId, sent.sourceRect]).toEqual([[page().targets[0]], 1, { x: 0, y: 0, width: 2, height: 2 }]);
   expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: page().targets[0]!.rect }]);

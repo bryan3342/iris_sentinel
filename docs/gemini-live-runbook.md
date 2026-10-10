@@ -4,8 +4,8 @@ This runbook connects Iris's page understanding to the real Gemini API on one
 computer, makes one deliberate test request, and turns it off again. A person
 runs every step by hand; nothing here is automated. Allow about 45 minutes.
 
-Everything runs locally. Nothing is deployed. Until this runbook is complete,
-page understanding answers only from the synthetic provider.
+Everything runs locally. Nothing is deployed. Page understanding stays off
+until this runbook is complete; it has no offline or placeholder mode.
 
 ## What gets sent, and what does not
 
@@ -26,7 +26,7 @@ page understanding answers only from the synthetic provider.
 - A clone of this repository.
 - About $1 of usage at most: the test in Part 5 is a single request.
 
-Never paste the API key, a session token, or billing or project identifiers into
+Never paste the API key, or billing or project identifiers into
 chat, an issue, a pull request, or any committed file.
 
 ## Part 1: Google account checks
@@ -104,38 +104,26 @@ until all seven are recorded.
    The ID is pinned in the manifest, so it is the same on every computer. If it
    differs, rebuild from an up-to-date clone.
 
-## Part 4: Server settings and a session token
+## Part 4: Server settings
 
-1. From `server/`, create a 15-minute session token:
-
-   ```sh
-   node scripts/provision-demo-session.mjs
-   ```
-
-   It prints `sessionToken`, `expiresAt` and `serverBinding`. Keep this terminal
-   private. The token is entered in Iris in Part 5; only the `serverBinding`
-   goes into the settings file, and it holds a hash, not the token.
-2. Edit `server/.dev.vars` so it contains these lines (keep your key line):
+1. Edit `server/.dev.vars` so it contains these lines (keep your key line):
 
    ```sh
    GEMINI_MODEL=gemini-3.8-flash
    ENABLE_PAGE_UNDERSTANDING=true
-   PAGE_UNDERSTANDING_PROVIDER=gemini
    PAGE_CONTENT_APPROVED=true
    EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn
-   DEMO_SESSIONS={"<session id>":{"tokenHash":"<hash>","expiresAt":<number>}}
    ```
 
-   For `DEMO_SESSIONS`, paste the printed `serverBinding` object on one line.
-   Any provider other than `synthetic` means real Gemini. Set
-   `PAGE_CONTENT_APPROVED=true` only after Part 1 is complete.
-3. Start the server and keep the terminal open:
+   Set `PAGE_CONTENT_APPROVED=true` only after Part 1 is complete. No token is
+   needed: the server answers the Iris extension on this computer only.
+2. Start the server and keep the terminal open:
 
    ```sh
    npm run dev
    ```
 
-   It listens on `http://127.0.0.1:8787` only.
+   It listens on `http://127.0.0.1:8787` only, and Iris connects to it on its own.
 
 ## Part 5: One live request
 
@@ -144,26 +132,21 @@ link, so the right answer is known.
 
 1. Open `https://example.com` in Chrome and keep it the active tab.
 2. Click the Iris toolbar icon to open the side panel.
-3. In **Page understanding**, enter the gateway `http://127.0.0.1:8787`, click
-   **Allow gateway access**, and approve Chrome's prompt.
-4. Paste the `sessionToken` from Part 4 into the token field and click **Use
-   demo session**. The field clears at once. The token stays entered until it
-   expires, Chrome restarts or Iris is reloaded.
-5. Type `More information` as the request and click **Send viewport to find
+3. In **Page understanding**, type `More information` as the request and click **Send viewport to find
    target**, once.
 
 Expected: a result starting "Recommended target 1. It is highlighted on the
 page.", then Gemini's short explanation, and the link outlined on the page.
 Nothing is clicked.
 
-This is the only request the test needs. Each session allows two requests a
-minute and ten in total.
+This is the only request the test needs. Iris allows one request at a time and
+ten a minute.
 
 ## Part 6 (optional): Gemini and gaze together
 
 Gemini can describe whatever gaze is aiming at. This uses one more request.
 
-1. In the side panel, turn on **Developer: the mouse stands in for the eyes**,
+1. In the side panel, turn on **Point with the mouse**,
    or calibrate with **Calibrate on this page** and turn on **Aim with my eyes**.
 2. Rest your eyes (or the mouse) on the "More information" link for about a
    second, until it is outlined.
@@ -192,12 +175,9 @@ Making Gemini's "find" answer the aimed target, ready to confirm, is future work
    ```sh
    ENABLE_PAGE_UNDERSTANDING=false
    PAGE_CONTENT_APPROVED=false
-   PAGE_UNDERSTANDING_PROVIDER=synthetic
-   DEMO_SESSIONS={}
    ```
 
-3. The session token expires on its own within 15 minutes.
-4. If the key may have been exposed, delete it in AI Studio and create a new
+3. If the key may have been exposed, delete it in AI Studio and create a new
    one.
 
 ## Troubleshooting
@@ -208,10 +188,11 @@ Making Gemini's "find" answer the aimed target, ready to confirm, is future work
 | `check:gemini` reports 404 | The model is not available to the project | Set another available model in `GEMINI_MODEL` |
 | `check:gemini` reports 429, or Iris shows `UPSTREAM_UNAVAILABLE` | Quota or rate limit, or Gemini is unavailable | Wait, then check quota in AI Studio |
 | `check:gemini` reports `UPSTREAM_REJECTED`, or Iris shows it | Gemini refused the key, the model or the request format | Check the key and `GEMINI_MODEL`; the HTTP code printed by `check:gemini` narrows it down |
-| `NOT_CONFIGURED` | A server setting is missing or malformed | Check the key, `EXTENSION_ORIGIN` and the one-line `DEMO_SESSIONS` JSON, then restart the server |
+| `REQUEST_FAILED` | The server is not running | Start it (Part 4, step 2) |
+| `NOT_CONFIGURED` | A server setting is missing or malformed | Check the key and `EXTENSION_ORIGIN`, then restart the server |
 | `DISABLED` | `ENABLE_PAGE_UNDERSTANDING` is not `true` | Set it and restart |
 | `CONTENT_NOT_APPROVED` | Real Gemini selected without approval | Finish Part 1, then set `PAGE_CONTENT_APPROVED=true` |
 | `FORBIDDEN` | The request came from a different extension ID | Check Part 3 and `EXTENSION_ORIGIN` |
-| `UNAUTHENTICATED` or `DEMO_SESSION_REQUIRED` | The token is wrong or expired | Provision a new token (Part 4) and restart the server |
-| `RATE_LIMITED` | More than two requests in a minute, or ten in total | Wait a minute, or provision a new token |
+| `UNAUTHENTICATED` | The request did not come from the Iris extension on this computer | Check `EXTENSION_ORIGIN` and that the server runs on this computer |
+| `RATE_LIMITED` | More than ten requests in a minute | Wait a minute |
 | `PAGE_NOT_ALLOWED` or `UNSUPPORTED_PAGE` | The page cannot be captured (browser page, incognito, video or embedded frames) | Use `https://example.com` |

@@ -7,8 +7,9 @@ This protocol recommends or explains. It contains no browser action operation.
 
 ## Routes and envelopes
 
-`POST /v0.1/page-understanding/{operation}` accepts JSON and requires
-`Authorization: Bearer <short-lived session token>`. Supported operations:
+`POST /v0.1/page-understanding/{operation}` accepts JSON from the Iris extension on
+this computer, or with `Authorization: Bearer <short-lived session token>` on a
+server reached from elsewhere (see Provisioning below). Supported operations:
 
 | Operation | Required operation fields | Result fields |
 | --- | --- | --- |
@@ -51,7 +52,7 @@ For `describe_image`, the extension must first list visible image IDs and bind
 that list to the same snapshot. It crops the masked viewport using `sourceRect`;
 only the visible portion is described. Image bytes contain no target overlay.
 For `describe_target`, the extension uses the target the user last rested gaze (or
-the development mouse stand-in) on for about a second, so targets passed over on
+the mouse) on for about a second, so targets passed over on
 the way to the side panel do not count. It must still be in the same document, at
 the same number and within 4 px of where gaze saw it. The crop is that target with
 room around it (at least 240 by 160 CSS pixels, inside the viewport), masked like
@@ -89,22 +90,23 @@ unsupported pages, missing image lists, cancellation and permission failures.
 
 ## Provisioning and resource ownership
 
-There are no authentication bootstrap or registration endpoints in this smaller
-MVP. A trusted operator runs `node server/scripts/provision-demo-session.mjs`
+The server normally runs on the user's computer. A request there needs no token
+when it reaches the loopback address with the exact `EXTENSION_ORIGIN`, which web
+pages cannot send; such requests may run one at a time, 10 a minute. The
+extension sends no `Authorization` header and stores no credential.
+
+For a server reached from another computer there are no authentication bootstrap
+or registration endpoints. A trusted operator runs `node server/scripts/provision-demo-session.mjs`
 locally to create a cryptographically random, participant-specific bearer token
 and a fixed 15-minute expiry. The operator adds only the returned `serverBinding`
 (session ID -> `{tokenHash, expiresAt}`) to the server's ignored `DEMO_SESSIONS`
 configuration, then hands the token privately to the verified participant.
 Never paste tokens into chat, source code, logs or shared fixtures.
 
-The participant enters the token at runtime in Iris's password field. The input
-is cleared immediately and the background keeps it in Chrome's session storage,
-scoped to the operator-provided gateway. Session storage lives in memory only,
-is hidden from content scripts, and survives Chrome stopping the idle background
-worker. There are no embedded vendor keys, reusable shared secrets, signing keys,
-IndexedDB or other on-disk credential persistence. Restarting Chrome or reloading
-the extension requires re-entry of the still-valid token. Removing its
-server entry revokes it. TLS is required except localhost. The server verifies
+The extension has no token entry; tokens are for clients of a non-local server.
+There are no embedded vendor keys, reusable shared secrets, signing keys,
+IndexedDB or other credential persistence. Removing a token's server entry
+revokes it. TLS is required except localhost. The server verifies
 expiry on every request and rejects provisioning more than 15 minutes ahead.
 
 Admission uses an in-memory map per Worker instance, with no database, Durable

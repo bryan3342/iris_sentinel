@@ -41,10 +41,6 @@ This opens http://localhost:5173 as a full-window gaze tracking view. Allow the 
 
 Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Saved calibration data is a few hundred numbers (eye positions, head pose and dot positions), never frames, and it never leaves your computer.
 
-### Without a camera
-
-Open http://localhost:5173/?sim to use a simulated gaze provider instead of the webcam. A simulated user looks wherever the mouse pointer is, with webcam-like jitter, and closes their eyes when the pointer leaves the window. Calibration, the red circle and click-to-refine all work as above: move the pointer onto each dot to calibrate. A simulated calibration is kept in memory only, so it never replaces a real one saved for this screen. Tests use the same provider with scripted looks (`extension/src/providers/simulated/gaze.ts`).
-
 ## Option 2: The real extension (load unpacked)
 
 1. Build once, or keep it rebuilding on every save:
@@ -60,7 +56,7 @@ Open http://localhost:5173/?sim to use a simulated gaze provider instead of the 
 
 After a rebuild, click the reload arrow on the Iris card in `chrome://extensions` and reopen the panel.
 
-To try aiming on real websites before calibrating, turn on **Developer: the mouse stands in for the eyes** in the panel. Move the mouse over the page and the nearest numbered link or button is outlined; resting on it for a second selects it. Anything that may submit, pay, delete or send asks for a second confirm: move away, then rest on it again within six seconds. **Developer: confirm now** confirms the outlined target at once. To aim with your eyes, click **Calibrate on this page** and look at each of the 9 dots until it moves (about 16 seconds); aiming starts when it finishes. The calibration is saved on this computer, so next time **Aim with my eyes** works right away.
+To aim without calibrating, turn on **Point with the mouse** in the panel. Move the mouse over the page and the nearest numbered link or button is outlined; resting on it for a second selects it. Anything that may submit, pay, delete or send asks for a second confirm: move away, then rest on it again within six seconds. To aim with your eyes, click **Calibrate on this page** and look at each of the 9 dots until it moves (about 16 seconds); aiming starts when it finishes. The calibration is saved on this computer, so next time **Aim with my eyes** works right away.
 
 **Fixed extension ID.** Iris always loads as `bohipliohnmknfglnkhglngbmpiahdcn`, on every computer, because `manifest.json` carries a public `key` (not a secret). The companion only answers this ID. Use it wherever a setup step asks for the extension ID, for example `EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn` in `server/.dev.vars`. If you loaded Iris before the ID was fixed, Chrome sees this as a new extension: remove the old Iris card, load `extension/dist` again, and allow the camera once more.
 
