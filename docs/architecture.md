@@ -24,7 +24,7 @@ Track and technology choices behind this design are in [tracks.md](tracks.md).
 - Works on normal websites. Chrome's own pages and the address bar are out of reach for extensions; voice "go to <site>" covers navigation.
 - Fatigue is presented as "you might be tired", never as a medical reading.
 - Desktop Chrome only.
-- The companion runs where the Presage Node.js SDK does: Apple Silicon Macs, Windows x64 and Linux (glibc 2.35+). Intel Macs are not supported.
+- The companion targets Apple Silicon Macs and Windows x64, the desktop platforms the Presage Node.js SDK supports and the companion installer covers. Intel Macs are not supported.
 
 ---
 
@@ -33,7 +33,7 @@ Track and technology choices behind this design are in [tracks.md](tracks.md).
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
 | Client | Chrome extension, Manifest V3, TypeScript | Side panel (UI, voice agent, gaze tracking), background coordinator, page helper injected into each tab |
-| Vitals and face sensing | **Presage SmartSpectra** (Node.js SDK) in a local companion | Live breathing waveform, blinks, talking detection, heart rate, heart rate variability. Runs on-device. Presage has no gaze output and no fatigue score. |
+| Vitals and face sensing | **Presage SmartSpectra** (Node.js SDK) in a local companion | Live breathing waveform, heart rate, heart rate variability, blinks, talking detection, facial expressions and a motion warning. Runs on-device. Presage has no gaze output and no fatigue, focus or movement score; Iris computes those. |
 | Companion link | Chrome native messaging | Chrome starts the companion and only Iris's extension can reach it. No open network port. |
 | Gaze (where the user looks) | MediaPipe Face Landmarker (in the side panel) | Primary aiming source. Eye and head landmarks are mapped to a screen point through the 5-dot calibration. The WebAssembly runtime and model are bundled with the extension. |
 | Voice | **ElevenLabs Agents** with client tools | Hands-free conversation with turn-taking; calls Iris actions as tools |
@@ -41,14 +41,14 @@ Track and technology choices behind this design are in [tracks.md](tracks.md).
 | Page understanding | **Gemini API** (Flash models, image input) | Matches spoken requests to numbered targets using a screenshot plus the target list, summarizes pages, describes images |
 | API gateway | Cloudflare Worker | Holds every API key; mints the ElevenLabs agent session; proxies Gemini |
 | Fatigue history (optional) | Tiger Data (managed Postgres with time-series) | Opt-in minute-level fatigue summaries for a caregiver trends view |
-| Shared logic | Plain TypeScript package | Target snapping, input modes, fatigue score, calibration fit. No vendor imports. |
+| Shared logic | Plain TypeScript package | Target snapping, input modes, fatigue score, focus score, movement level, calibration fit. No vendor imports. |
 
 **Vendor isolation.** Every vendor sits behind a neutral interface so it can be swapped without touching callers:
 
 | Interface | Implementations |
 | :--- | :--- |
 | `GazeProvider` (where the user looks) | MediaPipe, simulated |
-| `FaceProvider` (blinks, talking) | Presage companion, simulated |
+| `FaceProvider` (blinks, talking, expressions, motion warning, face points) | Presage companion, simulated |
 | `VitalsProvider` (breathing wave, HR, HRV) | Presage companion, simulated |
 | `VoiceAgent` | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
@@ -66,11 +66,12 @@ Webcam ─> Iris Companion (Node.js, Presage SDK)
             ├─ blink frames ───────> BlinkSegmenter ─> blink events (with duration)
             │                          └─ LongBlinkDetector ──────┤ confirm events
             ├─ talking on/off ─────> pauses confirms while talking│
-            └─ HR, HRV, blink events (for fatigue)                │
+            └─ HR, HRV, breathing rate, blink events,             │
+               expressions, motion warning, face points           │
                  │ native messaging (small JSON events, no video) │
                  ▼                                                ▼
         Background coordinator ── input mode state machine ── click(target)
-          ├─ FatigueEngine (packages/core)                        │
+          ├─ FatigueEngine, FocusEngine, movement (packages/core) │
           ▲                                                       ▼
           │ gaze points (screen coordinates)
 Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
@@ -83,7 +84,7 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 **Who owns what.**
 - **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`.
 - **Blinks:** Presage only. MediaPipe's blink detection is not used, so the two can never disagree. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events with a duration. Long blinks become confirm events; every blink event also feeds the fatigue score, which leaves out the long blinks used as confirms.
-- **Fatigue:** computed by Iris in the background coordinator, because it combines companion signals with behavior that only the extension sees.
+- **Fatigue, focus and movement:** computed by Iris in the background coordinator from Presage signals plus behavior that only the extension sees. Presage provides the raw signals, not these scores.
 
 **Camera sharing.** The companion and the side panel each open the webcam. Both must run at once; this is verified on every target machine before building on it. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 
@@ -95,6 +96,12 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 | Tiring | Longer confirm timing, larger targets |
 | Fatigued | Agent offers to read the page aloud and take requests by voice |
 | Sustained strain | Suggests a break; pauses gaze confirms until the user looks back |
+
+**Movement level.** Derived from frame-to-frame change in Presage face points plus its "excessive motion" warning. High movement lowers trust in the other body signals and can mean the user is restless or uncomfortable.
+
+**Focus score.** Combines how steady the gaze is on the page, blink pattern, movement level and Presage facial expressions. Like fatigue, it is computed against the user's own baseline and is never shown as a medical reading.
+
+**Presage signal limits** (from the SmartSpectra docs). Readings carry a confidence value and only become trustworthy after a warm-up: 12 seconds for pulse, 30 seconds for breathing, 60 seconds for heart rate variability. Breathing needs the upper chest in view and a still camera, and talking distorts it. Iris ignores readings below their stable threshold, pauses breathing-based signals while the user talks, and uses these signals for slow trends (fatigue, focus), not instant actions. The breath-hold confirm is the one exception and is checked on the demo laptop before it is relied on; long blink and dwell are always available.
 
 ### 3.2 Voice request flow
 
@@ -178,7 +185,7 @@ iris_sentinel/
 │           ├── gemini/          # find target, summarize, describe image
 │           └── tts/             # fixed voice lines
 ├── packages/
-│   ├── core/                    # target snapping, input modes, fatigue score, calibration fit
+│   ├── core/                    # target snapping, input modes, fatigue, focus, movement, calibration fit
 │   └── protocol/                # message types shared by companion, extension, server
 └── tests/
     ├── core/                    # unit tests for packages/core
