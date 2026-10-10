@@ -4,8 +4,13 @@ export interface PageSnapshot {
   targets: NumberedTarget[]; targetsTruncated: boolean;
   images: { id: number; rect: Rect }[]; masks: Rect[]; blocked: boolean;
 }
-/** Gaze's view of the page: target positions only. Nothing here is sent off the device. */
-export type PageTargets = Pick<PageSnapshot, 'documentToken' | 'revision' | 'viewport' | 'targets' | 'targetsTruncated'>;
+/**
+ * Gaze's view of the page: target positions, plus whether selecting each one
+ * needs a second confirm (missing counts as risky). Nothing here is sent off the device.
+ */
+export type PageTargets = Pick<PageSnapshot, 'documentToken' | 'revision' | 'viewport' | 'targetsTruncated'> & {
+  targets: (NumberedTarget & { risky?: boolean })[];
+};
 
 /** Current document and change counter, or null before the first scan. Self-contained for executeScript. */
 export function pageRevision(): { documentToken: string; revision: number } | null {
@@ -19,12 +24,28 @@ export function pageRevision(): { documentToken: string; revision: number } | nu
  * pages a screenshot cannot represent safely. The 'targets' mode serves gaze,
  * which sends nothing anywhere: it checks only links and buttons (role first,
  * before any layout work), applies none of the screenshot blocking rules, and
- * omits labels.
+ * omits labels. Each target says whether selecting it is risky: only an
+ * ordinary link to another page, or a plainly harmless button outside a form,
+ * is safe. Anything that may submit, pay, delete or send, and anything Iris
+ * cannot classify, is risky. The label is read here to decide and never returned.
  */
 export function pageSnapshot(): PageSnapshot;
 export function pageSnapshot(mode: 'targets'): PageTargets;
 export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'): PageSnapshot | PageTargets {
   const targetsOnly = mode === 'targets';
+  const riskyWords = /\b(pay|buy|purchase|order|checkout|check out|delete|remove|send|submit|confirm|sign out|log ?out|unsubscribe|transfer|donate|subscribe|cancel|place)\b/i;
+  const harmlessButton = /^(close|menu|next|previous|prev|back|more|less|expand|collapse|show|show more|show less|hide|open|play|pause)$/i;
+  const risky = (el: Element, role: 'link' | 'button') => {
+    const clean = (s: string | null) => (s ?? '').trim().replace(/\s+/g, ' ');
+    const text = clean(el.getAttribute('aria-label') || el.textContent || el.getAttribute('title'));
+    // Any name that sounds risky counts, even when another name is harmless.
+    const names = [el.getAttribute('aria-label'), el.textContent, el.getAttribute('title')];
+    if (el.closest('form') || names.some(n => riskyWords.test(clean(n)))) return true;
+    if (role === 'button') return !harmlessButton.test(text);
+    // Only a plain link to a web page: not a download, not script, mail, phone or another app.
+    if (!(el instanceof HTMLAnchorElement) || !el.hasAttribute('href') || el.hasAttribute('download')) return true;
+    try { return !/^https?:$/.test(new URL(el.href, location.href).protocol); } catch { return true; }
+  };
   // onChange is set by Iris's own overlay (content/overlay.ts) to erase its drawing on the next page change.
   type State = { documentToken: string; revision: number; onChange?: () => void };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: State; __irisOverlayV01?: { host: Element } };
@@ -51,7 +72,7 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
   const viewport: Viewport = { width: vv?.width ?? innerWidth, height: vv?.height ?? innerHeight,
     offsetLeft: vv?.offsetLeft ?? 0, offsetTop: vv?.offsetTop ?? 0,
     scale: vv?.scale ?? 1, scrollX, scrollY };
-  const targets: NumberedTarget[] = [], masks: Rect[] = [], images: { id: number; rect: Rect }[] = [];
+  const targets: (NumberedTarget & { risky?: boolean })[] = [], masks: Rect[] = [], images: { id: number; rect: Rect }[] = [];
   let blocked = viewport.scale !== 1, targetsTruncated = false, nextTarget = 1, nextImage = 1, scanned = 0;
   const rectOf = (el: Element, padding = 0): Rect | undefined => {
     const style = getComputedStyle(el);
@@ -91,7 +112,7 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
       const top = root.elementFromPoint(centerX, centerY);
       if (!top || !(el === top || el.contains(top))) continue;
       if (targets.length >= 100) { targetsTruncated = true; continue; }
-      if (targetsOnly) { targets.push({ id: nextTarget++, role, rect }); continue; }
+      if (targetsOnly) { targets.push({ id: nextTarget++, role, rect, risky: risky(el, role) }); continue; }
       // Avoid nested editable values and text derived from sensitive descendants.
       const label = (el.getAttribute('aria-label') || (!el.querySelector('input, textarea, [contenteditable], select') ? el.textContent : '') || '').trim().slice(0, 200);
       targets.push({ id: nextTarget++, role, rect, ...(label ? { label } : {}) });

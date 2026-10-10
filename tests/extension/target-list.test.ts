@@ -24,7 +24,7 @@ beforeEach(() => {
         calls.push(`${func.name}:${target.tabId}`);
         if (func.name === 'pageRevision') return [{ frameId: 0, result: p.scanned ? { documentToken: p.documentToken, revision: p.revision } : null }];
         p.scanned = true;
-        const targets = [{ id: 1, role: 'link', rect: { x: 10, y: 10 + p.revision, width: 100, height: 20 } }];
+        const targets = [{ id: 1, role: 'link', rect: { x: 10, y: 10 + p.revision, width: 100, height: 20 }, risky: false }];
         return [{ frameId: 0, result: { documentToken: p.documentToken, revision: p.revision, viewport: VIEWPORT, targets, targetsTruncated: false } }];
       }),
     },
