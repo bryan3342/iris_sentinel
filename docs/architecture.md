@@ -191,15 +191,17 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 - Google has separate data-handling/retention rules. The actual project's terms,
   logging/sharing and retention configuration must be verified before real browsing
   content is used; Iris does not promise zero provider retention.
-- The server runs on the user's computer, listens on the loopback address only,
-  and answers without a token only requests carrying the exact Iris extension
-  origin, which web pages cannot send. A server reached from elsewhere requires
-  operator-issued random tokens with a fixed 15-minute expiry; only hashes and
-  expiry are configured server-side. The extension embeds no vendor keys or
-  shared secrets and persists no credentials.
+- The server on the user's computer admits a request without a token only when it
+  reaches the loopback address with the exact `EXTENSION_ORIGIN`, which web pages
+  cannot send. Any other request (a server reached from elsewhere) uses
+  operator-provisioned, participant-specific random tokens with a fixed 15-minute
+  expiry; only hashes/expiry are configured server-side. Tokens are privately
+  handed to verified participants. The extension embeds no vendor keys/shared
+  reusable secrets and persists no credentials.
 - The Worker bounds inputs, outputs, streamed parsing and deadlines. Per Worker
-  instance: one in-flight request/session, 2/minute/session and 10/session, with
-  no automatic retries/renewal. Cold starts reset counters and different instances
+  instance: one in-flight request/session, 2/minute/session and 10/session for
+  token holders, and one in flight and 10/minute with no total cap for the local
+  extension, with no automatic retries/renewal. Cold starts reset counters and different instances
   enforce independently. Global concurrency/rate limits and participant daily
   quotas are deferred to the team's authentication/storage work. No database,
   Durable Object, KV binding, migration or IndexedDB is introduced by this MVP.
