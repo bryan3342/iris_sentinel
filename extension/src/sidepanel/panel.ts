@@ -1,6 +1,8 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { isExtensionPage, openCamera } from './setup/camera';
+import { numbersPanel } from './numbers';
 import { pageAccessPanel } from './setup/page-access';
+import { LiveTargetList } from './target-list';
 import { EyeTrace } from './trace';
 import { understandingPanel } from './understanding';
 
@@ -20,7 +22,7 @@ export function mountPanel(root: HTMLElement): void {
   status.textContent = 'Starting camera...';
 
   root.replaceChildren(preview, status);
-  if (isExtensionPage()) root.append(pageAccessPanel(), understandingPanel());
+  if (isExtensionPage()) root.append(pageAccessPanel(), numbersPanel(new LiveTargetList()), understandingPanel());
 
   openCamera()
     .then((stream) => {

@@ -4,9 +4,27 @@ export interface PageSnapshot {
   targets: NumberedTarget[]; targetsTruncated: boolean;
   images: { id: number; rect: Rect }[]; masks: Rect[]; blocked: boolean;
 }
+/** Gaze's view of the page: target positions only. Nothing here is sent off the device. */
+export type PageTargets = Pick<PageSnapshot, 'documentToken' | 'revision' | 'viewport' | 'targets' | 'targetsTruncated'>;
 
-/** Runs in Chrome's isolated world. Must remain self-contained for executeScript. */
-export function pageSnapshot(): PageSnapshot {
+/** Current document and change counter, or null before the first scan. Self-contained for executeScript. */
+export function pageRevision(): { documentToken: string; revision: number } | null {
+  const state = (globalThis as typeof globalThis & { __irisUnderstandingV01?: { documentToken: string; revision: number } }).__irisUnderstandingV01;
+  return state ? { documentToken: state.documentToken, revision: state.revision } : null;
+}
+
+/**
+ * Runs in Chrome's isolated world. Must remain self-contained for executeScript.
+ * The default mode serves page understanding: it finds fields to mask and blocks
+ * pages a screenshot cannot represent safely. The 'targets' mode serves gaze,
+ * which sends nothing anywhere: it checks only links and buttons (role first,
+ * before any layout work), applies none of the screenshot blocking rules, and
+ * omits labels.
+ */
+export function pageSnapshot(): PageSnapshot;
+export function pageSnapshot(mode: 'targets'): PageTargets;
+export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'): PageSnapshot | PageTargets {
+  const targetsOnly = mode === 'targets';
   // onChange is set by Iris's own overlay (content/overlay.ts) to erase its drawing on the next page change.
   type State = { documentToken: string; revision: number; onChange?: () => void };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: State; __irisOverlayV01?: { host: Element } };
@@ -48,31 +66,39 @@ export function pageSnapshot(): PageSnapshot {
     // Bound local traversal too; never silently miss sensitive fields on oversized pages.
     const elements = root.querySelectorAll('*');
     scanned += elements.length;
-    if (scanned > 10_000) { blocked = true; return; }
+    if (scanned > 10_000 && !targetsOnly) { blocked = true; return; }
     for (const el of elements) {
       if (el === overlay()) continue;
+      const role = el.matches('a[href], [role=link]') ? 'link' : el.matches('button, [role=button]') ? 'button' : undefined;
+      if (targetsOnly) {
+        if (el.shadowRoot) walk(el.shadowRoot);
+        if (!role) continue;
+      }
       const rect = rectOf(el);
       if (!rect) continue;
-      if (el.shadowRoot) walk(el.shadowRoot);
-      else if (el.localName.includes('-')) blocked = true; // inaccessible custom-control internals
-      if (el.matches('iframe, frame, object, embed, video') || el.getAnimations().some(a => a.playState === 'running')) blocked = true;
-      if (el.matches('input:not([type=hidden]), textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=combobox]')) {
-        const mask = rectOf(el, 8); if (mask) masks.push(mask);
-        continue;
+      if (!targetsOnly) {
+        if (el.shadowRoot) walk(el.shadowRoot);
+        else if (el.localName.includes('-')) blocked = true; // inaccessible custom-control internals
+        if (el.matches('iframe, frame, object, embed, video') || el.getAnimations().some(a => a.playState === 'running')) blocked = true;
+        if (el.matches('input:not([type=hidden]), textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=combobox]')) {
+          const mask = rectOf(el, 8); if (mask) masks.push(mask);
+          continue;
+        }
+        if (el.matches('img') && images.length < 100) images.push({ id: nextImage++, rect });
       }
-      if (el.matches('img') && images.length < 100) images.push({ id: nextImage++, rect });
-      const role = el.matches('a[href], [role=link]') ? 'link' : el.matches('button, [role=button]') ? 'button' : undefined;
       if (!role || el.matches(':disabled, [aria-disabled=true]')) continue;
       const centerX = rect.x + rect.width / 2 + viewport.offsetLeft, centerY = rect.y + rect.height / 2 + viewport.offsetTop;
       const top = root.elementFromPoint(centerX, centerY);
       if (!top || !(el === top || el.contains(top))) continue;
       if (targets.length >= 100) { targetsTruncated = true; continue; }
+      if (targetsOnly) { targets.push({ id: nextTarget++, role, rect }); continue; }
       // Avoid nested editable values and text derived from sensitive descendants.
       const label = (el.getAttribute('aria-label') || (!el.querySelector('input, textarea, [contenteditable], select') ? el.textContent : '') || '').trim().slice(0, 200);
       targets.push({ id: nextTarget++, role, rect, ...(label ? { label } : {}) });
     }
   };
   walk(document);
+  if (targetsOnly) return { documentToken: state.documentToken, revision: state.revision, viewport, targets, targetsTruncated };
   if (masks.length > 1000) blocked = true;
   return { documentToken: state.documentToken, revision: state.revision, viewport, targets, targetsTruncated, images, masks, blocked };
 }
