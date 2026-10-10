@@ -59,8 +59,9 @@ export class MediaPipeGazeProvider implements GazeProvider {
     const result = this.landmarker.detectForVideo(this.video, now);
     const landmarks = result.faceLandmarks[0];
     if (!landmarks) {
-      // No face: publish a null eye so listeners do not keep aiming at the last sample.
-      this.publish({ t: now, eye: null, head: this.lastHead });
+      // No face: publish a null eye so listeners do not keep aiming at the last
+      // sample, and open eyes so a missing face never reads as a long blink.
+      this.publish({ t: now, eye: null, head: this.lastHead, blink: { left: 0, right: 0 } });
       this.traceListeners.forEach((listener) => listener([[], []]));
       return;
     }

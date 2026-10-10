@@ -45,6 +45,15 @@ describe('SimulatedGazeProvider', () => {
     expect(at(900)).toEqual(eyeFor({ x: 0.9, y: 0.1 }));
   });
 
+  it('reports open eyes even while the look is null, so it never fakes a long blink', async () => {
+    const provider = new SimulatedGazeProvider(scripted([{ at: null, ms: 1000 }]), { noise: 0 });
+    const samples = record(provider);
+    await provider.start();
+    vi.advanceTimersByTime(300);
+    expect(samples.length).toBeGreaterThan(0);
+    expect(samples.every((s) => s.eye === null && s.blink.left === 0 && s.blink.right === 0)).toBe(true);
+  });
+
   it('adds the same bounded jitter on every run with the same seed', async () => {
     const run = async () => {
       const provider = new SimulatedGazeProvider(scripted([{ at: { x: 0.5, y: 0.5 }, ms: 1000 }]), { noise: 0.02, seed: 7 });

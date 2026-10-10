@@ -95,6 +95,20 @@ describe('toGazeSample', () => {
     expect(winked.x).toBeCloseTo(2 * averaged.x);
   });
 
+  it("reports each eye's closure by the user's own left and right", () => {
+    expect(toGazeSample(frame({ eyeBlinkLeft: 0.9, eyeBlinkRight: 0.2 }), 0).blink).toEqual({ left: 0.9, right: 0.2 });
+  });
+
+  it('still reports closure when both eyes are shut and the position drops out', () => {
+    const sample = toGazeSample(frame({ eyeBlinkLeft: 0.9, eyeBlinkRight: 0.8 }), 0);
+    expect(sample.eye).toBeNull();
+    expect(sample.blink).toEqual({ left: 0.9, right: 0.8 });
+  });
+
+  it('reads missing blink scores as open eyes', () => {
+    expect(toGazeSample(frame(), 0).blink).toEqual({ left: 0, right: 0 });
+  });
+
   it('pairs look-down scores with their own eye', () => {
     const leftClosed = { eyeBlinkLeft: 0.9 };
     expect(toGazeSample(frame({ ...leftClosed, eyeLookDownLeft: 0.8 }), 0).eye?.y).toBeCloseTo(0);
