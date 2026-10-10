@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyCalibration, CalibrationStore, FixationSmoother, GazeAim, GazePointer, type SnapTarget } from '@iris/core';
+import { applyCalibration, CalibrationStore, FixationSmoother, GazeAim, GazePointer, viewportFrame, type SnapTarget } from '@iris/core';
 import type { GazeSample, Point2 } from '@iris/protocol';
 import { DOT_LAYOUTS } from '../../extension/src/sidepanel/setup/calibration';
 import { eyeFor, scripted, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
@@ -126,7 +126,7 @@ describe('simulated gaze through calibration and smoothing', () => {
       { noise: 0.02, seed: 5 },
     );
     const aim = new GazeAim(new GazePointer(store));
-    aim.setTargets(targets, VIEWPORT);
+    aim.setTargets(targets, viewportFrame(VIEWPORT));
     const aims: { t: number; aim: number | null }[] = [];
     provider.onSample((s) => aims.push({ t: s.t, aim: aim.update(s) }));
     await provider.start();
