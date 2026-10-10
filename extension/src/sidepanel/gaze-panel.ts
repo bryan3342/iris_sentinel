@@ -48,7 +48,10 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void } | null = null;
 
+  let generation = 0; // bumps on every stop, so a slow calibration load cannot start a stale session
+
   const stop = () => {
+    generation++;
     active?.session.stop();
     active?.stop?.();
     active = null;
@@ -59,10 +62,11 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     mouse.input.checked = false;
     if (!eyes.input.checked || !camera) return;
     const provider = camera;
+    const mine = generation;
     void loadSamples().then((samples) => {
       let store: CalibrationStore | null = null;
       try { store = new CalibrationStore(samples, targets.list?.viewport ?? screenSize()); } catch { store = null; }
-      if (!eyes.input.checked) return;
+      if (mine !== generation) return;
       if (!store?.model) {
         eyes.input.checked = false;
         status.textContent = 'Calibrate first. Calibration on the page comes in the next update.';
