@@ -1,10 +1,10 @@
+import { abortable, readBytes } from './http';
 export interface Target { id: number; label: string; role: "link" | "button" }
 export interface FindTargetInput { request: string; targets: Target[] }
 export interface Selection { targetId: number | null }
 export interface PageUnderstanding {
   findTarget(input: FindTargetInput, signal?: AbortSignal): Promise<Selection>;
 }
-import { abortable, readBytes } from './http';
 export interface Env {
   GEMINI_API_KEY?: string; GEMINI_MODEL?: string; EXTENSION_ORIGIN?: string;
   ENABLE_PAGE_UNDERSTANDING?: string; PAGE_CONTENT_APPROVED?: string; ENABLE_LOCAL_LABELS?: string;
