@@ -1,11 +1,12 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
-// `vite` serves the playground (index.html) on localhost for testing in a normal
-// tab. `vite build` emits the unpacked extension into dist/; the playground is
-// not part of the build.
+// `vite` serves the playground (index.html) on localhost and opens it: a
+// full-window gaze tracking view for testing without installing the extension.
+// `vite build` emits the unpacked extension into dist/; the playground is not
+// part of the build.
 export default defineConfig({
-  server: { host: '127.0.0.1', port: 5173, strictPort: true },
+  server: { host: '127.0.0.1', port: 5173, strictPort: true, open: true },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

@@ -25,15 +25,20 @@ npm test
 npm run typecheck
 ```
 
-## Option 1: Playground in a normal tab (no install)
-
-The playground serves the side panel UI on your computer only, so you can try camera and sensor features without installing the extension.
+## Option 1: Gaze playground (no install)
 
 ```sh
 npm run dev
 ```
 
-Open http://localhost:5173 in Chrome and allow the camera when asked. The server listens on `127.0.0.1` only, so other devices on your network cannot reach it. Edits reload the page automatically.
+This opens http://localhost:5173 as a full-window gaze tracking view. Allow the camera when asked. The server listens on `127.0.0.1` only, so other devices on your network cannot reach it.
+
+1. Put the browser window on the monitor you will look at, ideally the one with the webcam, and make the window as large as the screen.
+2. Your camera fills the window with a red ring on each iris. Once your face is steady for about a second, calibration starts by itself: look at each dot until it disappears (9 dots near the screen edges; add `?dots=5` to the address for 5).
+3. A red circle then shows where you are looking. It holds steady while your eyes rest on one spot and jumps when you look somewhere new.
+4. Press **R** to recalibrate, for example after moving your seat or resizing the window.
+
+Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Calibration data stays in memory and is gone when you reload.
 
 ## Option 2: The real extension (load unpacked)
 
@@ -65,4 +70,5 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 | Port 5173 already in use | Stop the other process on that port; the dev server will not pick another port. |
 | "Camera is off" in the playground | Allow the camera from the camera icon in the address bar, then reload. |
 | Camera busy | Close other apps using the webcam (video calls, other tabs). |
+| "Calibration needs your face in view" | Keep your face in view and the tab visible for the whole run, then press R. |
 | "Eye tracking failed to start" | Delete `extension/public/mediapipe/` and rerun the command to fetch the runtime and model again. |
