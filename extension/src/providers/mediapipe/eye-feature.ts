@@ -27,9 +27,30 @@ interface EyeLandmarks {
 const RIGHT_EYE: EyeLandmarks = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133, side: 'Right' };
 const LEFT_EYE: EyeLandmarks = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263, side: 'Left' };
 const EYE_CLOSED = 0.5;
+const BLINK_MS = 400; // a blink shuts the lids for well under this; longer means the eye is closed
 
 const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
   (blendshapes[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED;
+
+/**
+ * Tells a blink from a closed eye by how long the lids have been shut. While a
+ * closure is still short enough to be a blink, the caller holds its last
+ * output, since the iris points under a closing lid are not worth reading.
+ * This only steadies aiming; blink events for confirms come from FaceProvider.
+ */
+export class ClosureTimer {
+  private closedSince: number | null = null;
+
+  /** True while the current closure is shorter than a blink. */
+  blinking(blendshapes: Record<string, number>, now: number): boolean {
+    if (!isClosed(blendshapes, RIGHT_EYE) && !isClosed(blendshapes, LEFT_EYE)) {
+      this.closedSince = null;
+      return false;
+    }
+    this.closedSince ??= now;
+    return now - this.closedSince < BLINK_MS;
+  }
+}
 
 /**
  * Iris center and contour points (0..1 image coordinates) for the user's right

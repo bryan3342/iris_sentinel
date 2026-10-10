@@ -1,6 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
-import { irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
+import { ClosureTimer, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -19,6 +19,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
   private lastHead: HeadPose = { yaw: 0, pitch: 0, eyes: { x: 0, y: 0 }, eyeSpan: 0 };
+  private readonly closure = new ClosureTimer();
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
   private readonly traceListeners = new Set<(eyes: [Point2[], Point2[]]) => void>();
 
@@ -65,6 +66,8 @@ export class MediaPipeGazeProvider implements GazeProvider {
     }
     const blendshapes: Record<string, number> = {};
     for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
+    // A blink is not a closed eye: hold the last sample and markers through it.
+    if (this.closure.blinking(blendshapes, now)) return;
     const frame: FaceFrame = {
       landmarks,
       blendshapes,
