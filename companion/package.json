@@ -10,10 +10,12 @@
     "build:install": "esbuild install/main.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/install-macos.mjs",
     "install:host": "npm run build && npm run build:install && node dist/install-macos.mjs",
     "uninstall:host": "npm run build:install && node dist/install-macos.mjs --uninstall",
+    "check:presage": "esbuild scripts/check-presage.ts --bundle --platform=node --format=esm --target=node20 --external:@smartspectra/* --outfile=dist/check-presage.mjs && node dist/check-presage.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@iris/protocol": "file:../packages/protocol"
+    "@iris/protocol": "file:../packages/protocol",
+    "@smartspectra/node-sdk": "^3.4.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

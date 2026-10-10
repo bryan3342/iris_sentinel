@@ -48,8 +48,10 @@ signature. `ENABLE_VOICE_AGENT` is independent of page understanding and default
 to false. The existing origin checks, in-memory demo rate budget and concurrency
 lease apply to minting; they do not cap conversation duration or global spend.
 The response is not cached. API keys stay in Worker secrets; signed URLs must
-remain in memory and must never be logged. The extension connection, microphone
-flow and client tools are subsequent milestones.
+remain in memory and must never be logged. The side panel has a microphone
+permission button that opens an extension tab, checks audio-only access and
+immediately stops all tracks without sending audio. The extension conversation
+connection and client tools are subsequent milestones.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
@@ -179,7 +181,7 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 
 ### 3.3 Data handling rules
 
-- Video and face landmarks never leave the laptop. Presage computes on-device and only contacts its backend to validate the API key. The companion turns Presage telemetry off (`enableTelemetry: false`) and does not use Presage LLM Insights, which would send measurements off the laptop.
+- Video and face landmarks never leave the laptop. Presage computes on-device. It contacts its backend to validate the API key and, when its processing model is not bundled, to download that model; it does not send video or readings. The companion turns Presage telemetry off (`enableTelemetry: false`) and does not use Presage LLM Insights, which would send measurements off the laptop.
 - Heart, breathing and blink data live in memory only.
 - If Tiger Data is enabled: strictly opt-in. Each stored row is a one-minute summary: fatigue score, fatigue level, click count and back-after-click count. Rows carry a random anonymous profile ID (made on the laptop at opt-in, resettable) plus a random session ID, so a caregiver can compare weeks without any name. Heart, breathing and blink data, page URLs and names are never stored. Raw minutes are deleted after 90 days. The database connection string is a Worker secret. Schema: `server/db/`.
 - All API keys live in Worker secrets. The extension holds none. The one exception is the Presage key, which the SDK needs on-device: the companion reads it from the operating system keychain at startup, holds it in memory only, and never writes it to code, logs or config files.

@@ -82,7 +82,9 @@ The companion is the small Node.js program that runs Presage on this computer, b
 
 3. Open the Iris side panel. It connects to the companion right away and shows **Body signals: companion connected**. Closing the panel ends the companion.
 
-4. To remove it, run `npm run uninstall:host` in `companion/`.
+4. To check Presage on its own, without Chrome, run `npm run check:presage` in `companion/`. It measures for 60 seconds (pass another number of seconds after `--`), shows camera hints, and reports which signals arrived, never the readings themselves. It turns on the camera and uses about a minute of Presage credit. Pulse settles after about 12 seconds, breathing after about 30 and HRV after about 60.
+
+5. To remove it, run `npm run uninstall:host` in `companion/`.
 
 ## What you should see
 
