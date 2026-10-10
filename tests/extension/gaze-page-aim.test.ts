@@ -21,7 +21,8 @@ beforeEach(() => {
   revision = 0;
   sent = [];
   vi.stubGlobal('chrome', {
-    tabs: { query: vi.fn(async () => [{ id: active, url: `https://site${active}.example` }]) },
+    tabs: { query: vi.fn(async () => [{ id: active, windowId: 1, url: `https://site${active}.example` }]) },
+    windows: { get: vi.fn(async () => ({ left: 0, top: 0 })) },
     scripting: {
       executeScript: vi.fn(async ({ target, func, args }: { target: { tabId: number }; func: { name: string }; args?: [OverlayCommand] }) => {
         const documentToken = `document_for_tab_${target.tabId}_abc`;

@@ -3,7 +3,7 @@ import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { SimulatedGazeProvider, type LookSource } from '../providers/simulated/gaze';
 import { GazeDot } from '../sidepanel/gaze-dot';
-import { runCalibration } from '../sidepanel/setup/calibration';
+import { elementPresenter, runCalibration } from '../sidepanel/setup/calibration';
 import * as savedCalibration from '../sidepanel/setup/calibration-storage';
 import { openCamera } from '../sidepanel/setup/camera';
 import { EyeTrace } from '../sidepanel/trace';
@@ -60,7 +60,7 @@ async function calibrate(provider: GazeProvider): Promise<void> {
   dot = null;
   hud.textContent = `Look at each dot until it disappears (${dotCount} dots).`;
   try {
-    store.setDots(await runCalibration(provider, stage, dotCount), viewport());
+    store.setDots(await runCalibration(provider, elementPresenter(stage), dotCount), viewport());
     await saveSamples(store.samples);
     showDot(provider);
   } catch {

@@ -5,6 +5,8 @@ import { pageRevision, pageSnapshot, type PageTargets } from '../page-understand
 /** One scan of the active tab. Target IDs are valid only together with this tab, document and revision. */
 export interface TargetList extends PageTargets {
   tabId: number;
+  /** The browser window's position on the screen, which places a screen-position calibration on the page. */
+  window: { left: number; top: number };
 }
 
 const POLL_MS = 250; // a few refreshes a second at most
@@ -12,8 +14,9 @@ const POLL_MS = 250; // a few refreshes a second at most
 /**
  * Keeps the active tab's numbered targets current for gaze. Every 250 ms it
  * reads the page's change counter (a tiny call) and rescans only when the tab,
- * the document or the counter has moved. Listeners get each new list, or null
- * while the active tab cannot be read (browser pages, no access, mid-load).
+ * the document or the counter has moved; a moved window republishes the same
+ * targets with its new position. Listeners get each new list, or null while
+ * the active tab cannot be read (browser pages, no access, mid-load).
  */
 export class LiveTargetList {
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -55,19 +58,23 @@ export class LiveTargetList {
     }
   }
 
-  private async read(): Promise<TargetList | null> {
+  /** Reads the active tab once, without publishing: the current list, or null when it cannot be read. */
+  async read(): Promise<TargetList | null> {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id || !eligibleTab(tab)) return null;
     const tabId = tab.id;
+    const { left = 0, top = 0 } = await chrome.windows.get(tab.windowId);
     const known = this.current;
     if (known?.tabId === tabId) {
       const [probe] = await chrome.scripting.executeScript({ target: { tabId }, func: pageRevision });
       const seen = probe?.result;
-      if (seen?.documentToken === known.documentToken && seen.revision === known.revision) return known;
+      if (seen?.documentToken === known.documentToken && seen.revision === known.revision) {
+        return known.window.left === left && known.window.top === top ? known : { ...known, window: { left, top } };
+      }
     }
     const [scan] = await chrome.scripting.executeScript({ target: { tabId }, func: pageSnapshot, args: ['targets'] });
     if (scan?.frameId !== 0) return null;
-    return { tabId, ...validateTargets(scan.result) };
+    return { tabId, window: { left, top }, ...validateTargets(scan.result) };
   }
 
   private publish(list: TargetList | null): void {
