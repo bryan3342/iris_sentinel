@@ -56,6 +56,9 @@ const MAX_HRV = 10_000;
 /** The largest value of each vitals reading the extension accepts; a sender drops anything above. */
 export const VITALS_LIMITS = { pulse: MAX_PULSE, breathing: MAX_BREATHING, hrv: MAX_HRV } as const;
 
+/** The longest quality hint the extension accepts; a sender cuts anything longer. */
+export const QUALITY_HINT_LIMIT = MAX_HINT_CHARS;
+
 /** Thrown for a message that breaks the protocol. Never repeats the message, which may hold vitals. */
 export class CompanionMessageError extends Error {
   constructor() {

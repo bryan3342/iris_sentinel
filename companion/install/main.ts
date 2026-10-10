@@ -23,11 +23,13 @@ if (process.argv[2] === '--uninstall') {
     home: homedir(),
     nodePath: process.execPath,
     bundleSource: fileURLToPath(new URL('./companion.mjs', import.meta.url)),
+    nodeModulesSource: fileURLToPath(new URL('../node_modules', import.meta.url)),
   });
   console.log(
     [
       'Installed the Iris companion:',
       `  program:       ${paths.bundlePath}`,
+      `  Presage SDK:   ${paths.runtimeDir}`,
       `  launcher:      ${paths.launcherPath} (runs ${process.execPath})`,
       `  Chrome entry:  ${paths.manifestPath}`,
       'Run this again after pulling companion changes.',
