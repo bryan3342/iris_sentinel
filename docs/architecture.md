@@ -166,7 +166,7 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 
 - Video and face landmarks never leave the laptop. Presage computes on-device and only contacts its backend to validate the API key. The companion turns Presage telemetry off (`enableTelemetry: false`) and does not use Presage LLM Insights, which would send measurements off the laptop.
 - Heart, breathing and blink data live in memory only.
-- If Tiger Data is enabled: strictly opt-in, minute-level fatigue summaries only, anonymous session ID, write key held by the Worker.
+- If Tiger Data is enabled: strictly opt-in. Each stored row is a one-minute summary: fatigue score, fatigue level, click count and back-after-click count. Rows carry a random anonymous profile ID (made on the laptop at opt-in, resettable) plus a random session ID, so a caregiver can compare weeks without any name. Heart, breathing and blink data, page URLs and names are never stored. Raw minutes are deleted after 90 days. The database connection string is a Worker secret. Schema: `server/db/`.
 - All API keys live in Worker secrets. The extension holds none. The one exception is the Presage key, which the SDK needs on-device: the companion reads it from the operating system keychain at startup, holds it in memory only, and never writes it to code, logs or config files.
 - Page screenshots/crops are sent only on an explicit user request. Iris handles
   them transiently in memory: no logging, persistence, caching, queues or
@@ -247,6 +247,7 @@ iris_sentinel/
 │   │   └── detectors/           # breath hold, blink segmenter, long blink, talking gate
 │   └── install/                 # registers the native messaging host (macOS, Windows)
 ├── server/                      # Cloudflare Worker, holds all keys
+│   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/
 │       └── routes/
 │           ├── agent-token/     # signed ElevenLabs agent session
