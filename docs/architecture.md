@@ -34,7 +34,7 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 - Works on normal websites. Chrome's own pages and the address bar are out of reach for extensions; voice "go to <site>" covers navigation.
 - Fatigue is presented as "you might be tired", never as a medical reading.
 - Desktop Chrome only.
-- The companion targets Apple Silicon Macs and Windows x64, the desktop platforms the Presage Node.js SDK supports and the companion installer covers. Intel Macs are not supported.
+- The companion targets Apple Silicon Macs, where the demo runs and the companion installer works today. Windows x64, which the Presage Node.js SDK also supports, is a stretch goal for the installer. Intel Macs are not supported.
 
 ---
 
@@ -256,7 +256,7 @@ iris_sentinel/
 │   │   ├── messaging/           # native messaging framing (length-prefixed JSON)
 │   │   ├── secrets/             # reads the Presage key from the OS keychain
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
-│   └── install/                 # registers the native messaging host (macOS, Windows)
+│   └── install/                 # registers the native messaging host (macOS; Windows is a stretch goal)
 ├── server/                      # Cloudflare Worker, holds all keys
 │   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/
