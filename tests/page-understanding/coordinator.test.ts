@@ -21,9 +21,9 @@ beforeEach(() => {
     if (message.type === 'iris.page.capture') return { ok: true, value: 'data:image/png;base64,AAAA' };
     if (message.type === 'iris.page.cancel') return { ok: true, value: null };
     return { ok: true, value: { protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
-      result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Synthetic crop.' }
-        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Synthetic target.' }
-        : { operation: 'find_target', targetId: 1, explanation: 'Synthetic match.' } } };
+      result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Sample crop.' }
+        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Sample target.' }
+        : { operation: 'find_target', targetId: 1, explanation: 'Sample match.' } } };
   });
   vi.stubGlobal('chrome', {
     tabs: { query: vi.fn(async () => [{ id: tabId, windowId: 1, url: 'https://example.com' }]), onActivated: event(), onUpdated: event() },
@@ -122,7 +122,7 @@ const aimedAt = (rect = page().targets[0]!.rect) => ({ documentToken: page().doc
 const describe = { gateway: find.gateway, operation: 'describe_target' as const };
 it('describes the aimed target from an outlined crop around it, without clicking', async () => {
   const response = await new PageCoordinator().inspect({ ...describe, aimed: aimedAt() });
-  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Synthetic target.' });
+  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Sample target.' });
   const sent = send.mock.calls.map(([m]) => m).find(m => m.type === 'iris.page.understand').input;
   expect([sent.targets, sent.targetId, sent.sourceRect]).toEqual([[page().targets[0]], 1, { x: 0, y: 0, width: 2, height: 2 }]);
   expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: page().targets[0]!.rect }]);

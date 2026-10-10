@@ -30,9 +30,9 @@ export const input = (operation = 'find_target') => ({
     targetId: 5, sourceRect: { x: 0, y: 0, width: 2, height: 2 } } : {}),
 });
 export const result = operation => operation === 'find_target' ? { operation, targetId: 7, explanation: 'The supplied icon matches.' }
-  : operation === 'summarize_page' ? { operation, scope: 'visible_viewport', summary: 'Only the visible viewport: a synthetic page.' }
+  : operation === 'summarize_page' ? { operation, scope: 'visible_viewport', summary: 'Only the visible viewport: a sample page.' }
   : operation === 'describe_target' ? { operation, targetId: 5, description: 'A link to more information.' }
-  : { operation, imageId: 3, description: 'A synthetic image crop.' };
+  : { operation, imageId: 3, description: 'A sample image crop.' };
 export async function setup() {
   const sessionToken = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
   const sessionId = 'session_abcdefghijklmnop'; let now = Date.now();

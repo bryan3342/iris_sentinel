@@ -4,7 +4,6 @@ import { DemoAccess, type Lease } from './access';
 import { abortable, failure, HttpError, json, readJson } from './http';
 import { GeminiMultimodal } from './multimodal';
 import { validatePng } from './png';
-import { FakePageUnderstanding } from './fake-page-understanding';
 import { ElevenLabsAgentSession, type AgentSessionProvider } from './routes/agent-token/index';
 
 /** Each operation's route segment and the provider method that answers it. */
@@ -48,12 +47,7 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         const ingestion = AbortSignal.any([deadline, AbortSignal.timeout(LIMITS.ingestionMs)]);
         const operation = path.slice('/v0.1/page-understanding/'.length);
         if (!path.startsWith('/v0.1/page-understanding/') || !(OPERATIONS as readonly string[]).includes(operation)) throw new HttpError(404, 'NOT_FOUND');
-        const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname);
-        const synthetic = env.PAGE_UNDERSTANDING_PROVIDER === 'synthetic';
-        if (synthetic && !local) throw new HttpError(503, 'NOT_CONFIGURED');
-        const delay = Number(env.SYNTHETIC_DELAY_MS || 0);
-        if (synthetic && (!Number.isInteger(delay) || delay < 0 || delay > 3000)) throw new HttpError(503, 'NOT_CONFIGURED');
-        if (!synthetic && env.PAGE_CONTENT_APPROVED !== 'true') throw new HttpError(503, 'CONTENT_NOT_APPROVED');
+        if (env.PAGE_CONTENT_APPROVED !== 'true') throw new HttpError(503, 'CONTENT_NOT_APPROVED');
         const authorization = request.headers.get('Authorization');
         if (!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) throw new HttpError(401, 'UNAUTHENTICATED');
         lease = await abortable(gate.admit(env, authorization.slice(7)), deadline);
@@ -62,7 +56,7 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         await validatePng(input.image, ingestion);
         let result;
         try {
-          const adapter = multimodal ?? (synthetic ? new FakePageUnderstanding(delay) : new GeminiMultimodal(env));
+          const adapter = multimodal ?? new GeminiMultimodal(env);
           result = validateUnderstanding(await abortable(adapter[METHODS[input.operation]](input, deadline), deadline), input);
           if (result.operation === 'summarize_page') {
             result = { ...result, summary: `Visible viewport only: ${result.summary}`.slice(0, 2000) };
