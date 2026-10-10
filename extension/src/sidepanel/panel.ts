@@ -1,6 +1,7 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { isExtensionPage, openCamera } from './setup/camera';
 import { EyeTrace } from './trace';
+import { understandingPanel } from './understanding';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -18,6 +19,7 @@ export function mountPanel(root: HTMLElement): void {
   status.textContent = 'Starting camera...';
 
   root.replaceChildren(preview, status);
+  if (isExtensionPage()) root.append(understandingPanel());
 
   openCamera()
     .then((stream) => {
