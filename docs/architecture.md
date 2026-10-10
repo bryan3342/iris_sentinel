@@ -13,7 +13,7 @@ by this change. Presage companion, ElevenLabs, long-blink confirms, scrolling
 and the full input-mode state machine below remain future work. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
 [page-understanding-protocol.md](page-understanding-protocol.md); account and
-manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
+live-use prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
 
 ---
 
@@ -240,9 +240,10 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 
 The tree below includes future modules. Currently implemented page understanding
 lives in `extension/src/page-understanding/` (helper, coordinator, masking and
-session client), `server/src/{access,http,png,multimodal,fake-page-understanding}.ts`,
-and `packages/protocol/src/page-understanding.ts`. Tests include synthetic fixtures,
-direct adapters/routes, capture races and a database-free local Worker run.
+session client), `server/src/{access,http,png,multimodal}.ts`,
+and `packages/protocol/src/page-understanding.ts`. Page understanding always uses
+real Gemini; Gemini is stood in for only inside automated tests (direct adapters
+and routes, capture races and a database-free local Worker run).
 
 ```
 iris_sentinel/
