@@ -21,6 +21,8 @@ export type { BaselineOptions, StrainOptions, TiredDirection } from './baseline'
 export { quantile } from './stats';
 export { combineScore, FatigueLevelTracker } from './fatigue-level';
 export type { FatigueLevelOptions, Score, ScoreOptions } from './fatigue-level';
+export { ClickPace } from './click-pace';
+export type { ClickPaceOptions } from './click-pace';
 export { SelectionGate } from './selection';
 export { SettledAim } from './settled-aim';
 export type { GateTarget, Selection, SelectionGateOptions } from './selection';
