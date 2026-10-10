@@ -37,6 +37,7 @@ describe('VitalsWindow', () => {
     feed(hrv, () => ({ value: 45, confidence: 0.9, stable: false }), 0, 30_000);
     feed(hrv, () => ({ value: 45, confidence: 0.4, stable: true }), 0, 30_000);
     feed(hrv, () => steady(Number.NaN), 0, 30_000);
+    feed(hrv, () => ({ value: 45, confidence: Number.NaN, stable: true }), 0, 30_000);
     feed(hrv, () => null, 0, 30_000);
     expect(hrv.value(29_000)).toBeNull();
   });

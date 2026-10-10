@@ -33,7 +33,7 @@ export class VitalsWindow {
 
   /** Adds the reading taken at `t`, if it is usable. */
   add(t: number, reading: Reading | null): void {
-    if (!reading || !reading.stable || reading.confidence < this.minConfidence || !Number.isFinite(reading.value)) return;
+    if (!reading || !reading.stable || !(reading.confidence >= this.minConfidence) || !Number.isFinite(reading.value)) return;
     this.readings = [...this.readings.filter((r) => r.t > t - this.windowMs), { t, value: reading.value }];
   }
 
