@@ -11,6 +11,12 @@ import type { Reading, VitalsSample } from './vitals';
 /** Bumped whenever either side's messages change. The companion announces it in `hello`. */
 export const COMPANION_PROTOCOL_VERSION = 1;
 
+/**
+ * Iris's fixed extension ID, pinned by the public `key` in
+ * extension/public/manifest.json. The companion only answers this caller.
+ */
+export const IRIS_EXTENSION_ID = 'bohipliohnmknfglnkhglngbmpiahdcn';
+
 /** What the companion is doing. Anything but `running` means no body signals. */
 export const COMPANION_STATES = [
   'starting',

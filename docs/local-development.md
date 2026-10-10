@@ -60,6 +60,8 @@ Open http://localhost:5173/?sim to use a simulated gaze provider instead of the 
 
 After a rebuild, click the reload arrow on the Iris card in `chrome://extensions` and reopen the panel.
 
+**Fixed extension ID.** Iris always loads as `bohipliohnmknfglnkhglngbmpiahdcn`, on every computer, because `manifest.json` carries a public `key` (not a secret). The companion only answers this ID. Use it wherever a setup step asks for the extension ID, for example `EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn` in `server/.dev.vars`. If you loaded Iris before the ID was fixed, Chrome sees this as a new extension: remove the old Iris card, load `extension/dist` again, and allow the camera once more.
+
 ## What you should see
 
 Once the camera is on, the panel shows **Eye tracking on** and:

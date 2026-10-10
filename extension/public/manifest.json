@@ -4,10 +4,11 @@
   "version": "0.1.0",
   "description": "Hands-free browsing with your eyes, breath and voice.",
   "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA073UYURZ1clLjRkRJ3UAgfhk1f/X02xU7snYGSPyEhJcfTjkKxFuLHmONPaVl3+rAYdcupP75sozLzITexquEr9A0AlDXD1yj/LOOQ/uV72frmnP8HkNwGdUD8o/3aRSOcfP0xFXa9eJ5E8QMLo8OcsIkMhFZsS421aNrrhSP6ob8sGbzn+XjHZhG/c9APVDCglLi5rjPfUaHIp9jjKKM7+47LAiopaO8C+0mjSRY7Wx9CrqB2JOx5NUFsLDlJKIYGWVKzGJuDvFHhJAo3VmLGGLQAtS62hwZJf4gd4HvLaUHIBZwG4auQn8vj0EEaGdqMzyHWmcT86hBeV1Mp38AQIDAQAB",
   "action": { "default_title": "Open Iris" },
   "background": { "service_worker": "background.js", "type": "module" },
   "side_panel": { "default_path": "sidepanel.html" },
-  "permissions": ["sidePanel", "activeTab", "scripting"],
+  "permissions": ["sidePanel", "activeTab", "scripting", "nativeMessaging"],
   "incognito": "not_allowed",
   "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "content_security_policy": {
