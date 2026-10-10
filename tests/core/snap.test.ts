@@ -43,6 +43,13 @@ describe('snapToTarget', () => {
     expect(snapToTarget({ x: 40, y: 30 }, [card, button], 1, OPTIONS)).toBe(2);
   });
 
+  it('holds the current aim over targets that overlap without one containing the other', () => {
+    const wide = target(1, 0, 0, 300, 40);
+    const overlapping = target(2, 250, 0, 100, 40);
+    expect(snapToTarget({ x: 270, y: 20 }, [wide, overlapping], 1, OPTIONS)).toBe(1);
+    expect(snapToTarget({ x: 270, y: 20 }, [wide, overlapping], null, OPTIONS)).toBe(2);
+  });
+
   it('holds the current aim between two neighbors until another is clearly closer', () => {
     const targets = [target(1, 0, 0, 100, 40), target(2, 0, 60, 100, 40)];
     // Point at y=55 is 15 px from target 1 and 5 px from target 2.
