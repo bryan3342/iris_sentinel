@@ -1,9 +1,10 @@
 import { CalibrationStore } from '@iris/core';
-import type { GazeSample } from '@iris/protocol';
+import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
+import { SimulatedGazeProvider, type LookSource } from '../providers/simulated/gaze';
 import { GazeDot } from '../sidepanel/gaze-dot';
 import { runCalibration } from '../sidepanel/setup/calibration';
-import { clearSamples, loadSamples, saveSamples } from '../sidepanel/setup/calibration-storage';
+import * as savedCalibration from '../sidepanel/setup/calibration-storage';
 import { openCamera } from '../sidepanel/setup/camera';
 import { EyeTrace } from '../sidepanel/trace';
 
@@ -12,7 +13,8 @@ import { EyeTrace } from '../sidepanel/trace';
 // for this screen is used right away; otherwise calibration starts once a face
 // is steady. Clicking stands in for a confirm gesture: the click position is a
 // confirmed target and refines the fit. Press R to redo the dots, X to forget
-// everything saved. Add ?dots=5 for 5 dots.
+// everything saved. Add ?dots=5 for 5 dots. Add ?sim to run without a camera:
+// a simulated user looks wherever the mouse pointer is.
 const STEADY_SAMPLES = 30; // about one second of a tracked face before calibrating
 
 const stage = document.getElementById('stage')!;
@@ -22,7 +24,13 @@ const hud = document.createElement('p');
 hud.className = 'hud';
 stage.append(video, hud);
 
-const dotCount = new URLSearchParams(location.search).get('dots') === '5' ? 5 : 9;
+const params = new URLSearchParams(location.search);
+const dotCount = params.get('dots') === '5' ? 5 : 9;
+const simulated = params.has('sim');
+// A simulated run keeps its calibration in memory so it never replaces a real one saved for this screen.
+const { loadSamples, saveSamples, clearSamples } = simulated
+  ? { loadSamples: async () => [], saveSamples: async () => {}, clearSamples: async () => {} }
+  : savedCalibration;
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
 let store = new CalibrationStore();
 let dot: GazeDot | null = null;
@@ -34,7 +42,7 @@ function trackingHud(): void {
   hud.textContent = `Tracking your gaze. Click where you look to refine (${confirms} confirms). R: redo dots. X: forget.`;
 }
 
-function showDot(provider: MediaPipeGazeProvider): void {
+function showDot(provider: GazeProvider): void {
   stopDot?.();
   dot?.remove();
   const next = new GazeDot(store, stage);
@@ -43,7 +51,7 @@ function showDot(provider: MediaPipeGazeProvider): void {
   trackingHud();
 }
 
-async function calibrate(provider: MediaPipeGazeProvider): Promise<void> {
+async function calibrate(provider: GazeProvider): Promise<void> {
   if (calibrating) return;
   calibrating = true;
   stopDot?.();
@@ -63,7 +71,7 @@ async function calibrate(provider: MediaPipeGazeProvider): Promise<void> {
 }
 
 /** Resolves once the face has been tracked for a short unbroken stretch. */
-function waitForSteadyFace(provider: MediaPipeGazeProvider): Promise<void> {
+function waitForSteadyFace(provider: GazeProvider): Promise<void> {
   return new Promise((resolve) => {
     let steady = 0;
     const unsubscribe = provider.onSample((sample: GazeSample) => {
@@ -75,13 +83,27 @@ function waitForSteadyFace(provider: MediaPipeGazeProvider): Promise<void> {
   });
 }
 
-async function start(): Promise<void> {
+/** The simulated user's eyes follow the mouse pointer and close when it leaves the window. */
+function pointerLook(): LookSource {
+  let at: Point2 | null = null;
+  const page = document.documentElement;
+  page.addEventListener('pointermove', (e) => (at = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight }));
+  page.addEventListener('pointerleave', () => (at = null));
+  return () => at;
+}
+
+async function cameraProvider(): Promise<GazeProvider> {
   hud.textContent = 'Starting camera...';
   video.srcObject = await openCamera();
   const provider = new MediaPipeGazeProvider(video);
   const trace = new EyeTrace(video);
   stage.append(trace.overlay);
   provider.onTracePoints((points) => trace.drawPoints(points));
+  return provider;
+}
+
+async function start(): Promise<void> {
+  const provider = simulated ? new SimulatedGazeProvider(pointerLook()) : await cameraProvider();
   hud.textContent = 'Loading eye tracking...';
   await provider.start();
 

@@ -6,7 +6,7 @@ Everything below runs on your own computer. Camera video is processed in the bro
 
 - Node.js 20 or newer (includes npm)
 - Google Chrome 116 or newer
-- A webcam
+- A webcam (optional for the playground, see [Without a camera](#without-a-camera))
 
 ## Install
 
@@ -40,6 +40,10 @@ This opens http://localhost:5173 as a full-window gaze tracking view. Allow the 
 5. The calibration is saved for this screen in the page's local storage, so a reload tracks right away without the dots. Press **R** to redo the dots, for example after moving to a different screen, and **X** to forget the saved calibration.
 
 Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Saved calibration data is a few hundred numbers (eye positions, head pose and dot positions), never frames, and it never leaves your computer.
+
+### Without a camera
+
+Open http://localhost:5173/?sim to use a simulated gaze provider instead of the webcam. A simulated user looks wherever the mouse pointer is, with webcam-like jitter, and closes their eyes when the pointer leaves the window. Calibration, the red circle and click-to-refine all work as above: move the pointer onto each dot to calibrate. A simulated calibration is kept in memory only, so it never replaces a real one saved for this screen. Tests use the same provider with scripted looks (`extension/src/providers/simulated/gaze.ts`).
 
 ## Option 2: The real extension (load unpacked)
 
