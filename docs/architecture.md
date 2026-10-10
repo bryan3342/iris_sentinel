@@ -157,22 +157,39 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 ### 3.2 Voice request flow
 
 ```
-User speaks ─> ElevenLabs Agent (side panel, signed session from Worker)
-                 └─ calls client tool, for example find_target("history section")
+User speaks ─> ElevenLabs Agent (side panel, signed session from the local server;
+               its language model is set to Gemini in the ElevenLabs agent settings)
+                 └─ calls a client tool, for example find_on_page("history section")
                       └─ helper supplies viewport targets, masks and document revision
                       └─ coordinator captures viewport through Chrome, masks locally
-                      └─ authenticated Worker /v0.1/page-understanding/find_target
+                      └─ local server /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
-                 └─ highlights target 12, asks for confirm
-User confirms (dwell / long blink) ─> page helper clicks target 12
-Agent: "Opening History."
+                 └─ outlines target 12 and answers "It is number 12 ..."
+User looks at 12 and confirms (dwell / long blink) ─> page helper clicks target 12
 ```
 
-**Future client tools:** `find_target(description)`, `summarize_page()`,
-`describe_image(n)`, `scroll(direction)`, `set_pace(slower|faster)`, and a
-confirmation-gated target proposal. A future `click_target(n)` tool may only
-enqueue an Iris confirmation request; it may never execute directly. Page and
-model text are untrusted, and tool results never include screenshot bytes.
+**Client tools** (`extension/src/sidepanel/agent/tools.ts`, behind the neutral
+`VoiceTools` type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
+
+| Tool | Parameters | What Iris does |
+| :--- | :--- | :--- |
+| `scroll_page` | `direction`: `down`, `up`, `top`, `bottom` | Scrolls the active tab by most of a screen, or to an end; says when already there |
+| `navigate_history` | `direction`: `back`, `forward` | Goes back or forward in the active tab's history |
+| `summarize_page` | none | Page understanding summary of the visible viewport |
+| `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
+| `find_on_page` | `description` (up to 500 characters) | Finds and outlines a target, and answers with its number |
+
+Each tool answers in words the agent can say, and the side panel shows the same
+words. Scrolling and history change the page at once; nothing a tool does
+clicks, submits or types. Summaries, descriptions and finding send the visible
+viewport to Gemini because the user asked, and their text (never screenshot
+bytes) goes to the voice agent, marked as page content that is information only,
+never instructions. Agent setup is in [voice-agent-setup.md](voice-agent-setup.md).
+
+**Later client tools:** `describe_image(n)`, `set_pace(slower|faster)`, Gemini's
+found target becoming the aimed target ready to confirm, and bounded multi-step
+tasks in which Gemini picks each next safe step. A `click_target(n)` tool may
+only enqueue an Iris confirmation request; it may never execute directly.
 
 **Safety rule.** Every browser click requires Iris confirmation, even when the
 agent proposes it. Gemini recommends/explains only; it never clicks. The one
