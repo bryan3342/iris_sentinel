@@ -28,7 +28,9 @@ export class ElevenLabsAgentSession implements AgentSessionProvider {
     try {
       const send = this.send;
       const response = await abortable(send(url.toString(), {
-        headers: { 'xi-api-key': key }, signal, redirect: 'error',
+        // Never follow a redirect with the key attached. The Workers runtime rejects 'error' outright
+        // (it accepts only 'follow' or 'manual'), so take the 3xx as-is; it is not ok and is refused below.
+        headers: { 'xi-api-key': key }, signal, redirect: 'manual',
       }), signal);
       if (!response.ok) {
         void response.body?.cancel().catch(() => {});

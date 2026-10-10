@@ -38,3 +38,27 @@ test('actual database-free Worker: provisioned authentication and the Gemini rou
     assert.deepEqual(upstream, ['find_target', 'summarize_page']); // the limited request never reached Gemini
   } finally { await mf.dispose(); }
 });
+
+test('actual Worker runtime mints a voice session from the extension on this computer', async () => {
+  // Runs the real ElevenLabs adapter in workerd, where fetch options differ from Node's
+  // (it rejects redirect: 'error'); only ElevenLabs' reply is stood in for.
+  const s = await setup();
+  const { outputFiles } = await build({ entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))],
+    bundle: true, write: false, format: 'esm', platform: 'neutral', target: 'es2022' });
+  const agent = 'agent_runtime_test';
+  const mf = new Miniflare({ modules: true, script: outputFiles[0].text, compatibilityDate: '2026-04-26',
+    bindings: { ...s.env, ENABLE_VOICE_AGENT: 'true', ELEVENLABS_API_KEY: `sk_${'a'.repeat(40)}`, ELEVENLABS_AGENT_ID: agent },
+    outboundService: async (outbound) => {
+      const url = new URL(outbound.url);
+      if (url.hostname !== 'api.elevenlabs.io') throw new Error('No other external calls permitted in tests');
+      return Response.json({ signed_url: `wss://api.elevenlabs.io/v1/convai/conversation?agent_id=${agent}&conversation_signature=test` });
+    },
+  });
+  try {
+    const response = await mf.dispatchFetch('http://127.0.0.1:8787/v0.1/agent-token', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Origin: s.env.EXTENSION_ORIGIN }, body: '{}',
+    });
+    assert.equal(response.status, 200, await response.clone().text());
+    assert.match((await response.json()).signedUrl, /^wss:\/\/api\.elevenlabs\.io\//);
+  } finally { await mf.dispose(); }
+});

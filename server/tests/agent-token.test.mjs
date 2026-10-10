@@ -20,7 +20,7 @@ test('authenticated voice route uses server configuration and works with page un
     assert.equal(upstream.searchParams.get('agent_id'), 'agent_test');
     assert.equal(upstream.searchParams.get('include_conversation_id'), 'true');
     assert.equal(options.headers['xi-api-key'], mockKey);
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     assert.ok(options.signal instanceof AbortSignal);
     return Response.json({ signed_url: signedUrl, conversation_id: 'mock-conversation' });
   });
@@ -109,4 +109,12 @@ test('upstream errors and invalid credentials are sanitized, bounded and never r
     });
     assert.equal(calls, 1);
   }
+});
+test('a redirect from ElevenLabs is refused, never followed with the key', async () => {
+  const s = await setup(); let calls = 0;
+  const agent = new m.ElevenLabsAgentSession(async () => { calls++; return new Response(null, { status: 302, headers: { Location: 'https://elsewhere.example/' } }); });
+  const response = await m.createWorker(undefined, s.gate, agent).fetch(request(s.session.sessionToken), { ...s.env, ...config });
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: { code: 'VOICE_UNAVAILABLE' } });
+  assert.equal(calls, 1);
 });
