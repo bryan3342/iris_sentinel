@@ -89,11 +89,6 @@ export class GazeSession {
     this.marks.stop();
   }
 
-  /** A confirm from a stand-in (tests, development), on the gaze samples' clock. */
-  confirmNow(): void {
-    this.confirms.emit({ t: this.lastT, source: 'stand-in' });
-  }
-
   private follow(list: TargetList): number | null {
     // A risky target waiting for its second confirm stays armed only if the new scan still shows
     // the same element in the same place; otherwise a new element under the old number could be

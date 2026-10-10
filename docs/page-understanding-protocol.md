@@ -51,7 +51,7 @@ For `describe_image`, the extension must first list visible image IDs and bind
 that list to the same snapshot. It crops the masked viewport using `sourceRect`;
 only the visible portion is described. Image bytes contain no target overlay.
 For `describe_target`, the extension uses the target the user last rested gaze (or
-the development mouse stand-in) on for about a second, so targets passed over on
+the mouse) on for about a second, so targets passed over on
 the way to the side panel do not count. It must still be in the same document, at
 the same number and within 4 px of where gaze saw it. The crop is that target with
 room around it (at least 240 by 160 CSS pixels, inside the viewport), masked like

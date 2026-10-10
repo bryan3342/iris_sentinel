@@ -11,7 +11,7 @@ import type { LiveTargetList } from './target-list';
 const POINTER_POLL_MS = 50;
 const screenSize = () => ({ width: screen.width, height: screen.height });
 
-/** Development only: the mouse over the browsing tab stands in for the eyes, with a perfect calibration. */
+/** Pointing with the mouse: the mouse over the browsing tab aims like the eyes, with a perfect calibration. */
 function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; store: CalibrationStore; stop: () => void } {
   let at: Point2 | null = null;
   const timer = setInterval(() => {
@@ -52,12 +52,9 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     return { label, input };
   };
   const eyes = toggle('Aim with my eyes');
-  const mouse = toggle('Developer: the mouse stands in for the eyes');
+  const mouse = toggle('Point with the mouse');
   const calibrate = document.createElement('button');
   calibrate.textContent = 'Calibrate on this page';
-  const standIn = document.createElement('button');
-  standIn.textContent = 'Developer: confirm now';
-  standIn.addEventListener('click', () => active?.session.confirmNow());
   const report = (outcome: Outcome) => { status.textContent = OUTCOMES[outcome]; };
   eyes.input.disabled = calibrate.disabled = true;
   let camera: GazeProvider | null = null;
@@ -131,7 +128,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
   });
-  section.append(calibrate, eyes.label, mouse.label, standIn, status);
+  section.append(calibrate, eyes.label, mouse.label, status);
   return {
     element: section,
     useCamera(provider) {
