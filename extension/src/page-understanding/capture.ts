@@ -1,5 +1,5 @@
 import { LIMITS, object, token, validateBinding, validateRect, type ImageInput, type NumberedTarget, type Rect } from '@iris/protocol';
-import type { PageSnapshot } from './page-helper';
+import type { PageSnapshot, PageTargets } from './page-helper';
 
 export function eligibleTab(tab: { incognito?: boolean; url?: string; pendingUrl?: string }): boolean {
   if (tab.incognito || !tab.url || tab.pendingUrl) return false;
@@ -9,25 +9,31 @@ export function eligibleTab(tab: { incognito?: boolean; url?: string; pendingUrl
       !(url.hostname === 'chrome.google.com' && url.pathname.startsWith('/webstore'));
   } catch { return false; }
 }
-export function validateSnapshot(value: unknown): PageSnapshot {
-  const s = object(value, ['documentToken', 'revision', 'viewport', 'targets', 'targetsTruncated', 'images', 'masks', 'blocked']);
+/** Validates what a page reported about its targets. Shared by page understanding and gaze. */
+export function validateTargets(value: unknown): PageTargets {
+  const s = object(value, ['documentToken', 'revision', 'viewport', 'targets', 'targetsTruncated']);
   const b = validateBinding({ tabToken: 'abcdefghijklmnop', documentToken: s.documentToken, revision: s.revision, captureId: 'abcdefghijklmnop', viewport: s.viewport });
-  if (!Array.isArray(s.targets) || s.targets.length > 100 || !Array.isArray(s.images) || s.images.length > 100 ||
-    !Array.isArray(s.masks) || s.masks.length > 1000 || typeof s.blocked !== 'boolean' || typeof s.targetsTruncated !== 'boolean') throw new Error('INVALID_SNAPSHOT');
-  const targetIds = new Set<number>(), imageIds = new Set<number>();
-  const positiveId = (value: unknown, ids: Set<number>) => {
-    if (!Number.isSafeInteger(value) || (value as number) < 1 || ids.has(value as number)) throw new Error('INVALID_SNAPSHOT');
-    ids.add(value as number); return value as number;
-  };
+  if (!Array.isArray(s.targets) || s.targets.length > 100 || typeof s.targetsTruncated !== 'boolean') throw new Error('INVALID_SNAPSHOT');
+  const ids = new Set<number>();
   const targets = s.targets.map(value => {
     const t = object(value, ['id', 'role', 'rect'], ['label']);
     if (!['link', 'button'].includes(t.role as string) || (t.label !== undefined && (typeof t.label !== 'string' || !t.label.trim() || t.label.length > 200))) throw new Error('INVALID_SNAPSHOT');
-    return { id: positiveId(t.id, targetIds), role: t.role as NumberedTarget['role'], rect: validateRect(t.rect, b.viewport), ...(t.label === undefined ? {} : { label: t.label as string }) };
+    return { id: positiveId(t.id, ids), role: t.role as NumberedTarget['role'], rect: validateRect(t.rect, b.viewport), ...(t.label === undefined ? {} : { label: t.label as string }) };
   });
-  return { documentToken: token(s.documentToken), revision: b.revision, viewport: b.viewport, targets,
-    targetsTruncated: s.targetsTruncated, blocked: s.blocked,
-    images: s.images.map(value => { const i = object(value, ['id', 'rect']); return { id: positiveId(i.id, imageIds), rect: validateRect(i.rect, b.viewport) }; }),
-    masks: s.masks.map(value => validateRect(value, b.viewport)) };
+  return { documentToken: token(s.documentToken), revision: b.revision, viewport: b.viewport, targets, targetsTruncated: s.targetsTruncated };
+}
+function positiveId(value: unknown, ids: Set<number>): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1 || ids.has(value as number)) throw new Error('INVALID_SNAPSHOT');
+  ids.add(value as number); return value as number;
+}
+export function validateSnapshot(value: unknown): PageSnapshot {
+  const s = object(value, ['documentToken', 'revision', 'viewport', 'targets', 'targetsTruncated', 'images', 'masks', 'blocked']);
+  const base = validateTargets({ documentToken: s.documentToken, revision: s.revision, viewport: s.viewport, targets: s.targets, targetsTruncated: s.targetsTruncated });
+  if (!Array.isArray(s.images) || s.images.length > 100 || !Array.isArray(s.masks) || s.masks.length > 1000 || typeof s.blocked !== 'boolean') throw new Error('INVALID_SNAPSHOT');
+  const imageIds = new Set<number>();
+  return { ...base, blocked: s.blocked,
+    images: s.images.map(value => { const i = object(value, ['id', 'rect']); return { id: positiveId(i.id, imageIds), rect: validateRect(i.rect, base.viewport) }; }),
+    masks: s.masks.map(value => validateRect(value, base.viewport)) };
 }
 export function assertSameSnapshot(before: PageSnapshot, after: PageSnapshot): void {
   if (after.blocked || JSON.stringify(before) !== JSON.stringify(after)) throw new Error('PAGE_CHANGED');
