@@ -1,4 +1,5 @@
 import { type FromCompanion, QUALITY_HINT_LIMIT } from '@iris/protocol';
+import { BlinkSegmenter } from '../detectors/blink';
 import type { Sensing } from '../host';
 import { type PresageMetrics, QualityChanges, VitalsWindow } from './map';
 import { stateForError } from './rules';
@@ -83,6 +84,7 @@ export class PresageSensing implements Sensing {
     }
     const quality = new QualityChanges();
     const vitals = new VitalsWindow();
+    const blinks = new BlinkSegmenter();
     // Presage reports camera quality for every frame, so the first report means the camera works.
     let sawFrame = false;
     const session = this.options.createSession(key, {
@@ -96,7 +98,10 @@ export class PresageSensing implements Sensing {
         if (change) send({ type: 'quality', ...change });
       },
       onMetrics: (metrics) => {
-        if (current()) vitals.add(metrics);
+        if (!current()) return;
+        vitals.add(metrics);
+        // Blinks go out as they end, not on the vitals tick, since their timing feeds the blink rate.
+        for (const durationMs of blinks.add(metrics.face?.blinking)) send({ type: 'blink', durationMs: Math.round(durationMs) });
       },
       onError: (code) => {
         if (!current()) return;

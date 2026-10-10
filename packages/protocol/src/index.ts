@@ -1,5 +1,6 @@
 export type { Point2, Unsubscribe } from './common';
 export {
+  BLINK_LIMIT_MS,
   COMPANION_PROTOCOL_VERSION,
   CompanionMessageError,
   IRIS_EXTENSION_ID,
