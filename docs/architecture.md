@@ -48,8 +48,10 @@ signature. `ENABLE_VOICE_AGENT` is independent of page understanding and default
 to false. The existing origin checks, in-memory demo rate budget and concurrency
 lease apply to minting; they do not cap conversation duration or global spend.
 The response is not cached. API keys stay in Worker secrets; signed URLs must
-remain in memory and must never be logged. The extension connection, microphone
-flow and client tools are subsequent milestones.
+remain in memory and must never be logged. The side panel has a microphone
+permission button that opens an extension tab, checks audio-only access and
+immediately stops all tracks without sending audio. The extension conversation
+connection and client tools are subsequent milestones.
 
 | Layer | Choice | Role |
 | :--- | :--- | :--- |
