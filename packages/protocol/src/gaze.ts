@@ -1,9 +1,10 @@
-import type { Point2, Unsubscribe } from './face';
+import type { Point2, Unsubscribe } from './common';
 
 /**
  * Gaze sensing contract: where the user is looking, before calibration maps it
- * to the screen. Implemented by MediaPipe (and a simulated provider); callers
- * never see vendor types. Blinks and talking come from FaceProvider instead.
+ * to the screen, and how closed each eye is. Implemented by MediaPipe (and a
+ * simulated provider); callers never see vendor types. Natural blink rate for
+ * fatigue comes from the Presage FaceProvider, and talking from the voice agent.
  */
 
 export interface HeadPose {
@@ -27,6 +28,12 @@ export interface GazeSample {
    */
   eye: Point2 | null;
   head: HeadPose;
+  /**
+   * Closure of the user's own left and right eye, 0 (open) to 1 (closed).
+   * Drives the long-blink confirm. Reads as open when no face is visible, so a
+   * missing face can never look like a long blink.
+   */
+  blink: { left: number; right: number };
 }
 
 export interface GazeProvider {

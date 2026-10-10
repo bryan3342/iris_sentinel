@@ -4,7 +4,8 @@ import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@i
 // where a simulated user is looking (a fraction of the screen, or null while
 // the eyes are closed or the face is out of view); the provider turns that into
 // eye samples through a fixed eye model, with optional webcam-like jitter from a
-// seeded generator so a run repeats exactly. The head stays still and level.
+// seeded generator so a run repeats exactly. The head stays still and level, and
+// the eyes always read open, so a null look never counts as a long blink.
 
 /** Where the simulated user is looking at `t` ms after start, as a fraction of the screen. */
 export type LookSource = (t: number) => Point2 | null;
@@ -77,7 +78,7 @@ export class SimulatedGazeProvider implements GazeProvider {
       const clean = eyeFor(at);
       eye = { x: clean.x + this.random() * this.noise, y: clean.y + this.random() * this.noise };
     }
-    const sample: GazeSample = { t, eye, head: SIMULATED_HEAD };
+    const sample: GazeSample = { t, eye, head: SIMULATED_HEAD, blink: { left: 0, right: 0 } };
     this.listeners.forEach((listener) => listener(sample));
   }
 }

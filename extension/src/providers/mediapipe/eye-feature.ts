@@ -37,8 +37,9 @@ const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
  * either eye's closure is still short enough to be a blink, the caller holds
  * its last output, since the iris points under a closing lid are not worth
  * reading. Each eye is timed on its own, so an eye that has been closed for a
- * while does not stop the other eye's blinks from being recognised. This only
- * steadies aiming; blink events for confirms come from FaceProvider.
+ * while does not stop the other eye's blinks from being recognised. Holding
+ * through blinks also means a published sample with a closed eye has already
+ * outlasted a blink, which is what the long-blink confirm reads.
  */
 export class ClosureTimer {
   private readonly closedSince: Record<EyeLandmarks['side'], number | null> = { Left: null, Right: null };
@@ -145,16 +146,18 @@ function headPose(frame: FaceFrame): HeadPose {
 
 export function toGazeSample(frame: FaceFrame, t: number): GazeSample {
   // A closed eye drops out of the estimate so the other eye aims alone; with
-  // both closed the sample carries no eye position and aiming holds still. This
-  // is not a blink signal: blinks come from FaceProvider (Presage).
+  // both closed the sample carries no eye position and aiming holds still. The
+  // missing position is not a blink signal: `blink` carries each eye's closure.
   const eyes = [RIGHT_EYE, LEFT_EYE].map((eye) => readEye(frame, eye)).filter((r): r is EyeReading => r !== null);
   const total = eyes.reduce((sum, r) => sum + r.weight, 0);
   const head = headPose(frame);
-  if (total === 0) return { t, eye: null, head };
+  const closure = (eye: EyeLandmarks) => frame.blendshapes[`eyeBlink${eye.side}`] ?? 0;
+  const blink = { left: closure(LEFT_EYE), right: closure(RIGHT_EYE) };
+  if (total === 0) return { t, eye: null, head, blink };
   const mean = (pick: (r: EyeReading) => number) => eyes.reduce((sum, r) => sum + r.weight * pick(r), 0) / total;
   // Up/down from landmarks is weak (the lids hide the iris), so blend in the
   // model's own look-down minus look-up scores.
   // Image x grows toward the user's left, so flip it: positive x is the user's right.
   const eye = { x: -mean((r) => r.offset.x), y: (mean((r) => r.offset.y) + mean((r) => r.lookDown)) / 2 };
-  return { t, eye, head };
+  return { t, eye, head, blink };
 }
