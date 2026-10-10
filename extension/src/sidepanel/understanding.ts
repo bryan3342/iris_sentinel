@@ -18,7 +18,7 @@ const HINTS: Record<string, string> = {
   TIMEOUT: 'The request timed out.', REQUEST_IN_FLIGHT: 'A request is already running.',
   RATE_LIMITED: 'This session allows two requests a minute and ten in total. Wait a minute, or use a new token.',
   NO_TARGETS: 'No links or buttons are visible on this page.',
-  NO_AIMED_TARGET: 'Rest your eyes, or the mouse stand-in, on a numbered target for a moment first.',
+  NO_AIMED_TARGET: 'Rest your eyes, or the mouse, on a numbered target for a moment first.',
   LIST_IMAGES_FIRST: 'List the visible image numbers first.', IMAGE_NOT_FOUND: 'No visible image has that number.',
   DISABLED: SETUP, NOT_CONFIGURED: SETUP, CONTENT_NOT_APPROVED: SETUP, FORBIDDEN: SETUP,
   UPSTREAM_UNAVAILABLE: 'Gemini is busy or over quota. Wait, then try again.',

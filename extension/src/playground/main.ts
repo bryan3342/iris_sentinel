@@ -1,7 +1,6 @@
 import { CalibrationStore } from '@iris/core';
-import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
+import type { GazeProvider, GazeSample } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
-import { SimulatedGazeProvider, type LookSource } from '../providers/simulated/gaze';
 import { GazeDot } from '../sidepanel/gaze-dot';
 import { elementPresenter, runCalibration } from '../sidepanel/setup/calibration';
 import * as savedCalibration from '../sidepanel/setup/calibration-storage';
@@ -13,8 +12,7 @@ import { EyeTrace } from '../sidepanel/trace';
 // for this screen is used right away; otherwise calibration starts once a face
 // is steady. Clicking stands in for a confirm gesture: the click position is a
 // confirmed target and refines the fit. Press R to redo the dots, X to forget
-// everything saved. Add ?dots=5 for 5 dots. Add ?sim to run without a camera:
-// a simulated user looks wherever the mouse pointer is.
+// everything saved. Add ?dots=5 for 5 dots.
 const STEADY_SAMPLES = 30; // about one second of a tracked face before calibrating
 
 const stage = document.getElementById('stage')!;
@@ -26,11 +24,7 @@ stage.append(video, hud);
 
 const params = new URLSearchParams(location.search);
 const dotCount = params.get('dots') === '5' ? 5 : 9;
-const simulated = params.has('sim');
-// A simulated run keeps its calibration in memory so it never replaces a real one saved for this screen.
-const { loadSamples, saveSamples, clearSamples } = simulated
-  ? { loadSamples: async () => [], saveSamples: async () => {}, clearSamples: async () => {} }
-  : savedCalibration;
+const { loadSamples, saveSamples, clearSamples } = savedCalibration;
 const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
 let store = new CalibrationStore();
 let dot: GazeDot | null = null;
@@ -83,15 +77,6 @@ function waitForSteadyFace(provider: GazeProvider): Promise<void> {
   });
 }
 
-/** The simulated user's eyes follow the mouse pointer and close when it leaves the window. */
-function pointerLook(): LookSource {
-  let at: Point2 | null = null;
-  const page = document.documentElement;
-  page.addEventListener('pointermove', (e) => (at = { x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight }));
-  page.addEventListener('pointerleave', () => (at = null));
-  return () => at;
-}
-
 async function cameraProvider(): Promise<GazeProvider> {
   hud.textContent = 'Starting camera...';
   video.srcObject = await openCamera();
@@ -103,7 +88,7 @@ async function cameraProvider(): Promise<GazeProvider> {
 }
 
 async function start(): Promise<void> {
-  const provider = simulated ? new SimulatedGazeProvider(pointerLook()) : await cameraProvider();
+  const provider = await cameraProvider();
   hud.textContent = 'Loading eye tracking...';
   await provider.start();
 

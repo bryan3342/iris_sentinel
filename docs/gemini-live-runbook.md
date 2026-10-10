@@ -163,7 +163,7 @@ minute and ten in total.
 
 Gemini can describe whatever gaze is aiming at. This uses one more request.
 
-1. In the side panel, turn on **Developer: the mouse stands in for the eyes**,
+1. In the side panel, turn on **Point with the mouse**,
    or calibrate with **Calibrate on this page** and turn on **Aim with my eyes**.
 2. Rest your eyes (or the mouse) on the "More information" link for about a
    second, until it is outlined.

@@ -168,12 +168,12 @@ describe('selecting with gaze', () => {
     provider.stop();
   });
 
-  it('selects through the stand-in exactly as through dwell', async () => {
+  it('selects through any confirm method exactly as through dwell', async () => {
     const { provider, gaze, selected } = selecting(() => centerOf(1));
     gaze.start();
     await provider.start();
     await vi.advanceTimersByTimeAsync(500); // aimed, but no dwell yet
-    gaze.confirmNow();
+    gaze.confirms.emit({ t: 500, source: 'stand-in' });
     await vi.advanceTimersByTimeAsync(0);
     expect(selected).toEqual([[1, false]]);
     gaze.stop();
