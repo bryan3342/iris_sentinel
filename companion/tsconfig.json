@@ -1,6 +1,6 @@
 {
   "extends": "../tsconfig.base.json",
-  "include": ["src", "install"],
+  "include": ["src", "install", "scripts"],
   "compilerOptions": {
     "types": ["node"]
   }
