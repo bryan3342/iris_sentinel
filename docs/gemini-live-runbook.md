@@ -85,14 +85,15 @@ until all seven are recorded.
    `.dev.vars` is ignored by Git. On Windows, use `copy` instead of `cp`.
 3. Open `server/.dev.vars` in an editor and replace `replace_with_your_key` with
    the API key from AI Studio. Save the file.
-4. Check that the key reaches the model. This sends one fixed text prompt and
-   no page content:
+4. Check that the key reaches the model and accepts Iris's request format. This
+   sends a fixed text prompt and a one-pixel image, and no page content:
 
    ```sh
    npm run check:gemini
    ```
 
-   Expected: `Gemini connection succeeded` and `Expected reply matched: true`.
+   Expected: `Gemini connection succeeded`, `Expected reply matched: true` and
+   `Page understanding request accepted: true`.
    On an error, see Troubleshooting.
 
 ## Part 3: Load the extension
@@ -118,7 +119,6 @@ until all seven are recorded.
 
    ```sh
    GEMINI_MODEL=gemini-3.8-flash
-   ENABLE_LOCAL_LABELS=false
    ENABLE_PAGE_UNDERSTANDING=true
    PAGE_UNDERSTANDING_PROVIDER=gemini
    PAGE_CONTENT_APPROVED=true
@@ -147,7 +147,8 @@ link, so the right answer is known.
 3. In **Page understanding**, enter the gateway `http://127.0.0.1:8787`, click
    **Allow gateway access**, and approve Chrome's prompt.
 4. Paste the `sessionToken` from Part 4 into the token field and click **Use
-   demo session**. The field clears at once.
+   demo session**. The field clears at once. The token stays entered until it
+   expires, Chrome restarts or Iris is reloaded.
 5. Type `More information` as the request and click **Send viewport to find
    target**, once.
 
@@ -203,6 +204,7 @@ Making Gemini's answer the aimed target, ready to confirm, is future work.
 | `check:gemini` reports 403 | The key lacks access to the project or API | Check the key's project in AI Studio |
 | `check:gemini` reports 404 | The model is not available to the project | Set another available model in `GEMINI_MODEL` |
 | `check:gemini` reports 429, or Iris shows `UPSTREAM_UNAVAILABLE` | Quota or rate limit, or Gemini is unavailable | Wait, then check quota in AI Studio |
+| `check:gemini` reports `UPSTREAM_REJECTED`, or Iris shows it | Gemini refused the key, the model or the request format | Check the key and `GEMINI_MODEL`; the HTTP code printed by `check:gemini` narrows it down |
 | `NOT_CONFIGURED` | A server setting is missing or malformed | Check the key, `EXTENSION_ORIGIN` and the one-line `DEMO_SESSIONS` JSON, then restart the server |
 | `DISABLED` | `ENABLE_PAGE_UNDERSTANDING` is not `true` | Set it and restart |
 | `CONTENT_NOT_APPROVED` | Real Gemini selected without approval | Finish Part 1, then set `PAGE_CONTENT_APPROVED=true` |

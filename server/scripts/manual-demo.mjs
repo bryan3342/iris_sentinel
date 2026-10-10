@@ -18,7 +18,7 @@ const session = provisionDemoSession();
 const worker = new Miniflare({ modules: true, script: outputFiles[0].text, compatibilityDate: '2026-04-26',
   host: '127.0.0.1', port: 8787,
   bindings: { EXTENSION_ORIGIN: `chrome-extension://${extensionId}`, DEMO_SESSIONS: JSON.stringify(session.serverBinding),
-    ENABLE_PAGE_UNDERSTANDING: 'true', PAGE_CONTENT_APPROVED: 'false', ENABLE_LOCAL_LABELS: 'false',
+    ENABLE_PAGE_UNDERSTANDING: 'true', PAGE_CONTENT_APPROVED: 'false',
     PAGE_UNDERSTANDING_PROVIDER: 'synthetic', SYNTHETIC_DELAY_MS: '2000' },
   outboundService: () => { throw new Error('External calls are disabled in the manual demo'); },
 });

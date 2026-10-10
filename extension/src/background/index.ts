@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
     if (base.type === 'iris.page.session') {
       object(message, ['type', 'gateway', 'sessionToken']);
       if (typeof base.gateway !== 'string' || typeof base.sessionToken !== 'string') throw new Error('INVALID_SESSION');
-      sessions.set(base.gateway, base.sessionToken); return null;
+      await sessions.set(base.gateway, base.sessionToken); return null;
     }
     if (base.type === 'iris.page.cancel') {
       object(message, ['type', 'requestId']);
@@ -42,14 +42,14 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
     const controller = new AbortController(); pending = { requestId: input.requestId, controller };
     const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(LIMITS.requestMs)]);
     try {
-      const session = sessions.require(gateway);
+      const session = await sessions.require(gateway);
       const response = await fetch(`${gateway}/v0.1/page-understanding/${input.operation}`, {
         method: 'POST', signal, credentials: 'omit', cache: 'no-store',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session}` }, body: JSON.stringify(input),
       });
       return validateResult(await responseJson(response), input);
     } catch (error) {
-      if (error instanceof Error && error.message === 'UNAUTHENTICATED') sessions.clear();
+      if (error instanceof Error && error.message === 'UNAUTHENTICATED') await sessions.clear();
       if (signal.aborted) throw new Error('CANCELLED_OR_TIMEOUT');
       throw error;
     } finally { pending = undefined; }

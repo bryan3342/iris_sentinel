@@ -81,11 +81,38 @@ it('an invented model ID is rejected at the client boundary', async () => {
   });
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow();
 });
-it('clears the overlay before capture and highlights only the validated target afterwards', async () => {
+it('holds the overlay clear during capture and highlights only the validated target afterwards', async () => {
   const response = await new PageCoordinator().inspect(find);
   expect(response.highlighted).toBe(true);
-  expect(events).toEqual(['overlay.clear', 'iris.page.capture', 'iris.page.understand', 'overlay.show',
+  expect(events).toEqual(['overlay.hold', 'iris.page.capture', 'overlay.release', 'iris.page.understand', 'overlay.show',
     JSON.stringify([current.documentToken, current.revision, 1])]);
   overlayReply = 'STALE'; events = [];
   expect((await new PageCoordinator().inspect(find)).highlighted).toBe(false);
+});
+it('lets Iris redraw its own marks once the screenshot is taken', async () => {
+  const afterCapture = vi.fn(() => events.push('afterCapture'));
+  await new PageCoordinator({ afterCapture }).inspect(find);
+  expect(events.slice(0, 4)).toEqual(['overlay.hold', 'iris.page.capture', 'overlay.release', 'afterCapture']);
+});
+const fire = (name: 'onActivated' | 'onUpdated' | 'onFocusChanged', ...args: unknown[]) => {
+  const source = name === 'onFocusChanged' ? (globalThis as any).chrome.windows : (globalThis as any).chrome.tabs;
+  source[name].addListener.mock.calls.forEach(([listener]: [(...a: unknown[]) => void]) => listener(...args));
+};
+it.each([
+  ['another tab loads', 'onUpdated', [7, { status: 'loading' }]],
+  ['a tab in another window opens', 'onActivated', [{ tabId: 7, windowId: 2 }]],
+  ['the same window regains focus', 'onFocusChanged', [1]],
+] as const)('keeps the request when %s', async (_name, event, args) => {
+  const previous = send.getMockImplementation()!;
+  send.mockImplementation(async message => { if (message.type === 'iris.page.understand') fire(event, ...args); return previous(message); });
+  expect((await new PageCoordinator().inspect(find)).result.result.operation).toBe('find_target');
+});
+it.each([
+  ['the examined tab updates', 'onUpdated', [1, { status: 'loading' }]],
+  ['another tab in its window becomes active', 'onActivated', [{ tabId: 7, windowId: 1 }]],
+  ['another window takes focus', 'onFocusChanged', [2]],
+] as const)('cancels the request when %s', async (_name, event, args) => {
+  const previous = send.getMockImplementation()!;
+  send.mockImplementation(async message => { if (message.type === 'iris.page.understand') fire(event, ...args); return previous(message); });
+  await expect(new PageCoordinator().inspect(find)).rejects.toThrow('PAGE_CHANGED_OR_CANCELLED');
 });

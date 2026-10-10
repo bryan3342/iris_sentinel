@@ -2,7 +2,7 @@
 // extension/public/mediapipe so the extension ships them locally (Manifest V3
 // forbids remote code). The model is pinned by SHA-256.
 import { createHash } from 'node:crypto';
-import { cp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 
@@ -17,6 +17,10 @@ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const require = createRequire(join(import.meta.dirname, '..', 'extension', 'package.json'));
 const visionDir = dirname(require.resolve('@mediapipe/tasks-vision'));
 await mkdir(outDir, { recursive: true });
+// Only the face model and a fresh runtime copy ship; anything an older setup left here would ship too.
+for (const entry of await readdir(outDir)) {
+  if (entry !== 'face_landmarker.task') await rm(join(outDir, entry), { recursive: true, force: true });
+}
 await cp(join(visionDir, 'wasm'), join(outDir, 'wasm'), { recursive: true });
 
 const existing = await readFile(modelPath).catch(() => null);

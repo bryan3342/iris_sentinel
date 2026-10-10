@@ -3,8 +3,10 @@ import type { NumberedTarget, Point2 } from '@iris/protocol';
 export type OverlayCommand =
   | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; pending?: number | null }
   | { type: 'clear' }
+  | { type: 'hold' }
+  | { type: 'release' }
   | { type: 'dot'; at: Point2 | null };
-export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
+export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
 
 /**
  * Draws target numbers and one highlight over the page. Runs in Chrome's
@@ -14,18 +16,26 @@ export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
  * redrawn only inside that root, so the page helper never counts a redraw as a
  * page change. A drawing is bound to one document revision and is erased by
  * the next page change. For calibration it instead shows one still dot over a
- * dimmed page, at a fraction of the visible viewport.
+ * dimmed page, at a fraction of the visible viewport. A hold clears the page and
+ * refuses every 'show' until released, so a screenshot never contains numbers drawn
+ * by another part of Iris (gaze keeps redrawing while it aims).
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
   type Understanding = { documentToken: string; revision: number; onChange?: () => void };
   type Overlay = { host: HTMLDivElement; layer: HTMLDivElement };
-  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay };
+  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay; __irisOverlayHoldV01?: number };
   const clear = () => {
     const drawn = Boolean(host.__irisOverlayV01?.layer.firstChild);
     host.__irisOverlayV01?.layer.replaceChildren();
     return drawn;
   };
-  if (command.type === 'clear') {
+  if (command.type === 'release') {
+    delete host.__irisOverlayHoldV01;
+    return 'CLEARED';
+  }
+  if (command.type === 'clear' || command.type === 'hold') {
+    // A hold lapses after 5 seconds on its own, in case the side panel closes before releasing it.
+    if (command.type === 'hold') host.__irisOverlayHoldV01 = Date.now() + 5_000;
     // Wait until the erased overlay has been painted, so a screenshot taken next never contains it.
     // A tab that is not visible never paints, so the wait is capped instead of hanging.
     if (clear()) {
@@ -36,6 +46,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     }
     return 'CLEARED';
   }
+  if (command.type === 'show' && (host.__irisOverlayHoldV01 ?? 0) > Date.now()) return 'HELD';
   const state = host.__irisUnderstandingV01;
   if (command.type === 'show' && (!state || state.documentToken !== command.documentToken || state.revision !== command.revision)) {
     clear();

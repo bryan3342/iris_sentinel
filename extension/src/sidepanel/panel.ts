@@ -29,7 +29,7 @@ export function mountPanel(root: HTMLElement): void {
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
   if (isExtensionPage()) {
-    root.append(pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(), companionPanel());
+    root.append(pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(marks), companionPanel());
   }
 
   openCamera()

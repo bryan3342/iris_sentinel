@@ -1,8 +1,31 @@
 import { PageCoordinator, broker } from '../page-understanding/coordinator';
 import type { Operation } from '@iris/protocol';
 import { gatewayUrl } from '../page-understanding/session';
+import type { PageMarks } from './page-marks';
 
-export function understandingPanel(): HTMLElement {
+const SETUP = 'The gateway is not set up for this request. See the troubleshooting table in the Gemini runbook.';
+const SESSION = 'Enter a current demo session token, then try again.';
+const CHANGED = 'The page changed or the request was cancelled, so any result was discarded.';
+/** What each failure means for the person using the panel. The code stays visible for the runbook's troubleshooting table. */
+const HINTS: Record<string, string> = {
+  REQUEST_FAILED: 'Check that the gateway is running and Iris has gateway access.',
+  INVALID_GATEWAY: 'Enter the gateway as an address such as http://127.0.0.1:8787.',
+  INVALID_SESSION: 'That token is not in the expected format.',
+  DEMO_SESSION_REQUIRED: SESSION, UNAUTHENTICATED: SESSION,
+  PAGE_NOT_ALLOWED: 'Use an ordinary web page in the focused window, and allow Iris on it.',
+  UNSUPPORTED_PAGE: 'This page cannot be captured safely: it is zoomed, very large, or has video or embedded frames.',
+  PAGE_CHANGED: CHANGED, PAGE_CHANGED_OR_CANCELLED: CHANGED, CANCELLED_OR_TIMEOUT: 'The request timed out or was cancelled.',
+  TIMEOUT: 'The request timed out.', REQUEST_IN_FLIGHT: 'A request is already running.',
+  RATE_LIMITED: 'This session allows two requests a minute and ten in total. Wait a minute, or use a new token.',
+  NO_TARGETS: 'No links or buttons are visible on this page.',
+  LIST_IMAGES_FIRST: 'List the visible image numbers first.', IMAGE_NOT_FOUND: 'No visible image has that number.',
+  DISABLED: SETUP, NOT_CONFIGURED: SETUP, CONTENT_NOT_APPROVED: SETUP, FORBIDDEN: SETUP,
+  UPSTREAM_UNAVAILABLE: 'Gemini is busy or over quota. Wait, then try again.',
+  UPSTREAM_REJECTED: 'Gemini refused the request. Check the key and model on the gateway.',
+  INVALID_MODEL_RESULT: 'Gemini returned an answer Iris could not use.',
+};
+
+export function understandingPanel(marks: PageMarks): HTMLElement {
   const panel = document.createElement('section'); panel.className = 'understanding';
   const title = document.createElement('h2'); title.textContent = 'Page understanding · private demo';
   const notice = document.createElement('p');
@@ -12,14 +35,14 @@ export function understandingPanel(): HTMLElement {
   const imageId = document.createElement('input'); imageId.type = 'number'; imageId.min = '1'; imageId.placeholder = 'Image number'; imageId.setAttribute('aria-label', 'Image number');
   const output = document.createElement('p'); output.setAttribute('role', 'status'); output.setAttribute('aria-live', 'polite');
   const session = document.createElement('input'); session.type = 'password'; session.autocomplete = 'off'; session.placeholder = 'Operator-issued demo token (15 minutes)'; session.setAttribute('aria-label', 'Demo session token');
-  const coordinator = new PageCoordinator(); const buttons: HTMLButtonElement[] = [];
+  const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() }); const buttons: HTMLButtonElement[] = [];
   const button = (label: string, action: () => Promise<void>) => {
     const el = document.createElement('button'); el.textContent = label; buttons.push(el);
     el.addEventListener('click', () => {
       buttons.forEach(b => { b.disabled = true; }); output.textContent = 'Working…';
       void action().catch(error => {
         const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'REQUEST_FAILED';
-        output.textContent = `${code}. Allow Iris on all websites, or invoke Iris on the current tab, and use a provisioned gateway. No automatic retry.`;
+        output.textContent = `${code}. ${HINTS[code] ?? HINTS.REQUEST_FAILED} No automatic retry.`;
       }).finally(() => buttons.forEach(b => { b.disabled = false; }));
     });
     return el;
