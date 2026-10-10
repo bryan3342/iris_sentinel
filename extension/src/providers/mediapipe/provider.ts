@@ -1,6 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
-import type { GazeProvider, GazeSample, HeadPose, Unsubscribe } from '@iris/protocol';
-import { toGazeSample } from './eye-feature';
+import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
+import { TRACE_POINTS, toGazeSample } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -20,6 +20,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private frameRequest: number | null = null;
   private lastHead: HeadPose = { yaw: 0, pitch: 0 };
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
+  private readonly traceListeners = new Set<(points: Point2[]) => void>();
 
   constructor(private readonly video: HTMLVideoElement) {}
 
@@ -38,6 +39,12 @@ export class MediaPipeGazeProvider implements GazeProvider {
     return () => this.sampleListeners.delete(listener);
   }
 
+  /** Iris center and contour points (0..1 image coordinates) for the on-screen trace. */
+  onTracePoints(listener: (points: Point2[]) => void): Unsubscribe {
+    this.traceListeners.add(listener);
+    return () => this.traceListeners.delete(listener);
+  }
+
   private scheduleFrame(): void {
     this.frameRequest = this.video.requestVideoFrameCallback((now) => {
       // Reschedule first so one failed frame does not end tracking.
@@ -53,6 +60,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
     if (!landmarks) {
       // No face: publish a null eye so listeners do not keep aiming at the last sample.
       this.publish({ t: now, eye: null, head: this.lastHead });
+      this.traceListeners.forEach((listener) => listener([]));
       return;
     }
     const blendshapes: Record<string, number> = {};
@@ -67,6 +75,8 @@ export class MediaPipeGazeProvider implements GazeProvider {
       now,
     );
     this.publish(sample);
+    const points = TRACE_POINTS.flatMap((i) => (landmarks[i] ? [landmarks[i]] : []));
+    this.traceListeners.forEach((listener) => listener(points));
   }
 
   private publish(sample: GazeSample): void {
