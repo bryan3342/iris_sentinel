@@ -27,6 +27,8 @@ export { ClickPace } from './click-pace';
 export type { ClickPaceOptions } from './click-pace';
 export { VitalsWindow } from './vitals-window';
 export type { VitalsWindowOptions } from './vitals-window';
+export { CLUE_SETTINGS, FATIGUE_CLUES, FatigueEngine } from './fatigue';
+export type { ClueSettings, ClueState, FatigueClue, FatigueEngineOptions, FatiguePause, FatigueState } from './fatigue';
 export { SelectionGate } from './selection';
 export { SettledAim } from './settled-aim';
 export type { GateTarget, Selection, SelectionGateOptions } from './selection';
