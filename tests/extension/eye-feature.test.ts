@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point2 } from '@iris/protocol';
-import { type FaceFrame, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
+import { type FaceFrame, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -148,6 +148,12 @@ describe('toGazeSample', () => {
     expect(head.eyes.x).toBeCloseTo(0.6);
     expect(head.eyes.y).toBeCloseTo(0.45);
     expect(head.eyeSpan).toBeCloseTo(0.4);
+  });
+
+  it('lists iris points for open eyes only', () => {
+    expect(irisPoints(frame()).map((eye) => eye.length)).toEqual([5, 5]);
+    expect(irisPoints(frame({ eyeBlinkLeft: 0.9 })).map((eye) => eye.length)).toEqual([5, 0]);
+    expect(irisPoints(frame({ eyeBlinkLeft: 0.9, eyeBlinkRight: 0.9 })).map((eye) => eye.length)).toEqual([0, 0]);
   });
 
   it('reports no head position when the eye corners are missing', () => {
