@@ -19,7 +19,7 @@ export function understandingPanel(): HTMLElement {
       buttons.forEach(b => { b.disabled = true; }); output.textContent = 'Working…';
       void action().catch(error => {
         const code = error instanceof Error && /^[A-Z_]+$/.test(error.message) ? error.message : 'REQUEST_FAILED';
-        output.textContent = `${code}. Invoke Iris on the current tab to grant access, and use a provisioned gateway. No automatic retry.`;
+        output.textContent = `${code}. Allow Iris on all websites, or invoke Iris on the current tab, and use a provisioned gateway. No automatic retry.`;
       }).finally(() => buttons.forEach(b => { b.disabled = false; }));
     });
     return el;
