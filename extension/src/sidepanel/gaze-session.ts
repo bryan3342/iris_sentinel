@@ -108,18 +108,27 @@ export class GazeSession {
     // the same element in the same place; otherwise a new element under the old number could be
     // selected with one confirm.
     const waiting = this.gate.pending(this.lastT);
-    const before = this.list?.targets.find((t) => t.id === waiting);
-    const after = list.targets.find((t) => t.id === waiting);
-    const same = before && after && this.list!.tabId === list.tabId && this.list!.documentToken === list.documentToken &&
-      Math.abs(before.rect.x - after.rect.x) <= 4 && Math.abs(before.rect.y - after.rect.y) <= 4 && isRisky(after);
+    const same = waiting !== null && this.samePlace(waiting, list) && isRisky(list.targets.find((t) => t.id === waiting)!);
     if (waiting !== null && !same) this.gate.reset();
+    // A long blink in progress keeps its locked target only while that number still means the same element.
+    const locked = this.longBlink.locked;
+    if (locked !== null && !this.samePlace(locked, list)) this.longBlink.reset();
     this.list = list;
     return this.aim.setTargets(list.targets, this.frameFor(list));
   }
 
+  /** Whether target `id` in the new scan is the same element, in the same place, as in the current one. */
+  private samePlace(id: number, list: TargetList): boolean {
+    const before = this.list?.targets.find((t) => t.id === id);
+    const after = list.targets.find((t) => t.id === id);
+    return Boolean(before && after && this.list!.tabId === list.tabId && this.list!.documentToken === list.documentToken &&
+      Math.abs(before.rect.x - after.rect.x) <= 4 && Math.abs(before.rect.y - after.rect.y) <= 4);
+  }
+
   private handle(event: ConfirmEvent): void {
     const list = this.list;
-    const target = list?.targets.find((t) => t.id === this.aim.current) ?? null;
+    const id = event.target ?? this.aim.current; // a long blink brings the target it locked before the eyes closed
+    const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = this.gate.confirm(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'confirm-again') {
       this.marks.setPending(outcome.target);

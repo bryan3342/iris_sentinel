@@ -258,11 +258,11 @@ describe('confirming with a long blink', () => {
     stop() { if (this.timer) clearInterval(this.timer); }
   }
 
-  it('selects the aimed target when the user closes both eyes deliberately, before any dwell', async () => {
-    const looking = (t: number): GazeSample => ({ t, eye: eyeFor(centerOf(1)), head: SIMULATED_HEAD, blink: { left: 0.05, right: 0.05 } });
+  it('selects the target aimed before the eyes closed, even if the reading lands elsewhere on opening', async () => {
+    const lookingAt = (id: number) => (t: number): GazeSample => ({ t, eye: eyeFor(centerOf(id)), head: SIMULATED_HEAD, blink: { left: 0.05, right: 0.05 } });
     const closed = (t: number): GazeSample => ({ t, eye: null, head: SIMULATED_HEAD, blink: { left: 0.9, right: 0.9 } });
-    // Aim at 1 for 600 ms (short of a dwell), close both eyes for 700 ms, then open them on 1.
-    const provider = new ScriptedEyes((t) => (t > 600 && t <= 1300 ? closed(t) : looking(t)));
+    // Aim at 1 for 600 ms (short of a dwell), close both eyes for 700 ms, then open with the reading on 2.
+    const provider = new ScriptedEyes((t) => (t <= 600 ? lookingAt(1)(t) : t <= 1300 ? closed(t) : lookingAt(2)(t)));
     const store = new CalibrationStore();
     store.setDots(simulatedCalibration(), VIEWPORT);
     const selected: number[] = [];
@@ -274,7 +274,7 @@ describe('confirming with a long blink', () => {
     await vi.advanceTimersByTimeAsync(1250);
     expect(selected).toEqual([]); // eyes still closed: nothing yet
     await vi.advanceTimersByTimeAsync(150);
-    expect(selected).toEqual([1]); // selected on opening, long before a dwell could finish
+    expect(selected).toEqual([1]); // the locked target, on opening, long before a dwell could finish
     gaze.stop();
     provider.stop();
   });
