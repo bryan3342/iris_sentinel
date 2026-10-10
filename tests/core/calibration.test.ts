@@ -77,3 +77,33 @@ describe('fitCalibration', () => {
     expect(() => fitCalibration(twoDots)).toThrow(/at least 3/);
   });
 });
+
+describe('fitCalibration with 9 dots', () => {
+  const NINE = [0.1, 0.5, 0.9].flatMap((y) => [0.1, 0.5, 0.9].map((x) => ({ x, y })));
+  // A webcam below the screen sees vertical eye travel unevenly and horizontal
+  // travel shrink toward the top, so the eye-to-screen map curves.
+  const curvedEye = (t: { x: number; y: number }) => ({
+    x: (t.x - 0.5) * 0.8 * (1 + 0.3 * (t.y - 0.5)),
+    y: (t.y - 0.5) * 0.6 + 0.4 * (t.y - 0.5) ** 2,
+  });
+  const samples = NINE.flatMap((target) =>
+    Array.from({ length: 10 }, () => ({ eye: curvedEye(target), head: LEVEL, target })),
+  );
+
+  it('switches to curved terms and fits a curved mapping better than 5 dots', () => {
+    const nine = fitCalibration(samples);
+    const five = fitCalibration(samples.filter((s) => s.target.x === 0.5 ? s.target.y === 0.5 : s.target.y !== 0.5));
+    expect(nine.quadratic).toBe(true);
+    const check = { x: 0.3, y: 0.8 };
+    const error = (model: typeof nine) => {
+      const p = applyCalibration(model, curvedEye(check), LEVEL);
+      return Math.hypot(p.x - check.x, p.y - check.y);
+    };
+    expect(error(nine)).toBeLessThan(0.03);
+    expect(error(nine)).toBeLessThan(error(five));
+  });
+
+  it('keeps a straight mapping with only 5 dots', () => {
+    expect(fitCalibration(samplesFor()).quadratic).toBe(false);
+  });
+});
