@@ -33,22 +33,27 @@ const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
   (blendshapes[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED;
 
 /**
- * Tells a blink from a closed eye by how long the lids have been shut. While a
- * closure is still short enough to be a blink, the caller holds its last
- * output, since the iris points under a closing lid are not worth reading.
- * This only steadies aiming; blink events for confirms come from FaceProvider.
+ * Tells a blink from a closed eye by how long each lid has been shut. While
+ * either eye's closure is still short enough to be a blink, the caller holds
+ * its last output, since the iris points under a closing lid are not worth
+ * reading. Each eye is timed on its own, so an eye that has been closed for a
+ * while does not stop the other eye's blinks from being recognised. This only
+ * steadies aiming; blink events for confirms come from FaceProvider.
  */
 export class ClosureTimer {
-  private closedSince: number | null = null;
+  private readonly closedSince: Record<EyeLandmarks['side'], number | null> = { Left: null, Right: null };
 
-  /** True while the current closure is shorter than a blink. */
+  /** True while either eye is in a closure shorter than a blink. */
   blinking(blendshapes: Record<string, number>, now: number): boolean {
-    if (!isClosed(blendshapes, RIGHT_EYE) && !isClosed(blendshapes, LEFT_EYE)) {
-      this.closedSince = null;
-      return false;
-    }
-    this.closedSince ??= now;
-    return now - this.closedSince < BLINK_MS;
+    const states = [RIGHT_EYE, LEFT_EYE].map((eye) => {
+      if (!isClosed(blendshapes, eye)) {
+        this.closedSince[eye.side] = null;
+        return false;
+      }
+      const since = (this.closedSince[eye.side] ??= now);
+      return now - since < BLINK_MS;
+    });
+    return states.some(Boolean);
   }
 }
 
