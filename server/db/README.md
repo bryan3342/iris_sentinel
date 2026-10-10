@@ -8,6 +8,8 @@ the TimescaleDB extension for time-series data.
 | :--- | :--- |
 | `001_fatigue_minutes.sql` | `fatigue_minutes`: one row per user per minute, deleted after 90 days |
 | `seed_dev.sql` | 14 days of fake minutes for one fake profile (dev and demos only) |
+| `002_fatigue_daily.sql` | `fatigue_daily`: daily averages per profile, kept up to date by TimescaleDB |
+| `003_fatigue_daily_policy.sql` | The hourly background refresh for `fatigue_daily` |
 
 **Stored per minute:** fatigue score (0 to 100), fatigue level, click count and
 back-after-click count, keyed by a random profile ID and session ID.
@@ -77,11 +79,48 @@ tiger db query --file server/db/seed_dev.sql
 | Re-run is safe | Run the seed again, then the count | Still `840` |
 | Time slices | `tiger db query -c "SELECT show_chunks('fatigue_minutes');"` | 2 or 3 chunks (one per week) |
 
+## 3. Daily summary
+
+```sh
+tiger db query --file server/db/002_fatigue_daily.sql
+tiger db query --file server/db/003_fatigue_daily_policy.sql
+tiger db query -c "CALL refresh_continuous_aggregate('fatigue_daily', NULL, NULL);"
+```
+
+The `CALL` fills `fatigue_daily` from every minute already stored, including
+the fake data. The hourly policy only recomputes the last 3 days, so older
+history needs this once. Run it as its own command: it cannot run inside a
+transaction, and `tiger db query` wraps multi-statement input in one.
+
+| Check | Command | Expected |
+| :--- | :--- | :--- |
+| Daily rows | `tiger db query -c "SELECT day, round(avg_score::numeric, 1) AS avg_score, active_minutes FROM fatigue_daily ORDER BY day;"` | 14 rows, 60 minutes each |
+| Refresh job exists | `tiger db query -c "SELECT schedule_interval FROM timescaledb_information.jobs WHERE proc_name = 'policy_refresh_continuous_aggregate';"` | One row: `01:00:00` |
+
+Week over week, the query the trends view will run:
+
+```sh
+tiger db query -c "
+SELECT CASE WHEN day >= date_trunc('day', now()) - INTERVAL '7 days'
+            THEN 'this week' ELSE 'last week' END AS period,
+       round(avg(avg_score)::numeric, 1) AS avg_score
+FROM fatigue_daily
+WHERE profile_id = '00000000-0000-4000-8000-000000000001'
+  AND day >= date_trunc('day', now()) - INTERVAL '14 days'
+GROUP BY 1 ORDER BY 1 DESC;"
+```
+
+Expected: `this week` around 60 and `last week` around 40.
+
 ## Start over (dev only)
 
 ```sh
+tiger db query -c "DROP MATERIALIZED VIEW IF EXISTS fatigue_daily;"
 tiger db query -c "DROP TABLE IF EXISTS fatigue_minutes;"
 ```
+
+Drop the summary first: the table cannot be dropped while the summary reads
+from it.
 
 Then run the sections again from 1.
 
