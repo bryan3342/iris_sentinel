@@ -173,7 +173,8 @@ has no account/database setup.
 ## Real content and billing gate
 
 Before changing provider to Gemini and setting `PAGE_CONTENT_APPROVED=true`,
-complete the readiness record: verify applicable Google data terms, logging/data
+follow the [live Gemini runbook](../docs/gemini-live-runbook.md) and complete
+the readiness record: verify applicable Google data terms, logging/data
 sharing, retention, model availability, credits, auto-reload and paid fallback.
 The reported $60 and disabled auto-reload are unverified. Iris retains screenshot
 bytes only transiently; that is not a promise of zero provider retention.

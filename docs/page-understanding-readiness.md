@@ -1,7 +1,9 @@
 # v0.1 private-demo MVP readiness
 
 Implementation and mocked verification do not authorize deployment or real
-Gemini calls. Use this record before a separately approved live demo. No private
+Gemini calls. Use this record before a separately approved live demo. The
+[live Gemini runbook](gemini-live-runbook.md) walks through checking each item,
+the first live request, and turning it off again. No private
 keys, billing identifiers or actual browsing content belong in this file.
 
 | Item | Current status | Evidence to record before live use |
