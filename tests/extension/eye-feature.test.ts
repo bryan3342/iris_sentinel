@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point2 } from '@iris/protocol';
-import { type FaceFrame, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
+import { ClosureTimer, type FaceFrame, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -164,5 +164,26 @@ describe('toGazeSample', () => {
   it('returns no eye position when landmarks are missing', () => {
     const empty: FaceFrame = { landmarks: [], blendshapes: {}, matrix: IDENTITY, aspect: 1 };
     expect(toGazeSample(empty, 5)).toMatchObject({ t: 5, eye: null });
+  });
+});
+
+describe('ClosureTimer', () => {
+  const open = {};
+  const shut = { eyeBlinkLeft: 0.9, eyeBlinkRight: 0.9 };
+
+  it('treats a short closure as a blink and a long one as closed eyes', () => {
+    const timer = new ClosureTimer();
+    expect(timer.blinking(open, 0)).toBe(false);
+    expect(timer.blinking(shut, 100)).toBe(true);
+    expect(timer.blinking(shut, 350)).toBe(true);
+    expect(timer.blinking(shut, 600)).toBe(false);
+  });
+
+  it('starts timing again after the eyes reopen', () => {
+    const timer = new ClosureTimer();
+    timer.blinking(shut, 0);
+    expect(timer.blinking(shut, 700)).toBe(false);
+    expect(timer.blinking(open, 800)).toBe(false);
+    expect(timer.blinking({ eyeBlinkLeft: 0.9 }, 900)).toBe(true);
   });
 });
