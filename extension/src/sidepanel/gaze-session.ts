@@ -1,4 +1,4 @@
-import type { GazeAim } from '@iris/core';
+import { viewportFrame, type GazeAim } from '@iris/core';
 import type { GazeProvider, Unsubscribe } from '@iris/protocol';
 import type { PageMarks } from './page-marks';
 
@@ -24,7 +24,7 @@ export class GazeSession {
 
   start(): void {
     if (this.stopSamples) return;
-    this.marks.follow((list) => this.aim.setTargets(list.targets, list.viewport));
+    this.marks.follow((list) => this.aim.setTargets(list.targets, viewportFrame(list.viewport)));
     this.marks.start();
     this.stopSamples = this.provider.onSample((sample) => this.marks.setAim(this.aim.update(sample)));
   }

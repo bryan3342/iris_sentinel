@@ -8,6 +8,6 @@ export { FixationSmoother } from './fixation';
 export type { FixationOptions } from './fixation';
 export { distanceToRect, snapToTarget } from './snap';
 export type { SnapOptions, SnapTarget } from './snap';
-export { GazePointer } from './gaze-pointer';
-export type { GazePointerOptions } from './gaze-pointer';
+export { GazePointer, viewportFrame } from './gaze-pointer';
+export type { CalibrationFrame, GazePointerOptions } from './gaze-pointer';
 export { DEFAULT_SNAP, GazeAim } from './gaze-aim';

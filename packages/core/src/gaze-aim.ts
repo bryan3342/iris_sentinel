@@ -1,6 +1,5 @@
 import type { GazeSample } from '@iris/protocol';
-import type { Viewport } from './calibration';
-import type { GazePointer } from './gaze-pointer';
+import type { CalibrationFrame, GazePointer } from './gaze-pointer';
 import { snapToTarget, type SnapOptions, type SnapTarget } from './snap';
 
 /**
@@ -16,7 +15,7 @@ export const DEFAULT_SNAP: SnapOptions = { maxDistance: 100, hysteresis: 30 };
 
 export class GazeAim {
   private targets: readonly SnapTarget[] = [];
-  private viewport: Viewport | null = null;
+  private frame: CalibrationFrame | null = null;
   private aimed: number | null = null;
 
   constructor(
@@ -29,10 +28,10 @@ export class GazeAim {
     return this.aimed;
   }
 
-  /** Replaces the list (a fresh scan of the page); returns the aim within it. */
-  setTargets(targets: readonly SnapTarget[], viewport: Viewport): number | null {
+  /** Replaces the list (a fresh scan of the page) and where the page sits in the calibration; returns the aim. */
+  setTargets(targets: readonly SnapTarget[], frame: CalibrationFrame): number | null {
     this.targets = targets;
-    this.viewport = viewport;
+    this.frame = frame;
     const point = this.pointer.point;
     this.aimed = point ? snapToTarget(point, targets, null, this.options) : null;
     return this.aimed;
@@ -40,8 +39,8 @@ export class GazeAim {
 
   /** Feeds one gaze sample; returns the aim after it. */
   update(sample: GazeSample): number | null {
-    if (!this.viewport) return null;
-    const point = this.pointer.update(sample, this.viewport);
+    if (!this.frame) return null;
+    const point = this.pointer.update(sample, this.frame);
     if (!sample.eye || !point) return this.aimed;
     this.aimed = snapToTarget(point, this.targets, this.aimed, this.options);
     return this.aimed;

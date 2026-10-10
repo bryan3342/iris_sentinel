@@ -1,7 +1,7 @@
-import { CalibrationStore, GazePointer, type Viewport } from '@iris/core';
+import { CalibrationStore, GazePointer, viewportFrame } from '@iris/core';
 import type { GazeSample, Point2 } from '@iris/protocol';
 
-const viewport = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
+const frame = () => viewportFrame({ width: window.innerWidth, height: window.innerHeight });
 
 /** A circle drawn where the user is looking, from calibrated, head-corrected, fixation-smoothed samples. */
 export class GazeDot {
@@ -15,13 +15,13 @@ export class GazeDot {
   }
 
   update(sample: GazeSample): void {
-    const point = this.pointer.update(sample, viewport());
+    const point = this.pointer.update(sample, frame());
     if (point) this.element.style.transform = `translate(${point.x}px, ${point.y}px)`;
   }
 
   /** The user confirmed a target at `pixel`; see GazePointer.confirm. */
   confirm(pixel: Point2): boolean {
-    return this.pointer.confirm(pixel, viewport());
+    return this.pointer.confirm(pixel, frame());
   }
 
   remove(): void {
