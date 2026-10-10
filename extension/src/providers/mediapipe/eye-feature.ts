@@ -33,14 +33,6 @@ const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
   (blendshapes[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED;
 
 /**
- * Tells a blink from a closed eye by how long each lid has been shut. While
- * either eye's closure is still short enough to be a blink, the caller holds
- * its last eye reading (see `holdThroughBlink`), since the iris points under a
- * closing lid are not worth reading. Each eye is timed on its own, so an eye
- * that has been closed for a while does not stop the other eye's blinks from
- * being recognised.
- */
-/**
  * The sample to publish during a blink: the last eye reading held, so aiming and dwell stay
  * still, with the lids' current closure reported, so quick blinks can be counted for the
  * double-blink click.
@@ -49,6 +41,14 @@ export function holdThroughBlink(last: GazeSample, blendshapes: Record<string, n
   return { ...last, t, blink: { left: blendshapes.eyeBlinkLeft ?? 0, right: blendshapes.eyeBlinkRight ?? 0 } };
 }
 
+/**
+ * Tells a blink from a closed eye by how long each lid has been shut. While
+ * either eye's closure is still short enough to be a blink, the caller holds
+ * its last eye reading (see `holdThroughBlink`), since the iris points under a
+ * closing lid are not worth reading. Each eye is timed on its own, so an eye
+ * that has been closed for a while does not stop the other eye's blinks from
+ * being recognised.
+ */
 export class ClosureTimer {
   private readonly closedSince: Record<EyeLandmarks['side'], number | null> = { Left: null, Right: null };
 
