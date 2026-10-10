@@ -5,9 +5,9 @@ const TRAIL_LENGTH = 20;
 const RED = '255, 40, 40';
 
 /**
- * Draws on the camera preview: a bright red ring around each iris, a dot at its
- * center, and a short fading trail of recent iris positions. Drawing only;
- * nothing is recorded or stored.
+ * Draws on the camera preview: a bright red ring around each open iris, a dot
+ * at its center, and a short fading trail of recent iris positions. A closed
+ * eye has no marker. Drawing only; nothing is recorded or stored.
  */
 export class EyeTrace {
   readonly overlay = document.createElement('canvas');
@@ -18,7 +18,7 @@ export class EyeTrace {
     this.overlay.className = 'trace-overlay';
   }
 
-  drawPoints(points: Point2[]): void {
+  drawPoints(eyes: [Point2[], Point2[]]): void {
     const scale = window.devicePixelRatio || 1;
     const canvas = this.overlay;
     canvas.width = canvas.clientWidth * scale;
@@ -26,10 +26,6 @@ export class EyeTrace {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (points.length < POINTS_PER_IRIS * 2) {
-      this.trails = [[], []];
-      return;
-    }
     // Match the video's object-fit: cover crop (fullscreen), which is a no-op in the panel.
     const vw = this.video.videoWidth || canvas.width;
     const vh = this.video.videoHeight || canvas.height;
@@ -42,7 +38,12 @@ export class EyeTrace {
     ctx.shadowBlur = 8 * size;
 
     for (let eye = 0; eye < 2; eye++) {
-      const [center, ...contour] = points.slice(eye * POINTS_PER_IRIS, (eye + 1) * POINTS_PER_IRIS).map(toPixels);
+      const points = eyes[eye]!;
+      if (points.length < POINTS_PER_IRIS) {
+        this.trails[eye] = []; // closed or lost: no marker, and the trail restarts when it reopens
+        continue;
+      }
+      const [center, ...contour] = points.map(toPixels);
       if (!center) continue;
       const trail = [...this.trails[eye]!, center].slice(-TRAIL_LENGTH);
       this.trails[eye] = trail;

@@ -26,10 +26,21 @@ interface EyeLandmarks {
 // Iris lists the center then its four contour points; averaging them steadies the center.
 const RIGHT_EYE: EyeLandmarks = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133, side: 'Right' };
 const LEFT_EYE: EyeLandmarks = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263, side: 'Left' };
-// Iris center then its four contour points, for each eye (user's right, then left).
-export const TRACE_POINTS = [468, 469, 470, 471, 472, 473, 474, 475, 476, 477];
-
 const EYE_CLOSED = 0.5;
+
+const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
+  (blendshapes[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED;
+
+/**
+ * Iris center and contour points (0..1 image coordinates) for the user's right
+ * eye, then left, for drawing on the preview. An eye that is closed or not
+ * found gets an empty list, so its marker disappears while it is not tracked.
+ */
+export function irisPoints(frame: FaceFrame): [Point2[], Point2[]] {
+  const of = (eye: EyeLandmarks): Point2[] =>
+    isClosed(frame.blendshapes, eye) ? [] : eye.iris.flatMap((i) => (frame.landmarks[i] ? [frame.landmarks[i]!] : []));
+  return [of(RIGHT_EYE), of(LEFT_EYE)];
+}
 const VERTICAL_SCALE = 5;
 
 interface EyeReading {
@@ -49,7 +60,7 @@ interface EyeReading {
 
 function readEye(frame: FaceFrame, eye: EyeLandmarks): EyeReading | null {
   const b = frame.blendshapes;
-  if ((b[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED) return null;
+  if (isClosed(b, eye)) return null;
   const at = (i: number) => {
     const p = frame.landmarks[i];
     return p ? { x: p.x * frame.aspect, y: p.y } : null;
