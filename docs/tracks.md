@@ -2,6 +2,18 @@
 
 ## Context
 
+**Current delivery: v0.1 private-demo MVP.** Page understanding is implemented
+and tested independently of ElevenLabs: explicit-request viewport screenshots,
+numbered target recommendations (including unlabeled icons), viewport summaries,
+and locally masked image crops. Authentication is manually provisioned; conservative
+per-instance rate/concurrency limits reduce quota exposure. No database is required;
+cold starts reset counters and distributed enforcement is deferred. Gemini explains/recommends only.
+No browser action or voice confirmation flow is implemented in this milestone.
+The feature stays disabled until provisioned. Real browsing content/live calls
+require provider data-handling and billing verification; $60 credits and
+auto-reload-off are user-reported and unverified. See the
+[protocol](page-understanding-protocol.md) and [readiness record](page-understanding-readiness.md).
+
 Sources: the hackknight.org public API (sponsors) and the Hack Knight Fall 2026 Devpost page (prizes, judging criteria). Iris is a Chrome extension with a local Presage companion (see [architecture.md](architecture.md)). This review checks every prize track and sponsor technology against Iris's mission: hands-free browsing for people with severe motor impairments. It keeps what fits, swaps what fits better, and drops what doesn't.
 
 **Facts that shape scope**
@@ -61,7 +73,7 @@ Sources: the hackknight.org public API (sponsors) and the Hack Knight Fall 2026 
 | Track story | "A voice agent that operates the browser for people who can't" | "We used speech-to-text and text-to-speech" |
 
 **Decision:** the voice layer is an ElevenLabs Agent running in the side panel. Its client tools are Iris's actions:
-- `click_target(n)`
+- a target proposal that Iris confirms before any future click
 - `scroll(direction)`
 - `find_target(description)`, which calls Gemini
 - `summarize_page()`, which calls Gemini
@@ -70,7 +82,10 @@ Sources: the hackknight.org public API (sponsors) and the Hack Knight Fall 2026 
 
 Plain text-to-speech stays as a backup for fixed lines (like "Opening...") in case the agent connection fails.
 
-**Rule kept:** the agent never clicks without a confirm (breath, blink or dwell) on anything that submits, pays or deletes.
+**Rule kept:** every browser click needs Iris confirmation (breath, blink or dwell),
+including ordinary links. Gemini and voice-tool output cannot grant confirmation.
+Future voice tools call the existing coordinator and return bounded text/IDs,
+never screenshot bytes. ElevenLabs does not need to exist before this MVP.
 
 ### C. Tiger Data for fatigue history: **stretch, only if staffed**
 
@@ -96,10 +111,10 @@ Plain text-to-speech stays as a backup for fixed lines (like "Opening...") in ca
 
 | Piece | Why it stays |
 | :--- | :--- |
-| Chrome extension (side panel, coordinator, page helper) | Already locked; works on real sites |
+| Chrome extension (side panel, coordinator, page helper) | v0.1 capture/understanding implemented for supported visible top-document content; gaze, voice and browser actions remain future work |
 | Presage via a local Node.js companion over native messaging | No browser version of Presage exists. Its on-device processing is the privacy story. It supplies the camera-based heart rate, breathing, blink, expression and motion signals behind Iris's fatigue, focus and movement scores. |
 | MediaPipe as the gaze (eye and head) tracker | Free and in-browser. Presage has no gaze output, so MediaPipe is the primary aiming source, not a fallback. Presage stays the only blink source. |
-| Cloudflare Worker holding all keys | Now holds Gemini, ElevenLabs, and optionally Tiger Data keys |
+| Cloudflare Worker holding all keys | Gemini key remains server-side; ElevenLabs/Tiger Data integration remains future work |
 
 ### E. Sponsors with no fit
 
