@@ -7,6 +7,7 @@ the TimescaleDB extension for time-series data.
 | File | What it creates |
 | :--- | :--- |
 | `001_fatigue_minutes.sql` | `fatigue_minutes`: one row per user per minute, deleted after 90 days |
+| `seed_dev.sql` | 14 days of fake minutes for one fake profile (dev and demos only) |
 
 **Stored per minute:** fatigue score (0 to 100), fatigue level, click count and
 back-after-click count, keyed by a random profile ID and session ID.
@@ -60,6 +61,21 @@ Remove the test row:
 ```sh
 tiger db query -c "DELETE FROM fatigue_minutes WHERE session_id = '00000000-0000-4000-8000-0000000000aa';"
 ```
+
+## 2. Fake data (dev only)
+
+One fake profile with one 60-minute session per day for the last 14 days. The
+recent week scores higher than the week before, so trends are easy to see.
+
+```sh
+tiger db query --file server/db/seed_dev.sql
+```
+
+| Check | Command | Expected |
+| :--- | :--- | :--- |
+| Seed loaded | `tiger db query -c "SELECT count(*) FROM fatigue_minutes;"` | `840` (14 days x 60 minutes) |
+| Re-run is safe | Run the seed again, then the count | Still `840` |
+| Time slices | `tiger db query -c "SELECT show_chunks('fatigue_minutes');"` | 2 or 3 chunks (one per week) |
 
 ## Start over (dev only)
 

@@ -250,7 +250,7 @@ iris_sentinel/
 │   │   └── detectors/           # blink segmenter (blink events for blink rate)
 │   └── install/                 # registers the native messaging host (macOS, Windows)
 ├── server/                      # Cloudflare Worker, holds all keys
-│   ├── db/                      # Tiger Data schema (SQL)
+│   ├── db/                      # Tiger Data schema (SQL) and dev seed
 │   └── src/
 │       └── routes/
 │           ├── agent-token/     # signed ElevenLabs agent session
