@@ -48,3 +48,32 @@ it('reports positions only: no labels, masks, images or blocking verdict', () =>
   expect(Object.keys(gaze).sort()).toEqual(['documentToken', 'revision', 'targets', 'targetsTruncated', 'viewport']);
   expect(gaze.targets.every((t) => !('label' in t))).toBe(true);
 });
+
+it('marks what selecting each target would risk, failing toward a second confirm', () => {
+  const row = (i: number) => `data-box="10 ${10 + i * 30} 200 20"`;
+  document.body.innerHTML = `
+    <a href="https://example.com/news" ${row(0)}>Today's news</a>
+    <a href="https://example.com/a" ${row(1)}>Delete my account</a>
+    <a href="https://example.com/f.pdf" download ${row(2)}>Report</a>
+    <a href="mailto:someone@example.com" ${row(3)}>Write to us</a>
+    <div role="link" ${row(4)}>Styled link</div>
+    <button ${row(5)}>Menu</button>
+    <button ${row(6)}>Send</button>
+    <button aria-label="" ${row(7)}></button>
+    <form><button type="button" ${row(8)}>Next</button></form>
+    <button ${row(9)}>  show   more </button>`;
+  const flags = pageSnapshot('targets').targets.map((t) => [t.rect.y, t.risky]);
+  expect(flags).toEqual([
+    [10, false], // a plain link to a web page
+    [40, true], // a risky word
+    [70, true], // a download
+    [100, true], // opens another app
+    [130, true], // not a real link: cannot tell what it does
+    [160, false], // a plainly harmless button
+    [190, true], // a risky word
+    [220, true], // icon only: cannot tell what it does
+    [250, true], // inside a form
+    [280, false], // harmless, whitespace aside
+  ]);
+});
+

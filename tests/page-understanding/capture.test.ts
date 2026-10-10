@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { assertSameSnapshot, eligibleTab, maskPixels, prepareImage, validateSnapshot } from '../../extension/src/page-understanding/capture';
+import { assertSameSnapshot, eligibleTab, maskPixels, prepareImage, validateSnapshot, validateTargets } from '../../extension/src/page-understanding/capture';
 import type { PageSnapshot } from '../../extension/src/page-understanding/page-helper';
 
 const snapshot = (): PageSnapshot => ({ documentToken: 'abcdefghijklmnop', revision: 1,
@@ -58,5 +58,20 @@ describe('capture safety', () => {
     expect(destDraw).toHaveBeenCalledWith(source, 200, 0, 200, 200, 0, 0, 200, 200);
     expect(fillRect.mock.invocationCallOrder[0]).toBeLessThan(destDraw.mock.invocationCallOrder[0]!);
     expect(close).toHaveBeenCalledOnce(); expect(source.width).toBe(0); expect(output.width).toBe(0);
+  });
+});
+describe('target risk flags', () => {
+  const gazeScan = (target: Record<string, unknown>) => {
+    const { documentToken, revision, viewport, targetsTruncated } = snapshot();
+    return { documentToken, revision, viewport, targetsTruncated, targets: [target] };
+  };
+  const rect = { x: 20, y: 10, width: 40, height: 20 };
+  it('requires a risk flag on every gaze target, so a missing one never reads as safe', () => {
+    expect(validateTargets(gazeScan({ id: 1, role: 'link', rect, risky: false }), true).targets[0]!.risky).toBe(false);
+    expect(() => validateTargets(gazeScan({ id: 1, role: 'link', rect }), true)).toThrow();
+    expect(() => validateTargets(gazeScan({ id: 1, role: 'link', rect, risky: 'no' }), true)).toThrow();
+  });
+  it('keeps the flag out of page understanding, whose targets go to the server', () => {
+    expect(() => validateSnapshot({ ...snapshot(), targets: [{ id: 1, role: 'link', rect, risky: false }] })).toThrow();
   });
 });

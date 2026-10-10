@@ -11,7 +11,7 @@ import { LiveTargetList } from '../../extension/src/sidepanel/target-list';
 // A 1920 x 1080 screen. The page is 1200 x 800 and its corner sits at the window's position.
 const SCREEN = { width: 1920, height: 1080, availLeft: 0, availTop: 0 };
 const VIEWPORT = { width: 1200, height: 800, offsetLeft: 0, offsetTop: 0, scale: 1, scrollX: 0, scrollY: 0 };
-const TARGETS = [1, 2, 3].map((id) => ({ id, role: 'link', rect: { x: 100 + (id - 1) * 400, y: 300, width: 200, height: 40 } }));
+const TARGETS = [1, 2, 3].map((id) => ({ id, role: 'link', rect: { x: 100 + (id - 1) * 400, y: 300, width: 200, height: 40 }, risky: false }));
 let windowAt: Point2, dot: Point2 | null, lookAt: Point2 | null, sent: OverlayCommand[];
 
 // Where on the screen a page point is, as a fraction of the screen: what the simulated user's eyes point at.

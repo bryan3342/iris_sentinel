@@ -9,7 +9,7 @@ import { LiveTargetList } from '../../extension/src/sidepanel/target-list';
 
 const VIEWPORT = { width: 1000, height: 800, offsetLeft: 0, offsetTop: 0, scale: 1, scrollX: 0, scrollY: 0 };
 // Three links in a row, like a navigation bar.
-const TARGETS = [1, 2, 3].map((id) => ({ id, role: 'link', rect: { x: 100 + (id - 1) * 300, y: 100, width: 200, height: 40 } }));
+const TARGETS = [1, 2, 3].map((id) => ({ id, role: 'link', rect: { x: 100 + (id - 1) * 300, y: 100, width: 200, height: 40 }, risky: false }));
 const centerOf = (id: number): Point2 => ({ x: (250 + (id - 1) * 300) / VIEWPORT.width, y: 120 / VIEWPORT.height });
 
 let active: number, revision: number, sent: { tabId: number; command: OverlayCommand }[];
