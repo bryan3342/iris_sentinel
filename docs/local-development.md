@@ -84,7 +84,9 @@ The companion is the small Node.js program that runs Presage on this computer, b
 
    This copies the companion to `~/Library/Application Support/Iris/companion/`, out of the repository, which macOS may protect if it sits in `~/Desktop`. It writes a launcher that calls Node by its full path, since Chrome starts programs with almost no `PATH`, and registers it with Chrome as `com.iris.companion`, which only the Iris extension ID may start. Run `npm run install:host` again after pulling companion changes.
 
-3. To remove it, run `npm run uninstall:host` in `companion/`.
+3. Open the Iris side panel. It connects to the companion right away and shows **Body signals: companion connected**. Closing the panel ends the companion.
+
+4. To remove it, run `npm run uninstall:host` in `companion/`.
 
 ## What you should see
 
