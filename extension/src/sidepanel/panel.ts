@@ -10,6 +10,7 @@ import { EyeTrace } from './trace';
 import { understandingPanel } from './understanding';
 import { microphonePanel } from './setup/microphone';
 import { conversationPanel } from './agent/panel';
+import { PageCoordinator } from '../page-understanding/coordinator';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -31,7 +32,10 @@ export function mountPanel(root: HTMLElement): void {
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
   if (isExtensionPage()) {
-    root.append(microphonePanel(), conversationPanel(), pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(marks), companionPanel());
+    // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
+    const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
+    root.append(microphonePanel(), conversationPanel({ coordinator, marks }), pageAccessPanel(), numbersPanel(marks), gaze.element,
+      understandingPanel(marks, coordinator), companionPanel());
   }
 
   openCamera()

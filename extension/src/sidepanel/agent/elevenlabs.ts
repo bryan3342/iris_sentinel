@@ -4,12 +4,16 @@ import rawAudioProcessor from '@elevenlabs/client/worklets/rawAudioProcessor.js?
 import audioConcatProcessor from '@elevenlabs/client/worklets/audioConcatProcessor.js?url&no-inline';
 import type { VoiceAgent } from './voice';
 
-/** Audio goes directly to ElevenLabs; no page content or browser tools are supplied. */
+/**
+ * Audio goes directly to ElevenLabs. Iris's browser tools are offered as client tools: the agent
+ * asks, Iris runs them in the browser and returns only their spoken answer, never a screenshot.
+ */
 export const elevenLabsVoice: VoiceAgent = {
-  async start(signedUrl, onState) {
+  async start(signedUrl, onState, tools) {
     return Conversation.startSession({
       signedUrl, connectionType: 'websocket',
       workletPaths: { rawAudioProcessor, audioConcatProcessor },
+      clientTools: tools,
       onConnect: () => onState('listening'),
       onModeChange: ({ mode }) => onState(mode),
       onDisconnect: () => onState('disconnected'),
