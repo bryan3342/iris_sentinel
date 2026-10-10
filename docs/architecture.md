@@ -117,6 +117,17 @@ Agent: "Opening History."
 
 **Client tools exposed to the agent:** `click_target(n)`, `scroll(direction)`, `find_target(description)`, `summarize_page()`, `describe_image(n)`, `set_pace(slower|faster)`.
 
+**Local milestone:** `POST /gemini/find-target` accepts a text request and numbered
+target labels, calls Gemini through the server's `PageUnderstanding.findTarget`
+interface, and returns a validated target ID or null for no clear match. Local
+testing uses `wrangler dev` on localhost in one terminal and `curl` in another.
+Keys stay in the ignored server `.dev.vars` bindings. Labels are sent only when
+the tester submits a request; inputs and model responses are not logged or
+stored. This milestone has no screenshot input, browser client, or click action.
+The documented screenshot-plus-target flow remains the next integration step.
+The local endpoint has no session authentication or rate limiting and must not
+be deployed until those protections are implemented.
+
 **Safety rule.** Anything that submits, pays or deletes always needs an explicit confirm, even when the agent proposes it.
 
 ### 3.3 Data handling rules
