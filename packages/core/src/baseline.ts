@@ -57,7 +57,7 @@ export class Baseline {
   /** Adds one usable value. Ignored once the personal baseline is set. */
   add(value: number): void {
     if (this.personalValue !== null || !Number.isFinite(value)) return;
-    this.collected = [...this.collected, value];
+    this.collected.push(value);
     if (this.collected.length < this.samples) return;
     const q = this.tiredDirection === 'up' ? this.restedQuantile : 1 - this.restedQuantile;
     this.personalValue = quantile(this.collected, q);
