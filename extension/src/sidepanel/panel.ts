@@ -21,7 +21,7 @@ export function mountPanel(root: HTMLElement): void {
   openCamera()
     .then((stream) => {
       video.srcObject = stream;
-      return startTracking(video, preview, root, status);
+      return startTracking(video, root, status);
     })
     .catch((error: unknown) => {
       if (video.srcObject) {
@@ -36,7 +36,6 @@ export function mountPanel(root: HTMLElement): void {
 
 async function startTracking(
   video: HTMLVideoElement,
-  preview: HTMLElement,
   root: HTMLElement,
   status: HTMLElement,
 ): Promise<void> {
