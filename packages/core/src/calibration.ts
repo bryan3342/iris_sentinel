@@ -1,9 +1,11 @@
 import type { HeadPose, Point2 } from '@iris/protocol';
 
 /**
- * Maps eye-in-head position plus head rotation to a point on the screen,
- * fitted from calibration samples gathered while the user looks at known dots.
- * Ridge-regularized least squares keeps the fit stable with few dots.
+ * Maps eye-in-head position to a point on the screen, fitted from calibration
+ * samples gathered while the user looks at known dots. Ridge-regularized least
+ * squares keeps the fit stable with few dots. Head movement after calibration
+ * is corrected geometrically rather than learned, because the user holds still
+ * while the dots are shown and a fit cannot learn from movement it never saw.
  */
 
 export interface CalibrationSample {
@@ -18,6 +20,13 @@ export interface CalibrationModel {
   y: number[];
   /** Adds curved eye terms; used when there are enough dots to support them. */
   quadratic: boolean;
+  /** Median head state while calibrating; movement away from it shifts the fitted point. */
+  head: HeadPose;
+}
+
+export interface Viewport {
+  width: number;
+  height: number;
 }
 
 const RIDGE = 1e-6;
@@ -25,8 +34,14 @@ const MIN_TARGETS = 3;
 const QUADRATIC_MIN_TARGETS = 9;
 const OUTLIER_KEEP = 0.8; // keep the 80% of samples per dot closest to its median
 
-function features(eye: Point2, head: HeadPose, quadratic: boolean): number[] {
-  const linear = [1, eye.x, eye.y, head.yaw, head.pitch];
+// The outer eye corners are the ruler that turns image units into centimeters.
+const EYE_SPAN_CM = 9; // adult outer eye-corner distance
+const CALIBRATION_DISTANCE_CM = 60; // assumed seat distance while calibrating, scaled by eye span since
+const CSS_PX_PER_CM = 96 / 2.54; // a CSS pixel is defined as 1/96 inch
+const MAX_SHIFT = 0.5; // viewport fraction, so a landmark glitch cannot throw the point off-screen
+
+function features(eye: Point2, quadratic: boolean): number[] {
+  const linear = [1, eye.x, eye.y];
   return quadratic ? [...linear, eye.x * eye.x, eye.y * eye.y, eye.x * eye.y] : linear;
 }
 
@@ -34,6 +49,16 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+}
+
+function medianHead(samples: CalibrationSample[]): HeadPose {
+  const of = (pick: (h: HeadPose) => number) => median(samples.map((s) => pick(s.head)));
+  return {
+    yaw: of((h) => h.yaw),
+    pitch: of((h) => h.pitch),
+    eyes: { x: of((h) => h.eyes.x), y: of((h) => h.eyes.y) },
+    eyeSpan: of((h) => h.eyeSpan),
+  };
 }
 
 /** Drops glances away and blinks: per dot, keeps samples nearest the median eye position. */
@@ -77,8 +102,8 @@ function solve(a: number[][], b: number[]): number[] {
 
 /**
  * Fits weights for raw feature rows (bias first). Features are centered first
- * so the ridge term only damps directions the data barely covers (for example
- * head rotation when the user held still) instead of shrinking the whole fit.
+ * so the ridge term only damps directions the data barely covers instead of
+ * shrinking the whole fit.
  */
 function ridgeFit(rows: number[][], targets: number[]): number[] {
   const n = rows[0]!.length;
@@ -101,18 +126,40 @@ function ridgeFit(rows: number[][], targets: number[]): number[] {
 export function fitCalibration(samples: CalibrationSample[]): CalibrationModel {
   const { kept, targets } = rejectOutliers(samples);
   const quadratic = targets >= QUADRATIC_MIN_TARGETS;
-  const rows = kept.map((s) => features(s.eye, s.head, quadratic));
+  const rows = kept.map((s) => features(s.eye, quadratic));
   return {
     quadratic,
+    head: medianHead(kept),
     x: ridgeFit(rows, kept.map((s) => s.target.x)),
     y: ridgeFit(rows, kept.map((s) => s.target.y)),
   };
 }
 
-/** Screen point (fraction of the viewport, clamped to 0..1) for one face sample. */
-export function applyCalibration(model: CalibrationModel, eye: Point2, head: HeadPose): Point2 {
-  const f = features(eye, head, model.quadratic);
+/**
+ * Screen shift (viewport fraction) that undoes head movement since calibration.
+ * Moving the head sideways by d cm while looking at one point turns the eyes by
+ * d over the viewing distance, which the fit reads as a point d cm away; turning
+ * the head by an angle reads as a point (distance times its tangent) away. Both
+ * are added back here. Image x grows toward the user's left while screen x grows
+ * toward their right; y grows downward in both. Turning left swings the eyes right
+ * in the head, so the fit reads too far right; tilting down makes them look up,
+ * so it reads too high.
+ */
+function headShift(base: HeadPose, head: HeadPose, viewport: Viewport): Point2 {
+  if (base.eyeSpan <= 0 || head.eyeSpan <= 0) return { x: 0, y: 0 };
+  const cmPerUnit = EYE_SPAN_CM / head.eyeSpan;
+  const distance = (CALIBRATION_DISTANCE_CM * base.eyeSpan) / head.eyeSpan;
+  const dxCm = -(head.eyes.x - base.eyes.x) * cmPerUnit - distance * Math.tan(head.yaw - base.yaw);
+  const dyCm = (head.eyes.y - base.eyes.y) * cmPerUnit + distance * Math.tan(head.pitch - base.pitch);
+  const clip = (v: number) => Math.max(-MAX_SHIFT, Math.min(MAX_SHIFT, v));
+  return { x: clip((dxCm * CSS_PX_PER_CM) / viewport.width), y: clip((dyCm * CSS_PX_PER_CM) / viewport.height) };
+}
+
+/** Screen point (fraction of the viewport, clamped to 0..1) for one gaze sample. */
+export function applyCalibration(model: CalibrationModel, eye: Point2, head: HeadPose, viewport: Viewport): Point2 {
+  const f = features(eye, model.quadratic);
   const dot = (w: number[]) => w.reduce((sum, wi, i) => sum + wi * f[i]!, 0);
+  const shift = headShift(model.head, head, viewport);
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
-  return { x: clamp(dot(model.x)), y: clamp(dot(model.y)) };
+  return { x: clamp(dot(model.x) + shift.x), y: clamp(dot(model.y) + shift.y) };
 }

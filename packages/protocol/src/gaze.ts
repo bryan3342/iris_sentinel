@@ -7,9 +7,14 @@ import type { Point2, Unsubscribe } from './face';
  */
 
 export interface HeadPose {
-  /** Head rotation in radians. */
+  /** Head turn in radians, positive toward the user's left. */
   yaw: number;
+  /** Head tilt in radians, positive downward. */
   pitch: number;
+  /** Midpoint of the outer eye corners, in the same image units as the eye feature. */
+  eyes: Point2;
+  /** Distance between the outer eye corners, same units. Shrinks as the user moves away. */
+  eyeSpan: number;
 }
 
 export interface GazeSample {

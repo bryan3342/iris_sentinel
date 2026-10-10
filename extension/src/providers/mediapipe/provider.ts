@@ -18,7 +18,7 @@ async function createLandmarker(): Promise<FaceLandmarker> {
 export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
-  private lastHead: HeadPose = { yaw: 0, pitch: 0 };
+  private lastHead: HeadPose = { yaw: 0, pitch: 0, eyes: { x: 0, y: 0 }, eyeSpan: 0 };
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
   private readonly traceListeners = new Set<(points: Point2[]) => void>();
 

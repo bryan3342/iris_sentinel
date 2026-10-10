@@ -44,6 +44,20 @@ function frame(
 /** Both irises moved by the same image offset. */
 const both = (by: Point2) => frame({}, { right: shift(RIGHT, by), left: shift(LEFT, by) });
 
+/** The whole eye moved by an image offset, iris staying centered: the head moved, the gaze did not. */
+const move = (eye: EyeShape, by: Point2): EyeShape => ({
+  corners: [{ x: eye.corners[0].x + by.x, y: eye.corners[0].y + by.y }, { x: eye.corners[1].x + by.x, y: eye.corners[1].y + by.y }],
+});
+
+/** 4x4 transform with rotation `r` (3x3, row-indexed) and translation `t`, in either layout. */
+const columnMajor = (r: number[][], t: [number, number, number]) =>
+  [0, 1, 2].flatMap((col) => [r[0]![col]!, r[1]![col]!, r[2]![col]!, 0]).concat([...t, 1]);
+const rowMajor = (r: number[][], t: [number, number, number]) =>
+  [0, 1, 2].flatMap((row) => [...r[row]!, t[row]!]).concat([0, 0, 0, 1]);
+const aboutVertical = (a: number) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]];
+const aboutHorizontal = (a: number) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]];
+const withMatrix = (matrix: number[]): FaceFrame => ({ ...frame(), matrix });
+
 describe('toGazeSample', () => {
   it('reads centered irises as looking straight ahead', () => {
     const { eye } = toGazeSample(frame(), 0);
@@ -101,6 +115,44 @@ describe('toGazeSample', () => {
     const { head } = toGazeSample(frame(), 0);
     expect(head.yaw).toBeCloseTo(0);
     expect(head.pitch).toBeCloseTo(0);
+  });
+
+  it('reads a turn about the vertical axis as yaw and a tilt about the horizontal axis as pitch', () => {
+    const turned = toGazeSample(withMatrix(columnMajor(aboutVertical(0.2), [0, 0, -60])), 0).head;
+    expect(turned.yaw).toBeCloseTo(0.2);
+    expect(turned.pitch).toBeCloseTo(0);
+    const tilted = toGazeSample(withMatrix(columnMajor(aboutHorizontal(0.1), [0, 0, -60])), 0).head;
+    expect(tilted.pitch).toBeCloseTo(0.1);
+    expect(tilted.yaw).toBeCloseTo(0);
+  });
+
+  it('reads the same pose whether the matrix is column-major or row-major', () => {
+    const [r, t] = [aboutVertical(0.2), [1, 2, -60] as [number, number, number]];
+    const a = toGazeSample(withMatrix(columnMajor(r, t)), 0).head;
+    const b = toGazeSample(withMatrix(rowMajor(r, t)), 0).head;
+    expect(b.yaw).toBeCloseTo(a.yaw);
+    expect(b.pitch).toBeCloseTo(a.pitch);
+  });
+
+  it('places the head at the outer eye corners', () => {
+    const { head } = toGazeSample(frame(), 0);
+    expect(head.eyes).toEqual({ x: 0.5, y: 0.4 });
+    expect(head.eyeSpan).toBeCloseTo(0.4);
+  });
+
+  it('moves the head position, not the eye feature, when the whole face shifts', () => {
+    const by = { x: 0.1, y: 0.05 };
+    const { eye, head } = toGazeSample(frame({}, { right: move(RIGHT, by), left: move(LEFT, by) }), 0);
+    expect(eye?.x).toBeCloseTo(0);
+    expect(eye?.y).toBeCloseTo(0);
+    expect(head.eyes.x).toBeCloseTo(0.6);
+    expect(head.eyes.y).toBeCloseTo(0.45);
+    expect(head.eyeSpan).toBeCloseTo(0.4);
+  });
+
+  it('reports no head position when the eye corners are missing', () => {
+    const empty: FaceFrame = { landmarks: [], blendshapes: {}, matrix: IDENTITY, aspect: 1 };
+    expect(toGazeSample(empty, 0).head.eyeSpan).toBe(0);
   });
 
   it('returns no eye position when landmarks are missing', () => {
