@@ -4,6 +4,16 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
+**Implementation status: v0.1 private-demo MVP.** The extension has a camera
+preview plus an explicit-request page-understanding harness. The Worker implements
+authenticated screenshot/target matching, visible-viewport summaries and local
+image-crop descriptions. It remains disabled by default and has not been deployed
+by this change. Presage companion, ElevenLabs, browser actions and the
+confirmation state machine below remain future work. Page understanding is built
+and tested independently of ElevenLabs. Contracts and exact limits are in
+[page-understanding-protocol.md](page-understanding-protocol.md); account and
+manual-demo prerequisites are in [page-understanding-readiness.md](page-understanding-readiness.md).
+
 ---
 
 ## 1. Context
@@ -110,14 +120,20 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 ```
 User speaks ─> ElevenLabs Agent (side panel, signed session from Worker)
                  └─ calls client tool, for example find_target("history section")
-                      └─ coordinator asks page helper for screenshot + numbered target list
-                      └─ Worker /gemini ─> Gemini ─> "target 12"
+                      └─ helper supplies viewport targets, masks and document revision
+                      └─ coordinator captures viewport through Chrome, masks locally
+                      └─ authenticated Worker /v0.1/page-understanding/find_target
+                           ─> Gemini ─> validated supplied target ID or null
                  └─ highlights target 12, asks for confirm
 User confirms (breath / blink / dwell) ─> page helper clicks target 12
 Agent: "Opening History."
 ```
 
-**Client tools exposed to the agent:** `click_target(n)`, `scroll(direction)`, `find_target(description)`, `summarize_page()`, `describe_image(n)`, `set_pace(slower|faster)`.
+**Future client tools:** `find_target(description)`, `summarize_page()`,
+`describe_image(n)`, `scroll(direction)`, `set_pace(slower|faster)`, and a
+confirmation-gated target proposal. A future `click_target(n)` tool may only
+enqueue an Iris confirmation request; it may never execute directly. Page and
+model text are untrusted, and tool results never include screenshot bytes.
 
 **Local milestone:** `POST /gemini/find-target` accepts a text request and numbered
 target labels, calls Gemini through the server's `PageUnderstanding.findTarget`
@@ -126,11 +142,25 @@ testing uses `wrangler dev` on localhost in one terminal and `curl` in another.
 Keys stay in the ignored server `.dev.vars` bindings. Labels are sent only when
 the tester submits a request; inputs and model responses are not logged or
 stored. This milestone has no screenshot input, browser client, or click action.
-The documented screenshot-plus-target flow remains the next integration step.
+This compatibility milestone precedes the authenticated v0.1 implementation.
 The local endpoint has no session authentication or rate limiting and must not
 be deployed until those protections are implemented.
 
-**Safety rule.** Anything that submits, pays or deletes always needs an explicit confirm, even when the agent proposes it.
+**Safety rule.** Every browser click requires Iris confirmation, even when the
+agent proposes it. Gemini recommends/explains only. The confirmation and browser
+action flow is separate from this server milestone; there is no click executor.
+
+**v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
+sensitive rectangles and revisions. Chrome capture runs through the background
+broker. The side-panel coordinator owns transient mask/crop canvases, capture
+consistency checks and plain-text results. The background owns runtime-only demo session tokens and authenticated HTTP. It rejects broker
+messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
+there is no database or distributed coordination in this smaller MVP. The Worker
+validates bounded PNGs and model output independently of the Gemini schema.
+Only the visible viewport is understood; summaries deterministically disclose
+this. Describe-image sends a locally masked crop for a revision-bound image ID,
+never a URL to fetch. Unsupported frames/custom controls/video/animations and
+pinch zoom fail closed; detectable capture races and stale results are discarded.
 
 ### 3.3 Data handling rules
 
@@ -138,8 +168,27 @@ be deployed until those protections are implemented.
 - Heart, breathing and blink data live in memory only.
 - If Tiger Data is enabled: strictly opt-in, minute-level fatigue summaries only, anonymous session ID, write key held by the Worker.
 - All API keys live in Worker secrets. The extension holds none. The one exception is the Presage key, which the SDK needs on-device: the companion reads it from the operating system keychain at startup, holds it in memory only, and never writes it to code, logs or config files.
-- Page screenshots sent to Gemini are taken only on a user request and are not stored.
-- The Worker rate-limits each session to protect paid quotas.
+- Page screenshots/crops are sent only on an explicit user request. Iris handles
+  them transiently in memory: no logging, persistence, caching, queues or
+  observability payload capture. Detectable editable fields are masked locally;
+  masking cannot guarantee removal of all private information. Incognito and
+  restricted browser pages are blocked. Camera video still never leaves the laptop.
+- Google has separate data-handling/retention rules. The actual project's terms,
+  logging/sharing and retention configuration must be verified before real browsing
+  content is used; Iris does not promise zero provider retention.
+- Private-demo access uses operator-provisioned, participant-specific random
+  tokens with a fixed 15-minute expiry; only hashes/expiry are configured server-side.
+  Tokens are privately handed to verified participants and entered at runtime.
+  The extension embeds no vendor keys/shared reusable secrets and persists no
+  credentials. Background restarts require re-entry of the still-valid token.
+- The Worker bounds inputs, outputs, streamed parsing and deadlines. Per Worker
+  instance: one in-flight request/session, 2/minute/session and 10/session, with
+  no automatic retries/renewal. Cold starts reset counters and different instances
+  enforce independently. Global concurrency/rate limits and participant daily
+  quotas are deferred to the team's authentication/storage work. No database,
+  Durable Object, KV binding, migration or IndexedDB is introduced by this MVP.
+- The reported $60 Gemini credits and auto-reload-off belief are unverified.
+  Verify billing before relying on it; an exact global spending cap is deferred.
 
 ---
 
@@ -172,6 +221,12 @@ be deployed until those protections are implemented.
 ---
 
 ## 5. Directory Tree
+
+The tree below includes future modules. Currently implemented page understanding
+lives in `extension/src/page-understanding/` (helper, coordinator, masking and
+session client), `server/src/{access,http,png,multimodal,fake-page-understanding}.ts`,
+and `packages/protocol/src/page-understanding.ts`. Tests include synthetic fixtures,
+direct adapters/routes, capture races and a database-free local Worker run.
 
 ```
 iris_sentinel/
