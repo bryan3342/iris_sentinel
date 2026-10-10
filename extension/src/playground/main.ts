@@ -1,7 +1,9 @@
 import { CalibrationStore } from '@iris/core';
 import type { GazeSample } from '@iris/protocol';
+import { MediaPipePointerProvider } from '../providers/mediapipe/hand-provider';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { GazeDot } from '../sidepanel/gaze-dot';
+import { PointerDot } from '../sidepanel/pointer-dot';
 import { runCalibration } from '../sidepanel/setup/calibration';
 import { clearSamples, loadSamples, saveSamples } from '../sidepanel/setup/calibration-storage';
 import { openCamera } from '../sidepanel/setup/camera';
@@ -12,7 +14,7 @@ import { EyeTrace } from '../sidepanel/trace';
 // for this screen is used right away; otherwise calibration starts once a face
 // is steady. Clicking stands in for a confirm gesture: the click position is a
 // confirmed target and refines the fit. Press R to redo the dots, X to forget
-// everything saved. Add ?dots=5 for 5 dots.
+// everything saved, F to add a blue finger pointer. Add ?dots=5 for 5 dots.
 const STEADY_SAMPLES = 30; // about one second of a tracked face before calibrating
 
 const stage = document.getElementById('stage')!;
@@ -28,10 +30,12 @@ let store = new CalibrationStore();
 let dot: GazeDot | null = null;
 let stopDot: (() => void) | null = null;
 let calibrating = false;
+let pointer: { provider: MediaPipePointerProvider; dot: PointerDot } | null = null;
 
 function trackingHud(): void {
   const confirms = store.samples.filter((s) => s.source === 'confirm').length;
-  hud.textContent = `Tracking your gaze. Click where you look to refine (${confirms} confirms). R: redo dots. X: forget.`;
+  const finger = pointer ? ' F: finger off.' : ' F: finger on.';
+  hud.textContent = `Tracking your gaze. Click where you look to refine (${confirms} confirms). R: redo dots. X: forget.${finger}`;
 }
 
 function showDot(provider: MediaPipeGazeProvider): void {
@@ -62,6 +66,24 @@ async function calibrate(provider: MediaPipeGazeProvider): Promise<void> {
   }
 }
 
+/** Starts or stops the finger pointer: a blue circle that follows the index fingertip like a trackpad. */
+async function toggleFinger(): Promise<void> {
+  if (pointer) {
+    pointer.provider.stop();
+    pointer.dot.remove();
+    pointer = null;
+    trackingHud();
+    return;
+  }
+  hud.textContent = 'Loading hand tracking...';
+  const provider = new MediaPipePointerProvider(video);
+  const fingerDot = new PointerDot(stage);
+  provider.onSample((sample) => fingerDot.update(sample));
+  await provider.start();
+  pointer = { provider, dot: fingerDot };
+  trackingHud();
+}
+
 /** Resolves once the face has been tracked for a short unbroken stretch. */
 function waitForSteadyFace(provider: MediaPipeGazeProvider): Promise<void> {
   return new Promise((resolve) => {
@@ -88,6 +110,7 @@ async function start(): Promise<void> {
   document.addEventListener('keydown', (event) => {
     const k = event.key.toLowerCase();
     if (k === 'r') void calibrate(provider);
+    if (k === 'f') void toggleFinger();
     if (k === 'x') {
       void clearSamples();
       store = new CalibrationStore();

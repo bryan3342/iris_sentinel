@@ -48,6 +48,7 @@ Track and technology choices behind this design are in [tracks.md](tracks.md).
 | Interface | Implementations |
 | :--- | :--- |
 | `GazeProvider` (where the user looks) | MediaPipe, simulated |
+| `PointerProvider` (where the user's index finger is, for users with some hand control) | MediaPipe Hand Landmarker, simulated |
 | `FaceProvider` (blinks, talking, expressions, motion warning, face points) | Presage companion, simulated |
 | `VitalsProvider` (breathing wave, HR, HRV) | Presage companion, simulated |
 | `VoiceAgent` | ElevenLabs Agents |
@@ -89,6 +90,8 @@ Webcam ─> Side panel: MediaPipe Face Landmarker ─> calibration fit
 **Camera sharing.** The companion and the side panel each open the webcam. Both must run at once; this is verified on every target machine before building on it. If it fails, the companion owns the camera, feeds Presage through its custom input path, and forwards downscaled frames to the side panel for MediaPipe over native messaging (each message to the extension is capped at 1 MB).
 
 **MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still; this is not a blink signal and never drives a confirm. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
+
+**Finger pointer.** For users who keep some hand control, MediaPipe Hand Landmarker runs on the same camera frames when this input is chosen and publishes the index fingertip as `PointerProvider` samples. A trackpad map turns it into a screen point: a small box in front of the user covers the whole viewport, so a few centimetres of hand travel sweep the screen, and a One Euro filter steadies it. Like gaze, it only aims; a confirm gesture still makes the click. The hand model ships inside the extension next to the face model, pinned by SHA-256, and hand landmarks never leave the page.
 
 **Fatigue score.** Combines slow body signals (blink rate up, heart rate variability down, breathing rate) with behavior (back-after-click rate, aim steadiness, time to click). It is computed against the user's own resting baseline, uses hysteresis so it does not flicker, and is paused while the user is talking.
 
@@ -185,7 +188,7 @@ iris_sentinel/
 │       │   ├── agent/           # ElevenLabs agent session and client tool definitions
 │       │   └── setup/           # permissions, lighting, calibration, breath practice
 │       ├── content/             # target finder, numbered overlay, click/scroll, enlarge, screenshot
-│       └── providers/           # MediaPipe gaze, simulated sensors
+│       └── providers/           # MediaPipe gaze and hand pointer, simulated sensors
 ├── companion/                   # Node.js helper running Presage
 │   ├── src/
 │   │   ├── presage/             # SDK session behind FaceProvider / VitalsProvider

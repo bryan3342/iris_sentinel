@@ -16,7 +16,7 @@ From the repository root:
 npm install
 ```
 
-The first `npm run dev`, `npm run dev:ext` or `npm run build` also prepares eye tracking: it copies the MediaPipe runtime from `node_modules` and downloads the face model (about 4 MB) into `extension/public/mediapipe/`, checking its SHA-256. Later runs reuse the file. This folder is not committed.
+The first `npm run dev`, `npm run dev:ext` or `npm run build` also prepares eye tracking: it copies the MediaPipe runtime from `node_modules` and downloads the face and hand models (about 12 MB together) into `extension/public/mediapipe/`, checking their SHA-256. Later runs reuse the file. This folder is not committed.
 
 ## Run the tests
 
@@ -38,6 +38,7 @@ This opens http://localhost:5173 as a full-window gaze tracking view. Allow the 
 3. A red circle then shows where you are looking. It holds steady while your eyes rest on one spot and jumps when you look somewhere new.
 4. Click where you are looking to refine the fit. In the product a confirm gesture (breath, long blink or dwell on a numbered target) plays this role; in the playground a click stands in for it. A click far from where the tracker thinks you are looking is ignored.
 5. The calibration is saved for this screen in the page's local storage, so a reload tracks right away without the dots. Press **R** to redo the dots, for example after moving to a different screen, and **X** to forget the saved calibration.
+6. Press **F** to add a blue finger pointer. Hold your index finger up in front of the camera and move it a few centimetres: the blue circle sweeps the screen like a trackpad cursor. Press **F** again to turn it off.
 
 Webcam gaze lands within roughly 100 to 200 px of where you look on a laptop screen, which is why Iris snaps to the nearest link or button rather than relying on the exact point. The page must stay visible (Chrome pauses the camera in hidden tabs). Saved calibration data is a few hundred numbers (eye positions, head pose and dot positions), never frames, and it never leaves your computer.
 
