@@ -11,11 +11,12 @@ const page = (): PageSnapshot => ({ documentToken: 'document_abcdefghijklmnop', 
   targets: [{ id: 1, role: 'button', rect: { x: 0, y: 0, width: 1, height: 1 } }],
   targetsTruncated: false, images: [{ id: 1, rect: { x: 0, y: 0, width: 2, height: 2 } }], masks: [], blocked: false });
 type Send = (message: any) => Promise<any>;
-let current: PageSnapshot, tabId: number, send: ReturnType<typeof vi.fn<Send>>;
+let current: PageSnapshot, tabId: number, send: ReturnType<typeof vi.fn<Send>>, events: string[], overlayReply: string;
 const event = () => ({ addListener: vi.fn(), removeListener: vi.fn() });
 beforeEach(() => {
-  current = page(); tabId = 1;
+  current = page(); tabId = 1; events = []; overlayReply = 'SHOWN';
   send = vi.fn(async message => {
+    events.push(message.type);
     if (message.type === 'iris.page.capture') return { ok: true, value: 'data:image/png;base64,AAAA' };
     if (message.type === 'iris.page.cancel') return { ok: true, value: null };
     return { ok: true, value: { protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
@@ -25,7 +26,12 @@ beforeEach(() => {
   vi.stubGlobal('chrome', {
     tabs: { query: vi.fn(async () => [{ id: tabId, windowId: 1, url: 'https://example.com' }]), onActivated: event(), onUpdated: event() },
     windows: { get: vi.fn(async () => ({ focused: true })), onFocusChanged: event() },
-    scripting: { executeScript: vi.fn(async () => [{ frameId: 0, result: structuredClone(current) }]) },
+    scripting: { executeScript: vi.fn(async ({ func, args }) => {
+      if (func.name !== 'pageOverlay') return [{ frameId: 0, result: structuredClone(current) }];
+      events.push(`overlay.${args[0].type}`);
+      if (args[0].type === 'show') events.push(JSON.stringify([args[0].documentToken, args[0].revision, args[0].highlight]));
+      return [{ frameId: 0, result: args[0].type === 'show' ? overlayReply : 'CLEARED' }];
+    }) },
     runtime: { sendMessage: send },
   });
 });
@@ -74,4 +80,12 @@ it('an invented model ID is rejected at the client boundary', async () => {
     return response;
   });
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow();
+});
+it('clears the overlay before capture and highlights only the validated target afterwards', async () => {
+  const response = await new PageCoordinator().inspect(find);
+  expect(response.highlighted).toBe(true);
+  expect(events).toEqual(['overlay.clear', 'iris.page.capture', 'iris.page.understand', 'overlay.show',
+    JSON.stringify([current.documentToken, current.revision, 1])]);
+  overlayReply = 'STALE'; events = [];
+  expect((await new PageCoordinator().inspect(find)).highlighted).toBe(false);
 });

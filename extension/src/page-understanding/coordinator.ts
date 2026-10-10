@@ -1,4 +1,5 @@
 import { LIMITS, validateInput, validateResult, type Operation, type PageResult } from '@iris/protocol';
+import { pageOverlay, type OverlayCommand, type OverlayResult } from '../content/overlay';
 import { assertSameSnapshot, eligibleTab, prepareImage, validateSnapshot } from './capture';
 import { pageSnapshot, type PageSnapshot } from './page-helper';
 import { gatewayUrl } from './session';
@@ -23,6 +24,10 @@ async function snapshot(tabId: number): Promise<PageSnapshot> {
   if (result.blocked) throw new Error('UNSUPPORTED_PAGE');
   return result;
 }
+async function overlay(tabId: number, command: OverlayCommand): Promise<OverlayResult | undefined> {
+  const results = await chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [command] });
+  return results[0]?.result as OverlayResult | undefined;
+}
 /** Iris coordinator. UI owns temporary canvases; background owns sessions and HTTP. */
 export class PageCoordinator {
   private pending?: { requestId: string; controller: AbortController };
@@ -32,7 +37,7 @@ export class PageCoordinator {
     this.pending.controller.abort();
     void broker({ type: 'iris.page.cancel', requestId: this.pending.requestId }).catch(() => {});
   }
-  async inspect(request: DemoRequest): Promise<{ result: PageResult; targetsTruncated: boolean }> {
+  async inspect(request: DemoRequest): Promise<{ result: PageResult; targetsTruncated: boolean; highlighted: boolean }> {
     if (this.pending) throw new Error('REQUEST_IN_FLIGHT');
     const requestId = crypto.randomUUID(), controller = new AbortController();
     this.pending = { requestId, controller };
@@ -55,6 +60,8 @@ export class PageCoordinator {
       if (request.operation === 'find_target' && !before.targets.length) throw new Error('NO_TARGETS');
       const selected = request.operation === 'describe_image' ? before.images.find(i => i.id === request.imageId) : undefined;
       if (request.operation === 'describe_image' && !selected) throw new Error('IMAGE_NOT_FOUND');
+      // Gemini sees the page itself, never Iris's own numbers or highlight.
+      await overlay(tabId, { type: 'clear' });
       const captured = await broker({ type: 'iris.page.capture', tabId, windowId: tab.windowId });
       signal.throwIfAborted();
       if (typeof captured !== 'string') throw new Error('INVALID_CAPTURE');
@@ -81,7 +88,11 @@ export class PageCoordinator {
       }, 250);
       const result = validateResult(await broker({ type: 'iris.page.understand', gateway, input }), input);
       await check();
-      return { result, targetsTruncated: before.targetsTruncated };
+      // Drawing only; the overlay refuses if the page changed since the snapshot. Nothing clicks.
+      const targetId = result.result.operation === 'find_target' ? result.result.targetId : null;
+      const highlighted = targetId !== null && await overlay(tabId, { type: 'show', documentToken: before.documentToken,
+        revision: before.revision, targets: before.targets, highlight: targetId }).then(r => r === 'SHOWN', () => false);
+      return { result, targetsTruncated: before.targetsTruncated, highlighted };
     } catch (error) {
       if (signal.aborted) throw new Error('PAGE_CHANGED_OR_CANCELLED');
       throw error;
