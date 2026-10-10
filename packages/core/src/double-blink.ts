@@ -20,9 +20,10 @@ type Segment = { aim: number | null; since: number };
  * Double blink: a click the moment the eyes open after two quick blinks of both eyes. The target
  * is locked as the first blink starts, from the aim that had held still for `steadyMs` just
  * before: a change in the last moments is the closing lids distorting the iris reading, so the
- * earlier aim wins, and nothing after that moment can redirect the click. A single blink, a wink
- * (one eye), a closure longer than a quick blink, blinks too far apart, or no steady aim before
- * the first blink never clicks. Each click needs two fresh blinks.
+ * earlier aim wins, and nothing after that moment can redirect the click. With no steady aim
+ * before the first blink the confirm carries a null target: nothing is clicked unless a target was
+ * picked another way (by voice). A single blink, a wink (one eye), a closure longer than a quick
+ * blink, or blinks too far apart is no double blink at all. Each click needs two fresh blinks.
  *
  * The camera holds back the start of every blink, so each closure is timed from the last open
  * sample, not the first closed one.
@@ -80,7 +81,7 @@ export class DoubleBlinkDetector {
     }
     const { target } = this.first;
     this.first = null;
-    return target === null ? null : { t: sample.t, source: 'double-blink', target };
+    return { t: sample.t, source: 'double-blink', target };
   }
 
   /** Forgets any blinks in progress, for example when the page's targets change under them. */

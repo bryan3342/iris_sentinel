@@ -6,6 +6,8 @@ const HINTS: Record<string, string> = {
   REQUEST_FAILED: 'The Iris server is not running. In a terminal: cd server, then npm run dev.',
   INVALID_INPUT: 'Iris did not understand that request.',
   NO_HISTORY: 'There is no page to go to in that direction.',
+  NO_AIMING: 'Turn on Aim with my eyes or Point with the mouse first, so you can confirm.',
+  NO_SUCH_NUMBER: 'There is no target with that number on the page. Turn on Show numbers to see them.',
   UNAUTHENTICATED: SETUP,
   PAGE_NOT_ALLOWED: 'Use an ordinary web page in the focused window, and allow Iris on it.',
   UNSUPPORTED_PAGE: 'This page cannot be captured safely: it is zoomed, very large, or has video or embedded frames.',

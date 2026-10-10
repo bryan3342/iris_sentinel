@@ -57,12 +57,13 @@ describe('DoubleBlinkDetector', () => {
 
   it('does not fall back to an old target when the user had just moved to a new one', () => {
     // Moved from 4 to 5 about 0.15 s before blinking: too late to be steady, too early to be the lids.
-    expect(play([[150, 150], [150, 100]], { aimAt: (t) => (t >= 450 ? 5 : 4) }).events).toHaveLength(0);
+    expect(play([[150, 150], [150, 100]], { aimAt: (t) => (t >= 450 ? 5 : 4) }).events.map((e) => e.target)).toEqual([null]);
   });
 
-  it('does not click without a steady aim before the first blink', () => {
-    expect(play([[150, 150], [150, 100]], { aimAt: (t) => Math.floor(t / FRAME) % 3 }).events).toHaveLength(0);
-    expect(play([[150, 150], [150, 100]], { aimAt: () => null }).events).toHaveLength(0);
+  it('reports a double blink with no target when nothing was aimed steadily before it', () => {
+    // Nothing is clicked unless a target was picked another way, such as by voice.
+    expect(play([[150, 150], [150, 100]], { aimAt: (t) => Math.floor(t / FRAME) % 3 }).events.map((e) => e.target)).toEqual([null]);
+    expect(play([[150, 150], [150, 100]], { aimAt: () => null }).events.map((e) => e.target)).toEqual([null]);
   });
 
   it('needs two fresh blinks for each click', () => {

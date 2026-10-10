@@ -16,8 +16,11 @@ export interface ConfirmEvent {
   /** Timestamp in milliseconds, on the gaze samples' clock. */
   t: number;
   source: ConfirmSource;
-  /** The target confirmed, when the method locked it earlier than the confirm itself. */
-  target?: number;
+  /**
+   * The target confirmed, when the method locked it earlier than the confirm itself; null when the
+   * method found no target to lock (nothing is selected unless one was picked another way).
+   */
+  target?: number | null;
 }
 
 /** Where confirm events from every method meet. */

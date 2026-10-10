@@ -281,4 +281,79 @@ describe('confirming with a double blink', () => {
     gaze.stop();
     provider.stop();
   });
+
+  describe('a target picked by voice', () => {
+    const away = { x: 0.5, y: 0.95 }; // far from every target: nothing is aimed
+    const eyesOn = (point: Point2, blinking: boolean) => (t: number): GazeSample =>
+      ({ t, eye: eyeFor(point), head: SIMULATED_HEAD, blink: blinking ? { left: 0.9, right: 0.9 } : { left: 0.05, right: 0.05 } });
+    /** Looks at `point`, blinking twice quickly starting at `blinkAt` ms. */
+    const doubleBlinkAt = (point: Point2, blinkAt: number) => (t: number) =>
+      eyesOn(point, (t > blinkAt && t <= blinkAt + 150) || (t > blinkAt + 300 && t <= blinkAt + 450))(t);
+    function picking(script: (t: number) => GazeSample, learn = false) {
+      const provider = new ScriptedEyes(script);
+      const store = new CalibrationStore();
+      store.setDots(simulatedCalibration(), VIEWPORT);
+      const selected: number[] = [];
+      let learned = 0;
+      const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+        select: async (_list, target) => { selected.push(target.id); return 'SELECTED'; },
+        learn, onLearned: () => { learned++; },
+      });
+      return { provider, gaze, selected, learned: () => learned };
+    }
+
+    it('opens with a double blink wherever the user is looking, and is marked on the page', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 1000));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500); // the page's targets have arrived
+      expect(gaze.arm(99)).toBe(false); // no such number
+      expect(gaze.arm(3)).toBe(true);
+      expect(sent.at(-1)!.command).toMatchObject({ type: 'show', armed: 3 });
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(selected).toEqual([3]);
+      expect(sent.at(-1)!.command).toMatchObject({ armed: null }); // picked targets clear once selected
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('never teaches the calibration, since the eyes were not on that target', async () => {
+      const { provider, gaze, selected, learned } = picking(doubleBlinkAt(away, 1000), true);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(selected).toEqual([3]);
+      expect(learned()).toBe(0);
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('expires after ten seconds, so a later double blink opens nothing', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 11_000));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      await vi.advanceTimersByTimeAsync(11_200);
+      expect(selected).toEqual([]);
+      gaze.stop();
+      provider.stop();
+    });
+
+    it('is dropped when a page change moves that number to another place', async () => {
+      const { provider, gaze, selected } = picking(doubleBlinkAt(away, 1500));
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      gaze.arm(3);
+      targets = TARGETS.map((t) => (t.id === 3 ? { ...t, rect: { ...t.rect, y: 400 } } : t));
+      revision++;
+      await vi.advanceTimersByTimeAsync(1300);
+      expect(selected).toEqual([]);
+      gaze.stop();
+      provider.stop();
+    });
+  });
 });

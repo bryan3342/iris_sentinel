@@ -1,7 +1,7 @@
 import type { NumberedTarget, Point2 } from '@iris/protocol';
 
 export type OverlayCommand =
-  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; pending?: number | null }
+  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; pending?: number | null; armed?: number | null }
   | { type: 'clear' }
   | { type: 'hold' }
   | { type: 'release' }
@@ -45,6 +45,8 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
       .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }
       .aim.again { border: 4px dashed #b00020; outline-color: #fff; }
       .again-note { position: fixed; padding: 2px 6px; font: bold 13px/18px sans-serif; color: #fff; background: #b00020; border-radius: 3px; }
+      .aim.armed { border: 4px solid #1d4ed8; outline-color: #fff; }
+      .armed-note { position: fixed; padding: 2px 6px; font: bold 13px/18px sans-serif; color: #fff; background: #1d4ed8; border-radius: 3px; }
       .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); }
       .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
         background: #2dd4bf; border: 3px solid #fff; }
@@ -158,9 +160,10 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   for (const target of command.targets) {
     const aimed = target.id === command.highlight;
     const waiting = target.id === command.pending; // a risky target waiting for its second confirm
-    if (aimed || waiting) {
+    const armed = !waiting && target.id === command.armed; // picked by voice, waiting for the user's confirm
+    if (aimed || waiting || armed) {
       const box = document.createElement('div');
-      box.className = waiting ? 'aim again' : 'aim';
+      box.className = waiting ? 'aim again' : armed ? 'aim armed' : 'aim';
       Object.assign(box.style, { left: left(target.rect.x), top: top(target.rect.y), width: `${target.rect.width}px`, height: `${target.rect.height}px` });
       aim.push(box);
     }
@@ -168,6 +171,13 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
       const note = document.createElement('div');
       note.className = 'again-note';
       note.textContent = 'Look away and back to confirm';
+      Object.assign(note.style, { left: left(target.rect.x), top: top(target.rect.y + target.rect.height + 4) });
+      aim.push(note);
+    }
+    if (armed) {
+      const note = document.createElement('div');
+      note.className = 'armed-note';
+      note.textContent = 'Picked by voice: blink twice or rest on it to open';
       Object.assign(note.style, { left: left(target.rect.x), top: top(target.rect.y + target.rect.height + 4) });
       aim.push(note);
     }
