@@ -15,8 +15,12 @@ function extensionStorage(): chrome.storage.StorageArea | null {
 export async function loadSamples(): Promise<StoredSample[]> {
   const area = extensionStorage();
   const raw = area ? (await area.get(key()))[key()] : localStorage.getItem(key());
-  const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
-  return Array.isArray(parsed) ? (parsed as StoredSample[]) : [];
+  try {
+    const parsed: unknown = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? (parsed as StoredSample[]) : [];
+  } catch {
+    return []; // a damaged entry just means calibrating again
+  }
 }
 
 export async function saveSamples(samples: StoredSample[]): Promise<void> {
