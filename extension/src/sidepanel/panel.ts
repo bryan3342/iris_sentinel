@@ -1,5 +1,6 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { isExtensionPage, openCamera } from './setup/camera';
+import { EyeTrace } from './trace';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -21,7 +22,7 @@ export function mountPanel(root: HTMLElement): void {
   openCamera()
     .then((stream) => {
       video.srcObject = stream;
-      return startTracking(video, root, status);
+      return startTracking(video, preview, root, status);
     })
     .catch((error: unknown) => {
       if (video.srcObject) {
@@ -36,18 +37,17 @@ export function mountPanel(root: HTMLElement): void {
 
 async function startTracking(
   video: HTMLVideoElement,
+  preview: HTMLElement,
   root: HTMLElement,
   status: HTMLElement,
 ): Promise<void> {
   status.textContent = 'Loading eye tracking...';
   const provider = new MediaPipeGazeProvider(video);
-  const readout = document.createElement('p');
-  root.append(readout);
-  provider.onSample((sample) => {
-    const eye = sample.eye ? `x ${sample.eye.x.toFixed(2)}  y ${sample.eye.y.toFixed(2)}` : 'not tracked';
-    readout.textContent =
-      `Eyes ${eye} | Head yaw ${sample.head.yaw.toFixed(2)} pitch ${sample.head.pitch.toFixed(2)}`;
-  });
+  const trace = new EyeTrace();
+  preview.append(trace.overlay);
+  root.append(trace.readout);
+  provider.onTracePoints((points) => trace.drawPoints(points));
+  provider.onSample((sample) => trace.addSample(sample));
   await provider.start();
   status.textContent = 'Eye tracking on. Processing stays on this computer.';
 }

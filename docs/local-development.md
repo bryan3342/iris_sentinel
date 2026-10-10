@@ -52,7 +52,11 @@ After a rebuild, click the reload arrow on the Iris card in `chrome://extensions
 
 ## What you should see
 
-Once the camera is on, the panel shows **Eye tracking on** and a live readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
+Once the camera is on, the panel shows **Eye tracking on** and:
+
+- A bright red ring around each iris and a red dot at its center, drawn on the camera preview and following your eyes frame by frame.
+- A short fading red trail behind each iris showing where your eyes just moved. It only draws on screen; nothing is recorded.
+- A readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
 
 ## Troubleshooting
 

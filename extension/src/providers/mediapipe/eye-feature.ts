@@ -18,6 +18,8 @@ export interface FaceFrame {
 // Iris lists the center then its four contour points; averaging them steadies the center.
 const RIGHT_EYE = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133 };
 const LEFT_EYE = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263 };
+// Iris center then its four contour points, for each eye (user's right, then left).
+export const TRACE_POINTS = [468, 469, 470, 471, 472, 473, 474, 475, 476, 477];
 
 const BLINK_CLOSED = 0.5;
 const VERTICAL_SCALE = 5;
