@@ -53,6 +53,9 @@ const MAX_PULSE = 300;
 const MAX_BREATHING = 100;
 const MAX_HRV = 10_000;
 
+/** The largest value of each vitals reading the extension accepts; a sender drops anything above. */
+export const VITALS_LIMITS = { pulse: MAX_PULSE, breathing: MAX_BREATHING, hrv: MAX_HRV } as const;
+
 /** Thrown for a message that breaks the protocol. Never repeats the message, which may hold vitals. */
 export class CompanionMessageError extends Error {
   constructor() {

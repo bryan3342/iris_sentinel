@@ -57,6 +57,7 @@ describe('toReading', () => {
     expect(toReading({ value: undefined, confidence: 90 })).toBeNull();
     expect(toReading({ value: Number.NaN, confidence: 90 })).toBeNull();
     expect(toReading({ value: -1, confidence: 90 })).toBeNull();
+    expect(toReading({ value: 301, confidence: 90 }, 300)).toBeNull();
   });
 });
 
@@ -93,6 +94,19 @@ describe('VitalsWindow', () => {
     window.add({ cardio: { pulseRate: [{ value: null, confidence: 90, timestamp: 1 }] } });
     window.add({});
     expect(window.take()).toEqual({ pulse: null, breathing: null, hrv: null });
+  });
+
+  it('drops readings above the protocol bounds so the message stays valid', () => {
+    const window = new VitalsWindow();
+    window.add({
+      cardio: { pulseRate: [{ value: 500, confidence: 90, timestamp: 1 }], hrv: [{ rmssd: 20_000, confidence: 90, timestamp: 1 }] },
+      breathing: { rate: [{ value: 14, confidence: 90, timestamp: 1 }, { value: 250, confidence: 90, timestamp: 2 }] },
+    });
+    const taken = window.take();
+    expect(taken.pulse).toBeNull();
+    expect(taken.hrv).toBeNull();
+    expect(taken.breathing?.value).toBe(14);
+    expect(() => validateFromCompanion({ type: 'vitals', ...taken })).not.toThrow();
   });
 
   it('produces vitals the extension accepts', () => {
