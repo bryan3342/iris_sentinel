@@ -25,6 +25,14 @@ describe('FixationSmoother', () => {
     expect(smoother.push({ x: 910, y: 300 })).toEqual({ x: 905, y: 300 });
   });
 
+  it('ignores outside points that disagree with each other', () => {
+    const smoother = new FixationSmoother({ radius: 50, confirm: 3 });
+    smoother.push({ x: 500, y: 300 });
+    smoother.push({ x: 900, y: 300 });
+    smoother.push({ x: 100, y: 300 });
+    expect(smoother.push({ x: 900, y: 600 })).toEqual({ x: 500, y: 300 });
+  });
+
   it('only averages the most recent points', () => {
     const smoother = new FixationSmoother({ radius: 100, window: 2 });
     smoother.push({ x: 0, y: 0 });

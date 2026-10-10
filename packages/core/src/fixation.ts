@@ -45,6 +45,11 @@ export class FixationSmoother {
       this.pending = [];
       return centroid(this.fixation);
     }
+    // Outside points only count toward a jump while they agree with each other.
+    const pendingCenter = this.pending.length > 0 ? centroid(this.pending) : point;
+    if (Math.hypot(point.x - pendingCenter.x, point.y - pendingCenter.y) > this.radius) {
+      this.pending = [];
+    }
     this.pending.push(point);
     if (this.pending.length < this.confirm) return center; // hold until the jump is confirmed
     this.fixation = this.pending;
