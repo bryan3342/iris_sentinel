@@ -1,11 +1,11 @@
-import { CalibrationStore, GazeAim, GazePointer } from '@iris/core';
+import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, type AccuracyReport } from '@iris/core';
 import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
 import { GazeSession, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
-import { loadSamples, saveSamples } from './setup/calibration-storage';
-import { calibrateOnPage, screenFrame } from './setup/page-calibration';
+import { loadSamples, saveCheck, saveSamples, type AccuracyRecord } from './setup/calibration-storage';
+import { calibrateOnPage, checkOnPage, screenFrame } from './setup/page-calibration';
 import type { LiveTargetList } from './target-list';
 
 const POINTER_POLL_MS = 50;
@@ -24,6 +24,17 @@ function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; 
   const store = new CalibrationStore();
   store.setDots(simulatedCalibration(), screenSize());
   return { provider, store, stop: () => { clearInterval(timer); provider.stop(); } };
+}
+
+const round = (v: number) => Math.round(v);
+/** One check in plain words, with up to three earlier ones (other lid angles or seats) to compare against. */
+function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): string {
+  const { posture } = report;
+  const now = `Gaze lands ${round(report.meanPx)} px from where you look on average (${round(report.share * 100)}% of the screen width), ` +
+    `worst ${round(report.worstPx)} px; left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
+    `Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
+  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°)`);
+  return before.length ? `${now} Earlier checks: ${before.join(', ')}.` : now;
 }
 
 const OUTCOMES: Record<Outcome, string> = {
@@ -55,8 +66,10 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   const mouse = toggle('Point with the mouse');
   const calibrate = document.createElement('button');
   calibrate.textContent = 'Calibrate on this page';
+  const check = document.createElement('button');
+  check.textContent = 'Check accuracy';
   const report = (outcome: Outcome) => { status.textContent = OUTCOMES[outcome]; };
-  eyes.input.disabled = calibrate.disabled = true;
+  eyes.input.disabled = calibrate.disabled = check.disabled = true;
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void } | null = null;
 
@@ -72,7 +85,11 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   /** Aims with the camera through a calibration saved in screen positions. */
   const aimWithEyes = (provider: GazeProvider, store: CalibrationStore) => {
     eyes.input.checked = true;
-    active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, { frameFor: screenFrame, onOutcome: report }) };
+    active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, {
+      frameFor: screenFrame, onOutcome: report,
+      // Every gaze selection refines the calibration for the posture the user is in now.
+      learn: true, onLearned: () => void saveSamples(store.samples),
+    }) };
     active.session.start();
     status.textContent = 'Looking aims at the nearest number. Dwell on it for a second to select it.';
   };
@@ -118,6 +135,37 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
       calibrate.disabled = false;
     });
   });
+  check.addEventListener('click', () => {
+    if (!camera) return;
+    const provider = camera;
+    stop();
+    eyes.input.checked = mouse.input.checked = false;
+    const mine = generation;
+    check.disabled = true;
+    void (async () => {
+      const store = new CalibrationStore(await loadSamples(), screenSize());
+      if (!store.model) {
+        status.textContent = 'Calibrate on this page first.';
+        return;
+      }
+      const list = await targets.read().catch(() => null);
+      if (!list) {
+        status.textContent = 'Open a website in this tab, then check.';
+        return;
+      }
+      status.textContent = 'Look at each dot until it moves. This takes about 16 seconds.';
+      const samples = await checkOnPage(provider, list);
+      const result = measureAccuracy(store.model, samples, screenSize());
+      const checks = await saveCheck({ at: Date.now(), report: result, frame: screenSize(), samples });
+      if (mine !== generation) return;
+      aimWithEyes(provider, store);
+      status.textContent = describeCheck(result, checks.slice(0, -1));
+    })().catch(() => {
+      status.textContent = 'The check needs your face in view. Try again.';
+    }).finally(() => {
+      check.disabled = false;
+    });
+  });
   mouse.input.addEventListener('change', () => {
     stop();
     eyes.input.checked = false;
@@ -128,12 +176,12 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
   });
-  section.append(calibrate, eyes.label, mouse.label, status);
+  section.append(calibrate, check, eyes.label, mouse.label, status);
   return {
     element: section,
     useCamera(provider) {
       camera = provider;
-      eyes.input.disabled = calibrate.disabled = false;
+      eyes.input.disabled = calibrate.disabled = check.disabled = false;
     },
   };
 }

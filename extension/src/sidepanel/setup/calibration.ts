@@ -9,6 +9,8 @@ export const DOT_LAYOUTS: Record<5 | 9, Point2[]> = {
   5: [{ x: 0.5, y: 0.5 }, { x: 0.05, y: 0.05 }, { x: 0.95, y: 0.05 }, { x: 0.95, y: 0.95 }, { x: 0.05, y: 0.95 }],
   9: grid([0.05, 0.5, 0.95]),
 };
+/** Accuracy check dots: inside the calibration grid, so the check is not graded on the points the fit was made from. */
+export const CHECK_DOTS: Point2[] = grid([0.2, 0.5, 0.8]);
 const SETTLE_MS = 800; // skip the eyes' travel and settling onto the dot
 const COLLECT_MS = 1000;
 
@@ -66,16 +68,18 @@ async function presentDots(
 
 /**
  * Collects where the eyes were at each dot; targets are fractions of the area
- * the presenter draws in. The caller hands the samples to a CalibrationStore.
+ * the presenter draws in. Calibration hands the samples to a CalibrationStore;
+ * an accuracy check scores them against the current fit.
  */
-export async function runCalibration(
-  provider: GazeProvider,
-  presenter: DotPresenter,
-  dotCount: 5 | 9,
-): Promise<CalibrationSample[]> {
+export async function collectAtDots(provider: GazeProvider, presenter: DotPresenter, dots: Point2[]): Promise<CalibrationSample[]> {
   const samples: CalibrationSample[] = [];
-  await presentDots(presenter, provider, DOT_LAYOUTS[dotCount], (target, s) => {
+  await presentDots(presenter, provider, dots, (target, s) => {
     if (s.eye) samples.push({ eye: s.eye, head: s.head, target });
   });
   return samples;
+}
+
+/** Collects the calibration dots. */
+export function runCalibration(provider: GazeProvider, presenter: DotPresenter, dotCount: 5 | 9): Promise<CalibrationSample[]> {
+  return collectAtDots(provider, presenter, DOT_LAYOUTS[dotCount]);
 }

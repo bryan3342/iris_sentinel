@@ -1,4 +1,4 @@
-import type { GazeSample } from '@iris/protocol';
+import type { GazeSample, Point2 } from '@iris/protocol';
 import type { CalibrationFrame, GazePointer } from './gaze-pointer';
 import { snapToTarget, type SnapOptions, type SnapTarget } from './snap';
 
@@ -35,6 +35,15 @@ export class GazeAim {
     const point = this.pointer.point;
     this.aimed = point ? snapToTarget(point, targets, null, this.options) : null;
     return this.aimed;
+  }
+
+  /**
+   * The user selected the aimed target, whose center is `pixel` on the page: the eyes' last
+   * few samples teach the calibration that this is where they were looking. Returns whether
+   * the calibration accepted it.
+   */
+  learn(pixel: Point2): boolean {
+    return this.frame ? this.pointer.confirm(pixel, this.frame, true) : false;
   }
 
   /** Feeds one gaze sample; returns the aim after it. */

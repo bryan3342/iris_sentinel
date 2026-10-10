@@ -2,7 +2,7 @@ import type { CalibrationFrame, CalibrationSample } from '@iris/core';
 import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pageOverlay } from '../../content/overlay';
 import type { TargetList } from '../target-list';
-import { runCalibration, type DotPresenter } from './calibration';
+import { CHECK_DOTS, collectAtDots, DOT_LAYOUTS, type DotPresenter } from './calibration';
 
 // Calibration on the browsing tab, stored in screen positions: each dot is
 // saved as its place on the page plus the window's position on the screen.
@@ -32,10 +32,19 @@ function pagePresenter(tabId: number): DotPresenter {
   return { show: (dot) => send(dot), hide: () => send(null) };
 }
 
-/** Runs the dots over the page in `list`'s tab; returns samples whose targets are screen positions. */
-export async function calibrateOnPage(provider: GazeProvider, list: TargetList, dotCount: 5 | 9 = 9): Promise<CalibrationSample[]> {
+/** Runs the calibration dots over the page in `list`'s tab; returns samples whose targets are screen positions. */
+export function calibrateOnPage(provider: GazeProvider, list: TargetList, dotCount: 5 | 9 = 9): Promise<CalibrationSample[]> {
+  return dotsOnPage(provider, list, DOT_LAYOUTS[dotCount]);
+}
+
+/** Runs the accuracy check dots over the page; samples are in screen positions, like calibration's. */
+export function checkOnPage(provider: GazeProvider, list: TargetList): Promise<CalibrationSample[]> {
+  return dotsOnPage(provider, list, CHECK_DOTS);
+}
+
+async function dotsOnPage(provider: GazeProvider, list: TargetList, dots: Point2[]): Promise<CalibrationSample[]> {
   const frame = screenFrame(list);
-  const samples = await runCalibration(provider, pagePresenter(list.tabId), dotCount);
+  const samples = await collectAtDots(provider, pagePresenter(list.tabId), dots);
   const onScreen = (dot: Point2): Point2 => ({
     x: (dot.x * list.viewport.width + frame.left) / frame.width,
     y: (dot.y * list.viewport.height + frame.top) / frame.height,
