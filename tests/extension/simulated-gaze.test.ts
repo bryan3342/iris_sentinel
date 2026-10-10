@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyCalibration, CalibrationStore, FixationSmoother } from '@iris/core';
+import { applyCalibration, CalibrationStore, FixationSmoother, snapToTarget, type SnapTarget } from '@iris/core';
 import type { GazeSample, Point2 } from '@iris/protocol';
 import { DOT_LAYOUTS } from '../../extension/src/sidepanel/setup/calibration';
 import { eyeFor, scripted, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
@@ -101,5 +101,34 @@ describe('simulated gaze through calibration and smoothing', () => {
     await provider.start();
     vi.advanceTimersByTime(1000);
     expect(Math.hypot(point.x - target.x * VIEWPORT.width, point.y - target.y * VIEWPORT.height)).toBeLessThan(20);
+  });
+
+  it('settles on the page target the simulated user looks at and holds it', async () => {
+    const store = new CalibrationStore();
+    await calibrate(store);
+    // A row of links 140 px wide with 20 px gaps, like a navigation bar.
+    const targets: SnapTarget[] = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, rect: { x: 100 + i * 160, y: 300, width: 140, height: 32 } }));
+    const center = (t: SnapTarget): Point2 => ({ x: (t.rect.x + t.rect.width / 2) / VIEWPORT.width, y: (t.rect.y + t.rect.height / 2) / VIEWPORT.height });
+    const provider = new SimulatedGazeProvider(
+      scripted([
+        { at: center(targets[2]!), ms: 1000 },
+        { at: center(targets[5]!), ms: 1000 },
+      ]),
+      { noise: 0.02, seed: 5 },
+    );
+    const smoother = new FixationSmoother({ radius: 70 });
+    let aim: number | null = null;
+    const aims: { t: number; aim: number | null }[] = [];
+    provider.onSample((s) => {
+      const p = applyCalibration(store.model!, s.eye!, s.head, VIEWPORT);
+      const point = smoother.push({ x: p.x * VIEWPORT.width, y: p.y * VIEWPORT.height });
+      aim = snapToTarget(point, targets, aim, { maxDistance: 80, hysteresis: 20 });
+      aims.push({ t: s.t, aim });
+    });
+    await provider.start();
+    vi.advanceTimersByTime(2000);
+    // After a short settle, each look holds one steady aim on the intended target.
+    expect(new Set(aims.filter((a) => a.t >= 300 && a.t < 1000).map((a) => a.aim))).toEqual(new Set([3]));
+    expect(new Set(aims.filter((a) => a.t >= 1300).map((a) => a.aim))).toEqual(new Set([6]));
   });
 });
