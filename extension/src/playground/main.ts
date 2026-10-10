@@ -69,6 +69,11 @@ async function start(): Promise<void> {
   await calibrate(provider);
 }
 
-start().catch(() => {
+start().catch((error: unknown) => {
+  if (video.srcObject) {
+    hud.textContent = 'Eye tracking failed to start.';
+    console.error('Iris: eye tracking failed', error);
+    return;
+  }
   hud.textContent = 'Camera is off. Allow it from the camera icon in the address bar, then reload.';
 });
