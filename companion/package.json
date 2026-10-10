@@ -6,7 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/companion.mjs",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node20 --external:@smartspectra/* --outfile=dist/companion.mjs",
     "build:install": "esbuild install/main.ts --bundle --platform=node --format=esm --target=node20 --outfile=dist/install-macos.mjs",
     "install:host": "npm run build && npm run build:install && node dist/install-macos.mjs",
     "uninstall:host": "npm run build:install && node dist/install-macos.mjs --uninstall",

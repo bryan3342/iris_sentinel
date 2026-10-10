@@ -9,30 +9,20 @@ import {
   ValidationCode,
 } from '@smartspectra/node-sdk';
 import { decodeMetrics } from '@smartspectra/node-sdk/messages';
-import type { PresageMetrics } from './map';
 import { presageOptions } from './rules';
+import type { PresageEvents, PresageRun } from './sensing';
 
 // The one place the companion touches the Presage SDK. It opens the camera,
 // measures on the laptop, and reports through plain callbacks using Presage's
 // code names, which map.ts and rules.ts translate. It never logs, and never
 // calls requestInsight (LLM Insights), which would send measurements off the laptop.
 
-export interface PresageEvents {
-  /** Measuring has started. */
-  onRunning(): void;
-  /** Camera quality for one frame: a Presage validation code name and its hint. */
-  onQuality(codeName: string, hint: string): void;
-  onMetrics(metrics: PresageMetrics): void;
-  /** Presage failed, with its error code name. Not called while stopping. */
-  onError(codeName: string): void;
-}
-
 const STOP_STEP_MS = 5_000;
 
 const nameOf = (table: Record<string, number>, value: number) =>
   Object.keys(table).find((key) => table[key] === value) ?? 'unknown';
 
-export class PresageSession {
+export class PresageSession implements PresageRun {
   private readonly sdk: SmartSpectraSDK;
   private stopping = false;
 
