@@ -1,20 +1,7 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
-import ts from "typescript";
-
-// Load the actual TypeScript sources without emitting files or adding a test runner.
-async function moduleUrl(path, replacements = {}) {
-  const source = await readFile(new URL(path, import.meta.url), "utf8");
-  let output = ts.transpileModule(source, {
-    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  for (const [from, to] of Object.entries(replacements)) output = output.replaceAll(from, to);
-  return `data:text/javascript;base64,${Buffer.from(output).toString("base64")}`;
-}
-const providerUrl = await moduleUrl("../src/page-understanding.ts");
-const { GeminiPageUnderstanding } = await import(providerUrl);
-const { createWorker } = await import(await moduleUrl("../src/index.ts", { "./page-understanding": providerUrl }));
+import { modules } from './modules.mjs';
+const { GeminiPageUnderstanding, createWorker } = modules;
 const input = { request: "Find history", targets: [{ id: 1, label: "History", role: "link" }] };
 const env = { GEMINI_API_KEY: "test-placeholder" };
 const upstream = (selection, finishReason = "STOP") => Response.json({
