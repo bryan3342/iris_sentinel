@@ -68,3 +68,6 @@ button {
   border-radius: 50%;
   pointer-events: none;
 }
+
+.understanding input { display: block; width: 100%; box-sizing: border-box; margin: 12px 0; padding: 10px; }
+.understanding button { display: block; margin: 8px 0; }
