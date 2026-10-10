@@ -146,9 +146,34 @@ Enable `ENABLE_VOICE_AGENT=true`, configure `ELEVENLABS_AGENT_ID`, and put
 `ELEVENLABS_API_KEY` in ignored `.dev.vars` locally or a Worker secret in deployment.
 The agent must require authentication: the exact `EXTENSION_ORIGIN` on this
 computer, or a provisioned `DEMO_SESSIONS` token elsewhere.
+
+Both values have an exact form, and the wrong form is the most common setup error:
+
+- `ELEVENLABS_API_KEY` is the API key, which starts with `sk_` and is displayed
+  only when the key is created or rotated. The 64-character hexadecimal **API key
+  ID** shown in the dashboard key list is not a credential. Sending it returns
+  HTTP 400 `api_key_id_used_as_api_key` on every endpoint. The key needs
+  Conversational AI permission.
+- `ELEVENLABS_AGENT_ID` is the bare `agent_...` value. Copying it from a dashboard
+  URL can append `?branchId=...`, which is not part of the ID.
+
+Either wrong form fails closed as `503` before any upstream request, so a
+misconfiguration never spends a vendor call.
+
+To verify connectivity:
+
+```sh
+npm run check:elevenlabs
+```
+
+Success prints `ElevenLabs connection succeeded` with a shortened agent ID and
+confirms the minted URL passed the same validation the Worker applies. Minting
+does not start a conversation, so this spends no conversation minutes, but it is
+a real authenticated call to a live vendor API. The check prints no key, no
+upstream error body and never the signed URL.
 Success returns `{ "signedUrl": "wss://..." }` with `Cache-Control: no-store`.
 The URL is a credential for one conversation; do not log, save or share it.
 Minting shares the per-instance demo budget (2/minute, 10/session); this does not
 limit the resulting conversation's duration or spend. No automatic retries occur.
 `npm test` exercises mocked ElevenLabs responses without keys or paid API calls.
-This milestone supplies credentials only; the extension voice UI follows later.
+This endpoint supplies session credentials; browser client tools remain a later milestone.
