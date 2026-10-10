@@ -51,7 +51,17 @@ const OUTCOMES: Record<Outcome, string> = {
  * time. Looking aims; a dwell (one second on a target) confirms and selects it,
  * and a risky target needs a second confirm.
  */
-export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element: HTMLElement; useCamera(provider: GazeProvider): void } {
+/** What picking a target by voice led to: ready for the eyes' or the mouse's confirm, nothing aiming, or no such number. */
+export type PickResult = 'PICKED_EYES' | 'PICKED_MOUSE' | 'NO_AIMING' | 'NO_SUCH_NUMBER';
+
+export interface GazePanel {
+  element: HTMLElement;
+  useCamera(provider: GazeProvider): void;
+  /** Picks target `id` for the user's next confirm (see GazeSession.arm). */
+  pick(id: number): PickResult;
+}
+
+export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel {
   const section = document.createElement('section');
   section.className = 'gaze-aim';
   const status = document.createElement('p');
@@ -75,7 +85,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
   const cursor = new GazeCursor();
   const onGaze = (at: Point2 | null, list: { tabId: number }) => cursor.move(list.tabId, at);
   let camera: GazeProvider | null = null;
-  let active: { session: GazeSession; stop?: () => void } | null = null;
+  let active: { session: GazeSession; stop?: () => void; mouse?: boolean } | null = null;
 
   let generation = 0; // bumps on every stop, so a slow calibration load cannot start a stale session
 
@@ -177,7 +187,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     eyes.input.checked = false;
     if (!mouse.input.checked) return;
     const sim = mouseGaze(targets);
-    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze }), stop: sim.stop };
+    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze }), stop: sim.stop, mouse: true };
     active.session.start();
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
@@ -188,6 +198,11 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): { element:
     useCamera(provider) {
       camera = provider;
       eyes.input.disabled = calibrate.disabled = check.disabled = false;
+    },
+    pick(id) {
+      if (!active) return 'NO_AIMING';
+      if (!active.session.arm(id)) return 'NO_SUCH_NUMBER';
+      return active.mouse ? 'PICKED_MOUSE' : 'PICKED_EYES';
     },
   };
 }

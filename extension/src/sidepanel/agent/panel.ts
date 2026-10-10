@@ -2,15 +2,16 @@ import { broker, type PageCoordinator } from '../../page-understanding/coordinat
 import { GATEWAY } from '../../page-understanding/gateway';
 import { openMicrophone } from '../setup/microphone';
 import { elevenLabsVoice } from './elevenlabs';
+import type { GazePanel } from '../gaze-panel';
 import type { PageMarks } from '../page-marks';
 import { VoiceController } from './session';
 import { browserTools } from './tools';
 
-export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks }): HTMLElement {
+export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }): HTMLElement {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
-  notice.textContent = 'Start sends microphone audio to ElevenLabs for conversation and plays its replies. Say things like "scroll down", "go to the top", "go back", "summarize this", "what is this" or "find the sign-in link". Summaries and descriptions send the visible page to Gemini and their text to the voice agent. Iris never clicks for you: look at the number and hold your gaze to open it. Stop or close this panel to end the conversation.';
+  notice.textContent = 'Start sends microphone audio to ElevenLabs for conversation and plays its replies. Say things like "scroll down", "go to the top", "go back", "summarize this", "what is this", "find the sign-in link" or "click number 12". Summaries and descriptions send the visible page to Gemini and their text to the voice agent. Iris never clicks on its own: a found or named number is selected, and you open it by blinking twice. Stop or close this panel to end the conversation.';
   const start = document.createElement('button'); start.textContent = 'Start conversation';
   const stop = document.createElement('button'); stop.textContent = 'Stop conversation'; stop.disabled = true;
   const status = document.createElement('p'); status.setAttribute('role', 'status');

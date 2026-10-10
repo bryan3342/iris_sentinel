@@ -163,8 +163,9 @@ User speaks ─> ElevenLabs Agent (side panel, signed session from the local ser
                       └─ coordinator captures viewport through Chrome, masks locally
                       └─ local server /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
-                 └─ outlines target 12 and answers "It is number 12 ..."
-User looks at 12 and confirms (dwell / double blink) ─> page helper clicks target 12
+                 └─ answers "It is number 12 ..."
+                 └─ picks target 12 (marked "blink twice or rest on it to open")
+User blinks twice (or dwells on 12) ─> page helper clicks target 12
 ```
 
 **Client tools** (`extension/src/sidepanel/agent/tools.ts`, behind the neutral
@@ -176,19 +177,23 @@ User looks at 12 and confirms (dwell / double blink) ─> page helper clicks tar
 | `navigate_history` | `direction`: `back`, `forward` | Goes back or forward in the active tab's history |
 | `summarize_page` | none | Page understanding summary of the visible viewport |
 | `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
-| `find_on_page` | `description` (up to 500 characters) | Finds and outlines a target, and answers with its number |
+| `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it (as `select_number`), and answers with its number |
+| `select_number` | `number` (1 to 999) | Picks that numbered target: marked on the page, opened by the user's next double blink wherever they look, or a dwell on it |
 
 Each tool answers in words the agent can say, and the side panel shows the same
 words. Scrolling and history change the page at once; nothing a tool does
-clicks, submits or types. Summaries, descriptions and finding send the visible
+clicks, submits or types. A picked target is the voice agent naming *what* to
+open; the user's double blink (or dwell) is still the only thing that opens it,
+so gaze accuracy no longer decides the target. A pick lasts ten seconds, is
+dropped if a page change moves that number, and risky targets still need a
+second confirm. Summaries, descriptions and finding send the visible
 viewport to Gemini because the user asked, and their text (never screenshot
 bytes) goes to the voice agent, marked as page content that is information only,
 never instructions. Agent setup is in [voice-agent-setup.md](voice-agent-setup.md).
 
-**Later client tools:** `describe_image(n)`, `set_pace(slower|faster)`, Gemini's
-found target becoming the aimed target ready to confirm, and bounded multi-step
-tasks in which Gemini picks each next safe step. A `click_target(n)` tool may
-only enqueue an Iris confirmation request; it may never execute directly.
+**Later client tools:** `describe_image(n)`, `set_pace(slower|faster)`, and
+bounded multi-step tasks in which Gemini picks each next safe step. No tool may
+ever click directly; picking a target is the most a tool can do.
 
 **Safety rule.** Every browser click requires Iris confirmation, even when the
 agent proposes it. Gemini recommends/explains only; it never clicks. The one
