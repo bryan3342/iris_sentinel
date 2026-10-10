@@ -24,4 +24,8 @@ export class FakePageUnderstanding implements PageUnderstanding {
     await this.ready(signal);
     return { operation: 'describe_image', imageId: input.imageId!, description: 'Synthetic provider: a visible image crop was supplied; no actual description was generated.' };
   }
+  async describeTarget(input: PageInput, signal: AbortSignal): Promise<Understanding> {
+    await this.ready(signal);
+    return { operation: 'describe_target', targetId: input.targetId!, description: 'Synthetic provider: an outlined target crop was supplied; no actual description was generated.' };
+  }
 }

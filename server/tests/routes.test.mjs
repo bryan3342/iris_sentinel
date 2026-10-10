@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { modules as m } from './modules.mjs';
 import { input, result, setup, request } from './fixtures.mjs';
-const provider = understand => ({ findTarget: understand, summarizePage: understand, describeImage: understand });
+const provider = understand => ({ findTarget: understand, summarizePage: understand, describeImage: understand, describeTarget: understand });
 
-for (const operation of ['find_target', 'summarize_page', 'describe_image']) {
+for (const operation of m.OPERATIONS) {
   test(`${operation}: authenticated route validates a synthetic screenshot`, async () => {
     const s = await setup(); let calls = 0;
     const worker = m.createWorker(provider(async data => { calls++; return result(data.operation); }));
