@@ -179,6 +179,18 @@ describe('ClosureTimer', () => {
     expect(timer.blinking(shut, 600)).toBe(false);
   });
 
+  it('still recognises a blink of the open eye while the other eye is held closed', () => {
+    const timer = new ClosureTimer();
+    const leftHeld = { eyeBlinkLeft: 0.9 };
+    timer.blinking(leftHeld, 0);
+    expect(timer.blinking(leftHeld, 700)).toBe(false); // left is closed, right is tracking
+    expect(timer.blinking(shut, 800)).toBe(true); // right blinks: hold
+    expect(timer.blinking(shut, 1000)).toBe(true);
+    expect(timer.blinking(leftHeld, 1100)).toBe(false); // right reopened: back to one-eye tracking
+    expect(timer.blinking(shut, 1700)).toBe(true); // right shuts again: a blink until proven longer
+    expect(timer.blinking(shut, 2200)).toBe(false); // right held shut too: both closed
+  });
+
   it('starts timing again after the eyes reopen', () => {
     const timer = new ClosureTimer();
     timer.blinking(shut, 0);
