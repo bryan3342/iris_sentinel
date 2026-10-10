@@ -28,6 +28,8 @@ export class MediaPipePointerProvider implements PointerProvider {
   stop(): void {
     if (this.frameRequest !== null) this.video.cancelVideoFrameCallback(this.frameRequest);
     this.frameRequest = null;
+    this.landmarker?.close(); // frees the model; start() builds a new one
+    this.landmarker = null;
   }
 
   onSample(listener: (sample: PointerSample) => void): Unsubscribe {

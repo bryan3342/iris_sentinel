@@ -31,6 +31,7 @@ let dot: GazeDot | null = null;
 let stopDot: (() => void) | null = null;
 let calibrating = false;
 let pointer: { provider: MediaPipePointerProvider; dot: PointerDot } | null = null;
+let fingerLoading = false;
 
 function trackingHud(): void {
   const confirms = store.samples.filter((s) => s.source === 'confirm').length;
@@ -75,12 +76,22 @@ async function toggleFinger(): Promise<void> {
     trackingHud();
     return;
   }
+  if (fingerLoading) return; // a second F press while the model loads would start a second provider
+  fingerLoading = true;
   hud.textContent = 'Loading hand tracking...';
   const provider = new MediaPipePointerProvider(video);
   const fingerDot = new PointerDot(stage);
   provider.onSample((sample) => fingerDot.update(sample));
-  await provider.start();
-  pointer = { provider, dot: fingerDot };
+  try {
+    await provider.start();
+    pointer = { provider, dot: fingerDot };
+  } catch (error) {
+    provider.stop();
+    fingerDot.remove();
+    console.error('Hand tracking failed to start', error);
+  } finally {
+    fingerLoading = false;
+  }
   trackingHud();
 }
 
