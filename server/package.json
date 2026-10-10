@@ -1,0 +1,15 @@
+{
+  "name": "@iris/server",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "wrangler dev --ip 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "check:gemini": "node --env-file=.dev.vars scripts/check-gemini.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.0.0"
+  }
+}
