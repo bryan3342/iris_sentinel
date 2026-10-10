@@ -24,7 +24,7 @@ Try these cases, allowing for the two-request/minute limit shared by all operati
 | --- | --- |
 | Find `History` | Synthetic no-match response; no actual Gemini match, no click, no highlight. A real match draws every target number on the page and outlines the recommended target; scrolling or any page change erases them |
 | Summarize | Explicit `Visible viewport only:` disclosure and synthetic response |
-| Turn on the mouse stand-in, rest on a button for a second, then click **What is this?** | `Target N:` and a synthetic description; nothing clicked. Without resting on a target first: `NO_AIMED_TARGET` |
+| Turn on **Point with the mouse**, rest on a button for a second, then click **What is this?** | `Target N:` and a synthetic description; nothing clicked. Without resting on a target first: `NO_AIMED_TARGET` |
 | Third request within a minute | `RATE_LIMITED`, no automatic retry |
 | List image numbers, then describe image 1 after the minute window clears | Synthetic crop description; no URL fetching |
 | Describe an image before listing or after scrolling/changing the page | Rejected image list/stale snapshot |

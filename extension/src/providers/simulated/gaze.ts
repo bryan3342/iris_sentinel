@@ -3,8 +3,8 @@ import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@i
 
 // A camera-free GazeProvider. It drives "Point with the mouse" in the side
 // panel, where the look source is the mouse pointer, and scripted looks in
-// tests. A look source says where the user is looking (a fraction of the screen, or null while
-// the eyes are closed or the face is out of view); the provider turns that into
+// tests. A look source says where the user is looking (a fraction of the screen,
+// or null while the eyes are closed or the face is out of view); the provider turns that into
 // eye samples through a fixed eye model, with optional webcam-like jitter from a
 // seeded generator so a run repeats exactly. The head stays still and level, and
 // the eyes always read open, so a null look never counts as a long blink.
