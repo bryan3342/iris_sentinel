@@ -1,6 +1,6 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
-import type { FaceProvider, FaceSample, Unsubscribe } from '@iris/protocol';
-import { toFaceSample } from './eye-feature';
+import type { GazeProvider, GazeSample, Unsubscribe } from '@iris/protocol';
+import { toGazeSample } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -14,11 +14,11 @@ async function createLandmarker(): Promise<FaceLandmarker> {
   });
 }
 
-/** FaceProvider backed by MediaPipe Face Landmarker, run on every video frame. */
-export class MediaPipeFaceProvider implements FaceProvider {
+/** GazeProvider backed by MediaPipe Face Landmarker, run on every video frame. */
+export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
-  private readonly sampleListeners = new Set<(sample: FaceSample) => void>();
+  private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
 
   constructor(private readonly video: HTMLVideoElement) {}
 
@@ -32,7 +32,7 @@ export class MediaPipeFaceProvider implements FaceProvider {
     this.frameRequest = null;
   }
 
-  onSample(listener: (sample: FaceSample) => void): Unsubscribe {
+  onSample(listener: (sample: GazeSample) => void): Unsubscribe {
     this.sampleListeners.add(listener);
     return () => this.sampleListeners.delete(listener);
   }
@@ -51,7 +51,7 @@ export class MediaPipeFaceProvider implements FaceProvider {
     if (!landmarks) return;
     const blendshapes: Record<string, number> = {};
     for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
-    const sample = toFaceSample(
+    const sample = toGazeSample(
       {
         landmarks,
         blendshapes,

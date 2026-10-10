@@ -52,7 +52,7 @@ After a rebuild, click the reload arrow on the Iris card in `chrome://extensions
 
 ## What you should see
 
-Once the camera is on, the panel shows **Eye tracking on** and a live readout of eye position (look right and `x` rises, look down and `y` rises), blink per eye (near 1 while closed) and whether you are talking.
+Once the camera is on, the panel shows **Eye tracking on** and a live readout of eye position (look right and `x` rises, look down and `y` rises) and head turn. Eye position shows "not tracked" while your eyes are closed.
 
 ## Troubleshooting
 

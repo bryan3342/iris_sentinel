@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point2 } from '@iris/protocol';
-import { type FaceFrame, toFaceSample } from '../../extension/src/providers/mediapipe/eye-feature';
+import { type FaceFrame, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -21,51 +21,44 @@ function frame(irisShift: Point2 = { x: 0, y: 0 }, blendshapes: Record<string, n
   return { landmarks, blendshapes, matrix: IDENTITY, aspect: 1 };
 }
 
-describe('toFaceSample', () => {
+describe('toGazeSample', () => {
   it('reads centered irises as looking straight ahead', () => {
-    const { eye } = toFaceSample(frame(), 0);
+    const { eye } = toGazeSample(frame(), 0);
     expect(eye?.x).toBeCloseTo(0);
     expect(eye?.y).toBeCloseTo(0);
   });
 
   it('reports positive x when the user looks to their right (image left)', () => {
-    expect(toFaceSample(frame({ x: -0.02, y: 0 }), 0).eye?.x).toBeGreaterThan(0);
+    expect(toGazeSample(frame({ x: -0.02, y: 0 }), 0).eye?.x).toBeGreaterThan(0);
   });
 
   it('reports positive y when the irises sit below the eye corners', () => {
-    expect(toFaceSample(frame({ x: 0, y: 0.01 }), 0).eye?.y).toBeGreaterThan(0);
+    expect(toGazeSample(frame({ x: 0, y: 0.01 }), 0).eye?.y).toBeGreaterThan(0);
   });
 
   it('blends look-down scores into the vertical position', () => {
-    const down = toFaceSample(frame(undefined, { eyeLookDownLeft: 0.6, eyeLookDownRight: 0.6 }), 0);
-    const up = toFaceSample(frame(undefined, { eyeLookUpLeft: 0.6, eyeLookUpRight: 0.6 }), 0);
+    const down = toGazeSample(frame(undefined, { eyeLookDownLeft: 0.6, eyeLookDownRight: 0.6 }), 0);
+    const up = toGazeSample(frame(undefined, { eyeLookUpLeft: 0.6, eyeLookUpRight: 0.6 }), 0);
     expect(down.eye?.y).toBeGreaterThan(0);
     expect(up.eye?.y).toBeLessThan(0);
   });
 
   it('drops the eye position while both eyes are closed', () => {
-    const sample = toFaceSample(frame(undefined, { eyeBlinkLeft: 0.9, eyeBlinkRight: 0.8 }), 0);
-    expect(sample.eye).toBeNull();
-    expect(sample.blink).toEqual({ left: 0.9, right: 0.8 });
+    expect(toGazeSample(frame(undefined, { eyeBlinkLeft: 0.9, eyeBlinkRight: 0.8 }), 0).eye).toBeNull();
   });
 
   it('keeps tracking through a one-eye wink', () => {
-    expect(toFaceSample(frame(undefined, { eyeBlinkLeft: 0.9 }), 0).eye).not.toBeNull();
-  });
-
-  it('flags talking from an open jaw', () => {
-    expect(toFaceSample(frame(undefined, { jawOpen: 0.4 }), 0).talking).toBe(true);
-    expect(toFaceSample(frame(undefined, { jawOpen: 0.05 }), 0).talking).toBe(false);
+    expect(toGazeSample(frame(undefined, { eyeBlinkLeft: 0.9 }), 0).eye).not.toBeNull();
   });
 
   it('reads a level head from the identity transform', () => {
-    const { head } = toFaceSample(frame(), 0);
+    const { head } = toGazeSample(frame(), 0);
     expect(head.yaw).toBeCloseTo(0);
     expect(head.pitch).toBeCloseTo(0);
   });
 
   it('returns no eye position when landmarks are missing', () => {
     const empty: FaceFrame = { landmarks: [], blendshapes: {}, matrix: IDENTITY, aspect: 1 };
-    expect(toFaceSample(empty, 5)).toMatchObject({ t: 5, eye: null });
+    expect(toGazeSample(empty, 5)).toMatchObject({ t: 5, eye: null });
   });
 });

@@ -1,6 +1,6 @@
-import type { FaceSample, Point2 } from '@iris/protocol';
+import type { GazeSample, HeadPose, Point2 } from '@iris/protocol';
 
-// Pure conversion from Face Landmarker output to a neutral FaceSample. Kept
+// Pure conversion from Face Landmarker output to a neutral GazeSample. Kept
 // free of MediaPipe imports so it can be unit tested with plain fixtures.
 
 export interface FaceFrame {
@@ -20,7 +20,6 @@ const RIGHT_EYE = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133 }
 const LEFT_EYE = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263 };
 
 const BLINK_CLOSED = 0.5;
-const TALKING_JAW_OPEN = 0.15;
 const VERTICAL_SCALE = 5;
 
 function eyeOffset(frame: FaceFrame, eye: typeof RIGHT_EYE): Point2 | null {
@@ -48,22 +47,20 @@ function eyeOffset(frame: FaceFrame, eye: typeof RIGHT_EYE): Point2 | null {
   return { x: 2 * along - 1, y: across * VERTICAL_SCALE };
 }
 
-function headPose(m: number[]): FaceSample['head'] {
+function headPose(m: number[]): HeadPose {
   const [r20 = 0, r21 = 0, r22 = 1] = [m[2], m[6], m[10]];
   return { yaw: Math.asin(Math.max(-1, Math.min(1, -r20))), pitch: Math.atan2(r21, r22) };
 }
 
-export function toFaceSample(frame: FaceFrame, t: number): FaceSample {
-  const blink = {
-    left: frame.blendshapes.eyeBlinkLeft ?? 0,
-    right: frame.blendshapes.eyeBlinkRight ?? 0,
-  };
-  const closed = blink.left > BLINK_CLOSED && blink.right > BLINK_CLOSED;
+export function toGazeSample(frame: FaceFrame, t: number): GazeSample {
+  // Closed eyes only suppress the gaze point so aiming holds still. This is not
+  // a blink signal: blinks come from FaceProvider (Presage).
+  const b = frame.blendshapes;
+  const closed = (b.eyeBlinkLeft ?? 0) > BLINK_CLOSED && (b.eyeBlinkRight ?? 0) > BLINK_CLOSED;
   const right = eyeOffset(frame, RIGHT_EYE);
   const left = eyeOffset(frame, LEFT_EYE);
   // Up/down from landmarks is weak (the lids hide the iris), so blend in the
   // model's own look-down minus look-up scores, averaged over both eyes.
-  const b = frame.blendshapes;
   const lookDown =
     ((b.eyeLookDownLeft ?? 0) + (b.eyeLookDownRight ?? 0) - (b.eyeLookUpLeft ?? 0) - (b.eyeLookUpRight ?? 0)) / 2;
   // Image x grows toward the user's left, so flip it: positive x is the user's right.
@@ -71,11 +68,5 @@ export function toFaceSample(frame: FaceFrame, t: number): FaceSample {
     closed || !right || !left
       ? null
       : { x: -(right.x + left.x) / 2, y: ((right.y + left.y) / 2 + lookDown) / 2 };
-  return {
-    t,
-    eye,
-    head: headPose(frame.matrix),
-    blink,
-    talking: (frame.blendshapes.jawOpen ?? 0) > TALKING_JAW_OPEN,
-  };
+  return { t, eye, head: headPose(frame.matrix) };
 }

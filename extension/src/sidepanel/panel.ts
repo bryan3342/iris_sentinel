@@ -1,4 +1,4 @@
-import { MediaPipeFaceProvider } from '../providers/mediapipe/provider';
+import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { isExtensionPage, openCamera } from './setup/camera';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
@@ -41,14 +41,13 @@ async function startTracking(
   status: HTMLElement,
 ): Promise<void> {
   status.textContent = 'Loading eye tracking...';
-  const provider = new MediaPipeFaceProvider(video);
+  const provider = new MediaPipeGazeProvider(video);
   const readout = document.createElement('p');
   root.append(readout);
   provider.onSample((sample) => {
     const eye = sample.eye ? `x ${sample.eye.x.toFixed(2)}  y ${sample.eye.y.toFixed(2)}` : 'not tracked';
     readout.textContent =
-      `Eyes ${eye} | Blink L ${sample.blink.left.toFixed(2)} R ${sample.blink.right.toFixed(2)} | ` +
-      `Talking ${sample.talking ? 'yes' : 'no'}`;
+      `Eyes ${eye} | Head yaw ${sample.head.yaw.toFixed(2)} pitch ${sample.head.pitch.toFixed(2)}`;
   });
   await provider.start();
   status.textContent = 'Eye tracking on. Processing stays on this computer.';
