@@ -22,7 +22,7 @@ Try these cases, allowing for the two-request/minute limit shared by all operati
 
 | Try | Expected |
 | --- | --- |
-| Find `History` | Synthetic no-match response; no actual Gemini match, no click |
+| Find `History` | Synthetic no-match response; no actual Gemini match, no click, no highlight. A real match draws every target number on the page and outlines the recommended target; scrolling or any page change erases them |
 | Summarize | Explicit `Visible viewport only:` disclosure and synthetic response |
 | Third request within a minute | `RATE_LIMITED`, no automatic retry |
 | List image numbers, then describe image 1 after the minute window clears | Synthetic crop description; no URL fetching |

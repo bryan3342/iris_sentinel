@@ -27,7 +27,7 @@ export function understandingPanel(): HTMLElement {
   const inspect = async (operation: Operation) => {
     const response = await coordinator.inspect({ gateway: gateway.value, operation, request: request.value, imageId: Number(imageId.value) });
     const result = response.result.result;
-    output.textContent = result.operation === 'find_target' ? `${result.targetId === null ? 'No clear match.' : `Recommended target ${result.targetId}. Iris confirmation is required before any future click.`} ${result.explanation}${response.targetsTruncated ? ' Target list was limited to 100.' : ''}`
+    output.textContent = result.operation === 'find_target' ? `${result.targetId === null ? 'No clear match.' : `Recommended target ${result.targetId}.${response.highlighted ? ' It is highlighted on the page.' : ''} Iris confirmation is required before any future click.`} ${result.explanation}${response.targetsTruncated ? ' Target list was limited to 100.' : ''}`
       : result.operation === 'summarize_page' ? result.summary : `Visible image crop ${result.imageId}: ${result.description}`;
   };
   const cancel = document.createElement('button'); cancel.textContent = 'Cancel'; cancel.addEventListener('click', () => coordinator.cancel());

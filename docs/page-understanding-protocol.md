@@ -40,7 +40,8 @@ other than 1) is blocked in the current capture helper.
 Each target has a unique positive safe-integer `id`, `role: "link"|"button"`,
 `rect`, and an optional nonempty `label` (at most 200 characters). Icon-only
 targets omit the label. The extension masks the bitmap first, resizes, then
-draws target IDs into the screenshot. Gemini never supplies click coordinates.
+draws target IDs into the screenshot. Iris's on-page number overlay is erased
+before every capture, so the bitmap shows only the page. Gemini never supplies click coordinates.
 Up to 100 visible targets are supplied; `targetsTruncated` discloses truncation.
 
 An image is `{mimeType: "image/png", data: <canonical base64>, width, height}`.

@@ -7,13 +7,21 @@ export interface PageSnapshot {
 
 /** Runs in Chrome's isolated world. Must remain self-contained for executeScript. */
 export function pageSnapshot(): PageSnapshot {
-  type State = { documentToken: string; revision: number };
-  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: State };
+  // onChange is set by Iris's own overlay (content/overlay.ts) to erase its drawing on the next page change.
+  type State = { documentToken: string; revision: number; onChange?: () => void };
+  const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: State; __irisOverlayV01?: { host: Element } };
+  const overlay = () => host.__irisOverlayV01?.host;
   if (!host.__irisUnderstandingV01) {
     const state: State = { documentToken: crypto.randomUUID(), revision: 0 };
     host.__irisUnderstandingV01 = state;
-    const change = () => { state.revision++; };
-    new MutationObserver(change).observe(document.documentElement, { subtree: true, attributes: true, characterData: true, childList: true });
+    const change = () => {
+      state.revision++;
+      const notify = state.onChange; state.onChange = undefined; notify?.();
+    };
+    // Mounting the overlay is Iris's own change, not the page's. Redraws happen inside its shadow root, which is not observed.
+    const ours = (r: MutationRecord) => r.target === overlay() ||
+      (r.type === 'childList' && r.addedNodes.length + r.removedNodes.length > 0 && [...r.addedNodes, ...r.removedNodes].every(n => n === overlay()));
+    new MutationObserver(records => { if (!records.every(ours)) change(); }).observe(document.documentElement, { subtree: true, attributes: true, characterData: true, childList: true });
     new ResizeObserver(change).observe(document.documentElement);
     for (const event of ['scroll', 'resize', 'input', 'change', 'load', 'transitionrun', 'animationstart']) addEventListener(event, change, true);
     visualViewport?.addEventListener('scroll', change);
@@ -42,6 +50,7 @@ export function pageSnapshot(): PageSnapshot {
     scanned += elements.length;
     if (scanned > 10_000) { blocked = true; return; }
     for (const el of elements) {
+      if (el === overlay()) continue;
       const rect = rectOf(el);
       if (!rect) continue;
       if (el.shadowRoot) walk(el.shadowRoot);
