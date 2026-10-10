@@ -13,5 +13,6 @@ export type { CalibrationFrame, GazePointerOptions } from './gaze-pointer';
 export { DEFAULT_SNAP, GazeAim } from './gaze-aim';
 export { ConfirmChannel, DwellDetector } from './confirm';
 export type { ConfirmEvent, ConfirmSource, DwellOptions } from './confirm';
+export { InMemorySessionStore } from './session-store';
 export { SelectionGate } from './selection';
 export type { GateTarget, Selection, SelectionGateOptions } from './selection';
