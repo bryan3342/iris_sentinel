@@ -1,4 +1,4 @@
-import { ConfirmChannel, DwellDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
+import { ConfirmChannel, DwellDetector, LongBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
 import type { GazeProvider, Point2, Unsubscribe } from '@iris/protocol';
 import { pageSelect, type SelectResult } from '../content/select';
 import type { PageMarks } from './page-marks';
@@ -51,6 +51,7 @@ const isRisky = (target: Target) => target.risky !== false; // a missing flag ne
 export class GazeSession {
   readonly confirms = new ConfirmChannel();
   private readonly dwell = new DwellDetector();
+  private readonly longBlink = new LongBlinkDetector();
   private readonly gate = new SelectionGate();
   private readonly frameFor: (list: TargetList) => CalibrationFrame;
   private readonly select: Select;
@@ -82,7 +83,8 @@ export class GazeSession {
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
-        const event = this.dwell.update(sample, aimed);
+        // A dwell or a deliberate long blink confirms the aimed target; both go through the gate.
+        const event = this.dwell.update(sample, aimed) ?? this.longBlink.update(sample, aimed);
         if (event) this.confirms.emit(event);
         this.marks.setPending(this.gate.pending(sample.t));
       }),
@@ -95,6 +97,7 @@ export class GazeSession {
     this.stops.forEach((stop) => stop());
     this.stops = [];
     this.gate.reset();
+    this.longBlink.reset();
     this.marks.setPending(null);
     this.marks.follow(null);
     this.marks.stop();
