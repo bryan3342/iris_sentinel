@@ -3,7 +3,7 @@ import { LiveTargetList, type TargetList } from '../../extension/src/sidepanel/t
 
 const VIEWPORT = { width: 800, height: 600, offsetLeft: 0, offsetTop: 0, scale: 1, scrollX: 0, scrollY: 0 };
 interface Page { url: string; documentToken: string; revision: number; scanned: boolean }
-let tabs: Map<number, Page>, active: number, calls: string[];
+let tabs: Map<number, Page>, active: number, calls: string[], windowLeft: number;
 
 function page(url: string, documentToken: string): Page {
   return { url, documentToken, revision: 0, scanned: false };
@@ -14,8 +14,10 @@ beforeEach(() => {
   tabs = new Map([[1, page('https://example.com', 'document_one_abcdefghij')], [2, page('chrome://settings', 'document_two_abcdefghij')]]);
   active = 1;
   calls = [];
+  windowLeft = 0;
   vi.stubGlobal('chrome', {
-    tabs: { query: vi.fn(async () => [{ id: active, url: tabs.get(active)!.url }]) },
+    tabs: { query: vi.fn(async () => [{ id: active, windowId: 9, url: tabs.get(active)!.url }]) },
+    windows: { get: vi.fn(async () => ({ left: windowLeft, top: 40 })) },
     scripting: {
       executeScript: vi.fn(async ({ target, func }: { target: { tabId: number }; func: { name: string } }) => {
         const p = tabs.get(target.tabId)!;
@@ -89,5 +91,18 @@ describe('LiveTargetList', () => {
     await run(list, 1000);
     expect(calls).toHaveLength(count);
     expect(seen.at(-1)).toBeNull();
+  });
+
+  it('republishes the same targets with the new window position when the window moves, without rescanning', async () => {
+    const list = new LiveTargetList();
+    list.start();
+    await run(list, 300);
+    const before = list.list!;
+    windowLeft = 250;
+    await run(list, 300);
+    expect(list.list).not.toBe(before);
+    expect(list.list).toMatchObject({ window: { left: 250, top: 40 }, targets: before.targets, revision: before.revision });
+    expect(calls.filter((c) => c.startsWith('pageSnapshot'))).toHaveLength(1);
+    list.stop();
   });
 });

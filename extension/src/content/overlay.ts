@@ -1,8 +1,9 @@
-import type { NumberedTarget } from '@iris/protocol';
+import type { NumberedTarget, Point2 } from '@iris/protocol';
 
 export type OverlayCommand =
   | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null }
-  | { type: 'clear' };
+  | { type: 'clear' }
+  | { type: 'dot'; at: Point2 | null };
 export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
 
 /**
@@ -12,7 +13,8 @@ export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED';
  * through. The host is a plain div with a closed shadow root, mounted once and
  * redrawn only inside that root, so the page helper never counts a redraw as a
  * page change. A drawing is bound to one document revision and is erased by
- * the next page change.
+ * the next page change. For calibration it instead shows one still dot over a
+ * dimmed page, at a fraction of the visible viewport.
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
   type Understanding = { documentToken: string; revision: number; onChange?: () => void };
@@ -35,7 +37,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     return 'CLEARED';
   }
   const state = host.__irisUnderstandingV01;
-  if (!state || state.documentToken !== command.documentToken || state.revision !== command.revision) {
+  if (command.type === 'show' && (!state || state.documentToken !== command.documentToken || state.revision !== command.revision)) {
     clear();
     return 'STALE';
   }
@@ -49,11 +51,28 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
       .badge { position: fixed; padding: 0 4px; font: bold 13px/18px sans-serif; color: #000;
         background: #ffeb3b; border: 1px solid #000; border-radius: 3px; }
       .badge.aimed { font-size: 16px; line-height: 22px; background: #fff; }
-      .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }`;
+      .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }
+      .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); }
+      .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+        background: #2dd4bf; border: 3px solid #fff; }`;
     const layer = document.createElement('div');
     root.append(style, layer);
     host.__irisOverlayV01 = { host: element, layer };
     document.documentElement.append(element);
+  }
+  if (command.type === 'dot') {
+    if (state) state.onChange = undefined; // a page change must not erase a calibration dot
+    if (!command.at) {
+      host.__irisOverlayV01.layer.replaceChildren();
+      return 'CLEARED';
+    }
+    const shade = document.createElement('div');
+    shade.className = 'shade';
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    Object.assign(dot.style, { left: `${command.at.x * 100}%`, top: `${command.at.y * 100}%` });
+    host.__irisOverlayV01.layer.replaceChildren(shade, dot);
+    return 'SHOWN';
   }
   const vv = visualViewport;
   const left = (x: number) => `${x + (vv?.offsetLeft ?? 0)}px`;
@@ -75,6 +94,6 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   }
   // The aimed target is drawn last so neighboring badges never cover it.
   host.__irisOverlayV01.layer.replaceChildren(...drawing, ...aim);
-  state.onChange = clear;
+  state!.onChange = clear; // checked above: show requires the scanned document and revision
   return 'SHOWN';
 }

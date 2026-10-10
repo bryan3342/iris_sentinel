@@ -69,4 +69,19 @@ describe('page overlay', () => {
     expect(await pageOverlay({ type: 'clear' })).toBe('CLEARED');
     expect(drawn()).toHaveLength(0);
   });
+
+  it('shows one calibration dot that a page change does not erase, without moving the page counter', async () => {
+    const snapshot = pageSnapshot();
+    await show(snapshot, 1);
+    expect(await pageOverlay({ type: 'dot', at: { x: 0.25, y: 0.75 } })).toBe('SHOWN');
+    document.body.append(document.createElement('p'));
+    await settle();
+    const [shade, dot] = drawn();
+    expect(shade!.className).toBe('shade');
+    expect([dot!.className, dot!.style.left, dot!.style.top]).toEqual(['dot', '25%', '75%']);
+    expect(await pageOverlay({ type: 'dot', at: null })).toBe('CLEARED');
+    expect(drawn()).toHaveLength(0);
+    await settle();
+    expect(pageSnapshot().revision).toBe(snapshot.revision + 1); // only the page's own change counted
+  });
 });
