@@ -5,8 +5,11 @@ export type OverlayCommand =
   | { type: 'clear' }
   | { type: 'hold' }
   | { type: 'release' }
-  | { type: 'dot'; at: Point2 | null };
+  | { type: 'dot'; at: Point2 | null }
+  | { type: 'listen' };
 export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
+/** The connection over which the side panel streams the live gaze point to the page. */
+export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
 
 /**
  * Draws target numbers and one highlight over the page. Runs in Chrome's
@@ -19,15 +22,53 @@ export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
  * dimmed page, at a fraction of the visible viewport. A hold clears the page and
  * refuses every 'show' until released, so a screenshot never contains numbers drawn
  * by another part of Iris (gaze keeps redrawing while it aims).
+ *
+ * 'listen' starts the live gaze cursor: a red ring that follows the user's gaze,
+ * moved over a connection from the side panel instead of one injection per frame.
+ * It lives in the same closed shadow root, so page scripts cannot read where the
+ * user looks, and it hides for a screenshot, when the eyes close, and when the
+ * side panel disconnects.
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
   type Understanding = { documentToken: string; revision: number; onChange?: () => void };
-  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement };
+  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement; cursor: HTMLDivElement; listening?: boolean };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay; __irisOverlayHoldV01?: number };
+  const STYLE = `
+      .badge { position: fixed; padding: 0 4px; font: bold 13px/18px sans-serif; color: #000;
+        background: #ffeb3b; border: 1px solid #000; border-radius: 3px; }
+      .badge.aimed { font-size: 16px; line-height: 22px; background: #fff; }
+      .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }
+      .aim.again { border: 4px dashed #b00020; outline-color: #fff; }
+      .again-note { position: fixed; padding: 2px 6px; font: bold 13px/18px sans-serif; color: #fff; background: #b00020; border-radius: 3px; }
+      .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); }
+      .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
+        background: #2dd4bf; border: 3px solid #fff; }
+      .cursor { position: fixed; left: -24px; top: -24px; width: 48px; height: 48px; box-sizing: border-box;
+        border: 4px solid #ff2828; box-shadow: 0 0 12px #ff2828; border-radius: 50%; }`;
+  const held = () => (host.__irisOverlayHoldV01 ?? 0) > Date.now();
   const clear = () => {
-    const drawn = Boolean(host.__irisOverlayV01?.layer.firstChild);
-    host.__irisOverlayV01?.layer.replaceChildren();
+    const overlay = host.__irisOverlayV01;
+    const drawn = Boolean(overlay && (overlay.layer.firstChild || !overlay.cursor.hidden));
+    overlay?.layer.replaceChildren();
+    if (overlay) overlay.cursor.hidden = true;
     return drawn;
+  };
+  const mount = (): Overlay => {
+    if (host.__irisOverlayV01) return host.__irisOverlayV01;
+    const element = document.createElement('div');
+    element.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict';
+    const root = element.attachShadow({ mode: 'closed' });
+    const style = document.createElement('style');
+    // No transitions or animations: the page helper treats those as page changes.
+    style.textContent = STYLE;
+    const layer = document.createElement('div');
+    const cursor = document.createElement('div');
+    cursor.className = 'cursor';
+    cursor.hidden = true;
+    root.append(style, layer, cursor);
+    host.__irisOverlayV01 = { host: element, layer, cursor };
+    document.documentElement.append(element);
+    return host.__irisOverlayV01;
   };
   if (command.type === 'release') {
     delete host.__irisOverlayHoldV01;
@@ -46,37 +87,37 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     }
     return 'CLEARED';
   }
-  if (command.type === 'show' && (host.__irisOverlayHoldV01 ?? 0) > Date.now()) return 'HELD';
+  if (command.type === 'listen') {
+    const overlay = mount();
+    if (!overlay.listening) {
+      overlay.listening = true;
+      chrome.runtime.onConnect.addListener((port) => {
+        if (port.name !== 'iris.gaze-cursor') return; // GAZE_CURSOR_PORT; self-contained for executeScript
+        port.onMessage.addListener((message: unknown) => {
+          const at = (message as { at?: { x?: unknown; y?: unknown } | null } | null)?.at;
+          const valid = !!at && typeof at.x === 'number' && typeof at.y === 'number' && Number.isFinite(at.x) && Number.isFinite(at.y);
+          overlay.cursor.hidden = !valid || held();
+          if (valid && !held()) {
+            const vv = visualViewport;
+            overlay.cursor.style.transform = `translate(${(at.x as number) + (vv?.offsetLeft ?? 0)}px, ${(at.y as number) + (vv?.offsetTop ?? 0)}px)`;
+          }
+        });
+        port.onDisconnect.addListener(() => { overlay.cursor.hidden = true; });
+      });
+    }
+    return 'SHOWN';
+  }
+  if (command.type === 'show' && held()) return 'HELD';
   const state = host.__irisUnderstandingV01;
   if (command.type === 'show' && (!state || state.documentToken !== command.documentToken || state.revision !== command.revision)) {
     clear();
     return 'STALE';
   }
-  if (!host.__irisOverlayV01) {
-    const element = document.createElement('div');
-    element.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;contain:strict';
-    const root = element.attachShadow({ mode: 'closed' });
-    const style = document.createElement('style');
-    // No transitions or animations: the page helper treats those as page changes.
-    style.textContent = `
-      .badge { position: fixed; padding: 0 4px; font: bold 13px/18px sans-serif; color: #000;
-        background: #ffeb3b; border: 1px solid #000; border-radius: 3px; }
-      .badge.aimed { font-size: 16px; line-height: 22px; background: #fff; }
-      .aim { position: fixed; box-sizing: border-box; border: 4px solid #000; outline: 3px solid #ffeb3b; }
-      .aim.again { border: 4px dashed #b00020; outline-color: #fff; }
-      .again-note { position: fixed; padding: 2px 6px; font: bold 13px/18px sans-serif; color: #fff; background: #b00020; border-radius: 3px; }
-      .shade { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); }
-      .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
-        background: #2dd4bf; border: 3px solid #fff; }`;
-    const layer = document.createElement('div');
-    root.append(style, layer);
-    host.__irisOverlayV01 = { host: element, layer };
-    document.documentElement.append(element);
-  }
+  const overlay = mount();
   if (command.type === 'dot') {
     if (state) state.onChange = undefined; // a page change must not erase a calibration dot
     if (!command.at) {
-      host.__irisOverlayV01.layer.replaceChildren();
+      overlay.layer.replaceChildren();
       return 'CLEARED';
     }
     const shade = document.createElement('div');
@@ -84,7 +125,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     const dot = document.createElement('div');
     dot.className = 'dot';
     Object.assign(dot.style, { left: `${command.at.x * 100}%`, top: `${command.at.y * 100}%` });
-    host.__irisOverlayV01.layer.replaceChildren(shade, dot);
+    overlay.layer.replaceChildren(shade, dot);
     return 'SHOWN';
   }
   const vv = visualViewport;
@@ -114,7 +155,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     (aimed ? aim : drawing).push(badge);
   }
   // The aimed target is drawn last so neighboring badges never cover it.
-  host.__irisOverlayV01.layer.replaceChildren(...drawing, ...aim);
+  overlay.layer.replaceChildren(...drawing, ...aim);
   state!.onChange = clear; // checked above: show requires the scanned document and revision
   return 'SHOWN';
 }

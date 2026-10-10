@@ -1,5 +1,5 @@
 import { ConfirmChannel, DwellDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
-import type { GazeProvider, Unsubscribe } from '@iris/protocol';
+import type { GazeProvider, Point2, Unsubscribe } from '@iris/protocol';
 import { pageSelect, type SelectResult } from '../content/select';
 import type { PageMarks } from './page-marks';
 import type { TargetList } from './target-list';
@@ -24,6 +24,8 @@ export interface GazeSessionOptions {
   select?: Select;
   /** Told what each confirm led to, for the side panel's status line. */
   onOutcome?: (outcome: Outcome) => void;
+  /** Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face lost. */
+  onGaze?: (at: Point2 | null, list: TargetList) => void;
 }
 
 const isRisky = (target: Target) => target.risky !== false; // a missing flag never reads as safe
@@ -34,8 +36,9 @@ const isRisky = (target: Target) => target.risky !== false; // a missing flag ne
  * is aimed from the last gaze point before it is drawn. Dwell and any other
  * confirm method meet in `confirms`; each confirm goes through the selection
  * gate, so a safe target is selected at once and a risky one only after a
- * second confirm. Gaze points stay in the side panel; the page only learns
- * which target is aimed, and which to select. The caller owns the provider's
+ * second confirm. Snapping stays in the side panel; the page learns which
+ * target is aimed and which to select, and `onGaze` feeds the live cursor that
+ * Iris draws inside its closed overlay. The caller owns the provider's
  * lifecycle (the camera preview shares it).
  */
 export class GazeSession {
@@ -70,6 +73,7 @@ export class GazeSession {
       this.provider.onSample((sample) => {
         this.lastT = sample.t;
         const aimed = this.aim.update(sample);
+        if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
         const event = this.dwell.update(sample, aimed);
         if (event) this.confirms.emit(event);

@@ -1,4 +1,4 @@
-import type { GazeSample } from '@iris/protocol';
+import type { GazeSample, Point2 } from '@iris/protocol';
 import type { CalibrationFrame, GazePointer } from './gaze-pointer';
 import { snapToTarget, type SnapOptions, type SnapTarget } from './snap';
 
@@ -22,6 +22,11 @@ export class GazeAim {
     private readonly pointer: GazePointer,
     private readonly options: SnapOptions = DEFAULT_SNAP,
   ) {}
+
+  /** The latest smoothed gaze point in page pixels, or null before calibration has one. */
+  get point(): Point2 | null {
+    return this.pointer.point;
+  }
 
   /** The aimed target ID in the current list, or null. */
   get current(): number | null {
