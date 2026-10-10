@@ -61,7 +61,7 @@ only the visible portion is described. Image bytes contain no target overlay.
 | Explanation / summary / image description | 500 / 2000 / 1500 characters |
 | Gemini response | 256 KiB streamed; generated text at most 8192 characters before parsing |
 | Ingestion / upstream / request | 5 / 30 / 40 seconds |
-| Generation | 2048 maximum output tokens; one call, no retries/fallback |
+| Generation | 2048 maximum output tokens, low thinking; one call, no retries/fallback |
 
 JSON and image validation precede Gemini. Runtime output validation is
 independent of Gemini's structured-output schema and also applies to fake
@@ -71,7 +71,8 @@ IDs, invented target IDs and unknown generated fields fail validation.
 Errors are `{error: {code}}`, with no provider body, model text or credentials.
 Codes include `INVALID_INPUT`, `INVALID_IMAGE`, `USE_JSON`,
 `UNSUPPORTED_ENCODING`, `BODY_TOO_LARGE`, `UNAUTHENTICATED`, `FORBIDDEN`,
-`RATE_LIMITED`, `REQUEST_IN_FLIGHT`, `TIMEOUT`, `UPSTREAM_UNAVAILABLE`,
+`RATE_LIMITED`, `REQUEST_IN_FLIGHT`, `TIMEOUT`, `UPSTREAM_UNAVAILABLE` (busy or
+over quota), `UPSTREAM_REJECTED` (key, model or request format refused),
 `INVALID_MODEL_RESULT`, `NOT_CONFIGURED`, `DISABLED`, `CONTENT_NOT_APPROVED`,
 `UNAVAILABLE`, `USE_POST`, and `NOT_FOUND`. All responses use
 `Cache-Control: no-store`. Limit responses include `Retry-After`; clients do not
@@ -89,10 +90,12 @@ configuration, then hands the token privately to the verified participant.
 Never paste tokens into chat, source code, logs or shared fixtures.
 
 The participant enters the token at runtime in Iris's password field. The input
-is cleared immediately and the background holds it in memory only, scoped to the
-operator-provided gateway. There are no embedded vendor keys, reusable shared
-secrets, signing keys, IndexedDB or other credential persistence. Extension
-background restarts require re-entry of the still-valid token. Removing its
+is cleared immediately and the background keeps it in Chrome's session storage,
+scoped to the operator-provided gateway. Session storage lives in memory only,
+is hidden from content scripts, and survives Chrome stopping the idle background
+worker. There are no embedded vendor keys, reusable shared secrets, signing keys,
+IndexedDB or other on-disk credential persistence. Restarting Chrome or reloading
+the extension requires re-entry of the still-valid token. Removing its
 server entry revokes it. TLS is required except localhost. The server verifies
 expiry on every request and rejects provisioning more than 15 minutes ahead.
 

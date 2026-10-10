@@ -153,17 +153,6 @@ confirmation-gated target proposal. A future `click_target(n)` tool may only
 enqueue an Iris confirmation request; it may never execute directly. Page and
 model text are untrusted, and tool results never include screenshot bytes.
 
-**Local milestone:** `POST /gemini/find-target` accepts a text request and numbered
-target labels, calls Gemini through the server's `PageUnderstanding.findTarget`
-interface, and returns a validated target ID or null for no clear match. Local
-testing uses `wrangler dev` on localhost in one terminal and `curl` in another.
-Keys stay in the ignored server `.dev.vars` bindings. Labels are sent only when
-the tester submits a request; inputs and model responses are not logged or
-stored. This milestone has no screenshot input, browser client, or click action.
-This compatibility milestone precedes the authenticated v0.1 implementation.
-The local endpoint has no session authentication or rate limiting and must not
-be deployed until those protections are implemented.
-
 **Safety rule.** Every browser click requires Iris confirmation, even when the
 agent proposes it. Gemini recommends/explains only; it never clicks. The one
 place Iris clicks is the page helper's select step, after a confirm passes the
@@ -173,9 +162,10 @@ covered, and a risky element only after a second confirm, checked again in the
 page itself.
 
 **v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
-sensitive rectangles and revisions. Chrome capture runs through the background
-broker. The side-panel coordinator owns transient mask/crop canvases, capture
-consistency checks and plain-text results. The background owns runtime-only demo session tokens and authenticated HTTP. It rejects broker
+sensitive rectangles and revisions, and numbers targets exactly as the gaze scan
+does. Chrome capture runs through the background broker; during capture the
+overlay is held clear, so gaze cannot draw Iris's numbers into the screenshot. The side-panel coordinator owns transient mask/crop canvases, capture
+consistency checks and plain-text results. The background owns demo session tokens, kept in Chrome's memory-only session storage so they survive the idle worker restarting, and authenticated HTTP. It rejects broker
 messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
 there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.

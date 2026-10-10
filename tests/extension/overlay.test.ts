@@ -16,11 +16,13 @@ const show = (snapshot: { documentToken: string; revision: number }, highlight: 
   pageOverlay({ type: 'show', documentToken: snapshot.documentToken, revision: snapshot.revision, targets: TARGETS, highlight });
 
 beforeEach(() => {
+  vi.restoreAllMocks();
   // happy-dom has no visual viewport; Chrome always does. An unzoomed one, as the scanner requires.
   vi.stubGlobal('visualViewport', { width: innerWidth, height: innerHeight, offsetLeft: 0, offsetTop: 0, scale: 1, addEventListener() {} });
   g.__irisOverlayV01?.host.remove();
   delete g.__irisOverlayV01;
   delete g.__irisUnderstandingV01;
+  delete (g as { __irisOverlayHoldV01?: number }).__irisOverlayHoldV01;
   document.body.replaceChildren();
 });
 
@@ -68,6 +70,20 @@ describe('page overlay', () => {
     await show(pageSnapshot(), 1);
     expect(await pageOverlay({ type: 'clear' })).toBe('CLEARED');
     expect(drawn()).toHaveLength(0);
+  });
+
+  it('refuses to draw numbers while held for a screenshot, until released or the hold lapses', async () => {
+    const snapshot = pageSnapshot();
+    await show(snapshot, 1);
+    expect(await pageOverlay({ type: 'hold' })).toBe('CLEARED');
+    expect(drawn()).toHaveLength(0);
+    expect(await show(snapshot, 2)).toBe('HELD');
+    expect(drawn()).toHaveLength(0);
+    expect(await pageOverlay({ type: 'release' })).toBe('CLEARED');
+    expect(await show(snapshot, 2)).toBe('SHOWN');
+    await pageOverlay({ type: 'hold' });
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 5_001);
+    expect(await show(snapshot, 2)).toBe('SHOWN');
   });
 
   it('shows one calibration dot that a page change does not erase, without moving the page counter', async () => {

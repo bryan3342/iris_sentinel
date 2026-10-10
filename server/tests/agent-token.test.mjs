@@ -22,7 +22,7 @@ test('authenticated voice route uses server configuration and works with page un
     assert.ok(options.signal instanceof AbortSignal);
     return Response.json({ signed_url: signedUrl, conversation_id: 'mock-conversation' });
   });
-  const worker = m.createWorker(undefined, undefined, s.gate, agent);
+  const worker = m.createWorker(undefined, s.gate, agent);
   const response = await worker.fetch(request(s.session.sessionToken), { ...s.env, ...config, ENABLE_PAGE_UNDERSTANDING: 'false' });
   assert.equal(response.status, 200); assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.deepEqual(await response.json(), { signedUrl }); assert.equal(calls, 1);
@@ -41,18 +41,18 @@ test('route rejects disabled, missing/expired auth, wrong origin, invalid body a
   ]) {
     const s = await setup();
     if (options.headers?.Authorization === 'VALID_TOKEN') options.headers.Authorization = `Bearer ${s.session.sessionToken}`;
-    const worker = m.createWorker(undefined, undefined, s.gate, { createSession: async () => assert.fail('No mint allowed') });
+    const worker = m.createWorker(undefined, s.gate, { createSession: async () => assert.fail('No mint allowed') });
     const response = await worker.fetch(request(s.session.sessionToken, options), { ...s.env, ...config, ...envOverrides });
     assert.equal(response.status, status);
   }
   const s = await setup(); s.advance(900_001);
-  const worker = m.createWorker(undefined, undefined, s.gate, { createSession: async () => assert.fail('Expired session') });
+  const worker = m.createWorker(undefined, s.gate, { createSession: async () => assert.fail('Expired session') });
   assert.equal((await worker.fetch(request(s.session.sessionToken), { ...s.env, ...config })).status, 401);
 });
 
 test('preflight allows only configured origin; voice minting shares the existing rate budget', async () => {
   const s = await setup(); let calls = 0;
-  const worker = m.createWorker(undefined, undefined, s.gate, { createSession: async () => { calls++; return { signedUrl }; } });
+  const worker = m.createWorker(undefined, s.gate, { createSession: async () => { calls++; return { signedUrl }; } });
   const env = { ...s.env, ...config };
   const preflight = await worker.fetch(request('', { method: 'OPTIONS', body: undefined, headers: { Origin: env.EXTENSION_ORIGIN } }), env);
   assert.equal(preflight.status, 200); assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), env.EXTENSION_ORIGIN);
@@ -64,7 +64,7 @@ test('cancellation retains the concurrency lease and releases the route promptly
   const s = await setup(), controller = new AbortController(); let entered;
   const arrived = new Promise(resolve => { entered = resolve; });
   const agent = new m.ElevenLabsAgentSession(async () => { entered(); return new Promise(() => {}); });
-  const worker = m.createWorker(undefined, undefined, s.gate, agent), env = { ...s.env, ...config };
+  const worker = m.createWorker(undefined, s.gate, agent), env = { ...s.env, ...config };
   const pending = worker.fetch(request(s.session.sessionToken, { signal: controller.signal }), env);
   await arrived; controller.abort();
   assert.equal((await pending).status, 504);

@@ -64,6 +64,11 @@ export class PageMarks {
     this.draw();
   }
 
+  /** Draws the marks again after something else cleared the page, such as a page understanding screenshot. */
+  redraw(): void {
+    this.draw();
+  }
+
   private setList(list: TargetList | null): void {
     if (this.drawnTab !== null && this.drawnTab !== list?.tabId) send(this.drawnTab, { type: 'clear' });
     this.drawnTab = list?.tabId ?? null;

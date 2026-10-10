@@ -27,7 +27,7 @@ export function mountPanel(root: HTMLElement): void {
   const targets = new LiveTargetList();
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
-  if (isExtensionPage()) root.append(pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel());
+  if (isExtensionPage()) root.append(pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel(marks));
 
   openCamera()
     .then((stream) => {

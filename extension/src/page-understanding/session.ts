@@ -27,20 +27,29 @@ export function gatewayUrl(value: string): string {
     !(url.protocol === 'https:' || url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('INVALID_GATEWAY');
   return url.origin;
 }
-/** Runtime-only participant token; never embedded or persisted. */
+type SessionArea = Pick<chrome.storage.StorageArea, 'get' | 'set' | 'remove'>;
+interface StoredSession { gateway: string; token: string; expiresAt: number }
+const KEY = 'iris:demo-session';
+/**
+ * Participant token, never embedded. Chrome's session storage holds it in memory only:
+ * never written to disk, hidden from content scripts, and kept when Chrome stops the
+ * idle background worker after about 30 seconds, which would lose a plain variable.
+ */
 export class DemoSession {
-  private current?: { gateway: string; token: string; expiresAt: number };
-  clear(): void { this.current = undefined; }
-  set(gateway: string, sessionToken: string): void {
+  constructor(private readonly area: SessionArea = chrome.storage.session) {}
+  clear(): Promise<void> { return this.area.remove(KEY); }
+  async set(gateway: string, sessionToken: string): Promise<void> {
     gateway = gatewayUrl(gateway);
     if (!/^[A-Za-z0-9_-]{43}$/.test(sessionToken)) throw new Error('INVALID_SESSION');
-    this.current = { gateway, token: sessionToken, expiresAt: Date.now() + 900_000 };
+    const session: StoredSession = { gateway, token: sessionToken, expiresAt: Date.now() + 900_000 };
+    await this.area.set({ [KEY]: session });
   }
-  require(gateway: string): string {
-    if (this.current?.gateway !== gateway || this.current.expiresAt <= Date.now()) {
-      this.clear(); throw new Error('DEMO_SESSION_REQUIRED');
+  async require(gateway: string): Promise<string> {
+    const current = (await this.area.get(KEY))[KEY] as StoredSession | undefined;
+    if (current?.gateway !== gateway || current.expiresAt <= Date.now()) {
+      await this.clear(); throw new Error('DEMO_SESSION_REQUIRED');
     }
     // Actual expiration/revocation is independently enforced by the server.
-    return this.current.token;
+    return current.token;
   }
 }

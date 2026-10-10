@@ -94,18 +94,18 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
     if (scanned > 10_000 && !targetsOnly) { blocked = true; return; }
     for (const el of elements) {
       if (el === overlay()) continue;
+      // Both modes walk every shadow root and skip editable elements alike, so gaze and
+      // page understanding give the same target the same number.
+      if (el.shadowRoot) walk(el.shadowRoot);
       const role = el.matches('a[href], [role=link]') ? 'link' : el.matches('button, [role=button]') ? 'button' : undefined;
-      if (targetsOnly) {
-        if (el.shadowRoot) walk(el.shadowRoot);
-        if (!role) continue;
-      }
+      const editable = el.matches('input:not([type=hidden]), textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=combobox]');
+      if (targetsOnly && (!role || editable)) continue;
       const rect = rectOf(el);
       if (!rect) continue;
       if (!targetsOnly) {
-        if (el.shadowRoot) walk(el.shadowRoot);
-        else if (el.localName.includes('-')) blocked = true; // inaccessible custom-control internals
+        if (!el.shadowRoot && el.localName.includes('-')) blocked = true; // inaccessible custom-control internals
         if (el.matches('iframe, frame, object, embed, video') || el.getAnimations().some(a => a.playState === 'running')) blocked = true;
-        if (el.matches('input:not([type=hidden]), textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox], [role=combobox]')) {
+        if (editable) {
           const mask = rectOf(el, 8); if (mask) masks.push(mask);
           continue;
         }

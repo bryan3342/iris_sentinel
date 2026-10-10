@@ -11,6 +11,7 @@ for (const operation of ['find_target', 'summarize_page', 'describe_image']) {
       const body = JSON.parse(options.body); assert.equal(body.contents[0].parts[1].inlineData.data, input(operation).image.data);
       assert.equal(body.tools, undefined); assert.equal(body.cachedContent, undefined);
       assert.ok(body.generationConfig.maxOutputTokens <= 2048);
+      assert.deepEqual(body.generationConfig.thinkingConfig, { thinkingLevel: 'low' });
       return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(result(operation)) }] } }] });
     });
     assert.deepEqual(await adapter.understand(m.validateInput(input(operation)), new AbortController().signal), result(operation));
@@ -42,6 +43,7 @@ for (const code of [400, 401, 403, 429, 500, 503]) test(`multimodal upstream HTT
     calls++; return new Response('secret upstream details', { status: code });
   });
   await assert.rejects(adapter.findTarget(input(), AbortSignal.timeout(1000)), error =>
-    error.status === (code === 429 || code >= 500 ? 503 : 502) && error.code === 'UPSTREAM_UNAVAILABLE' && !/secret/.test(error.message));
+    error.status === (code === 429 || code >= 500 ? 503 : 502) && !/secret/.test(error.message) &&
+    error.code === (code === 429 || code >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'UPSTREAM_REJECTED'));
   assert.equal(calls, 1);
 });

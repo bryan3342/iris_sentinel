@@ -63,3 +63,18 @@ it('treats links without a usable address, and mixed harmless and risky names, a
   expect(pageSnapshot('targets').targets.map((t) => t.risky)).toEqual([true, true]);
 });
 
+
+it('numbers targets the same way for gaze and page understanding', () => {
+  // A layout-less custom element (like display: contents) still holds targets, and an editable link is never a target.
+  document.body.innerHTML = `
+    <a href="/one" data-box="10 10 100 20">One</a>
+    <x-group></x-group>
+    <a href="/edit" contenteditable data-box="10 70 100 20">Editable</a>
+    <button data-box="10 100 80 20">Last</button>`;
+  document.querySelector('x-group')!.attachShadow({ mode: 'open' }).innerHTML = '<button data-box="10 40 60 20">Inside</button>';
+  const page = pageSnapshot();
+  const shape = (targets: { id: number; rect: { y: number } }[]) => targets.map((t) => [t.id, t.rect.y]);
+  expect(page.blocked).toBe(false);
+  expect(shape(page.targets)).toEqual([[1, 10], [2, 40], [3, 100]]);
+  expect(shape(pageSnapshot('targets').targets)).toEqual(shape(page.targets));
+});
