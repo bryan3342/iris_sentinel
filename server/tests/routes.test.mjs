@@ -5,7 +5,7 @@ import { input, result, setup, request } from './fixtures.mjs';
 const provider = understand => ({ findTarget: understand, summarizePage: understand, describeImage: understand, describeTarget: understand });
 
 for (const operation of m.OPERATIONS) {
-  test(`${operation}: authenticated route validates a synthetic screenshot`, async () => {
+  test(`${operation}: authenticated route validates a screenshot`, async () => {
     const s = await setup(); let calls = 0;
     const worker = m.createWorker(provider(async data => { calls++; return result(data.operation); }));
     const response = await worker.fetch(request(input(operation), s.session.sessionToken), s.env);
@@ -15,7 +15,7 @@ for (const operation of m.OPERATIONS) {
     assert.deepEqual(m.validateResult(body, m.validateInput(input(operation))).result, expected);
     assert.equal(calls, 1);
     const persisted = JSON.stringify(s.env);
-    assert.doesNotMatch(persisted, /synthetic|image\/png|iVBOR|Find the icon/);
+    assert.doesNotMatch(persisted, /sample|image\/png|iVBOR|Find the icon/);
   });
 }test('authentication, configuration and origin denial happen before provider calls', async () => {
   const s = await setup(), worker = m.createWorker(provider(async () => assert.fail('must not call provider')));
@@ -61,9 +61,4 @@ test('timeout keeps a conservative concurrency lease and stops the route', async
   await arrived; controller.abort();
   assert.equal((await response).status, 504);
   assert.equal((await s.call('/admit', { sessionToken: s.session.sessionToken })).status, 409);
-});
-test('synthetic provider never becomes an implicit deployed fallback', async () => {
-  const s = await setup();
-  const worker = m.createWorker();
-  assert.equal((await worker.fetch(request(input(), s.session.sessionToken), { ...s.env, PAGE_UNDERSTANDING_PROVIDER: 'synthetic' })).status, 503);
 });

@@ -7,8 +7,9 @@ every future click requires Iris confirmation in a separate milestone.
 
 The feature is disabled by default. See the
 [protocol](../docs/page-understanding-protocol.md) and
-[readiness record](../docs/page-understanding-readiness.md). No deployment or paid
-call is needed to test it.
+[readiness record](../docs/page-understanding-readiness.md). Page understanding
+always uses real Gemini; there is no offline or placeholder mode. No deployment
+is needed to use it.
 
 Use Node.js 22 or newer (the repository's CI uses Node 22).
 
@@ -70,14 +71,10 @@ References:
 - [Gemini API reference](https://ai.google.dev/api)
 - [Cloudflare local secrets](https://developers.cloudflare.com/workers/local-development/environment-variables/)
 
-## Authenticated viewport operations without spending credits
+## Authenticated viewport operations
 
-For the simplest manual-first setup, follow the
-[manual test guide](../docs/page-understanding-manual-test.md). Its dedicated
-launcher serves the fixture and synthetic Worker together, provisions a temporary
-token, never reads `.dev.vars`, and blocks every external Worker request. Use
-`npm run manual:demo -- <extension-ID>` from `server/` with Node 22.
-The longer steps below configure a regular Wrangler development session instead.
+The [live Gemini runbook](../docs/gemini-live-runbook.md) is the step-by-step
+guide. In short:
 
 1. Build/load the unpacked extension with Node 22 (`npm ci`, `npm run build`
    at the repository root). Open Iris on a normal tab to grant `activeTab`.
@@ -87,15 +84,13 @@ The longer steps below configure a regular Wrangler development session instead.
    `serverBinding` JSON to `DEMO_SESSIONS` in ignored `.dev.vars`; merge entries
    for multiple participants. Hand each token privately to its verified participant.
 3. Set `EXTENSION_ORIGIN=chrome-extension://<exact 32-letter ID>` in `.dev.vars`.
-   Set `ENABLE_PAGE_UNDERSTANDING=true`, `PAGE_UNDERSTANDING_PROVIDER=synthetic`,
-   and leave `PAGE_CONTENT_APPROVED=false`. The synthetic provider is localhost-only
-   and produces clearly marked fixed responses, not accuracy evaluations.
+   Set `ENABLE_PAGE_UNDERSTANDING=true`, and `PAGE_CONTENT_APPROVED=true` once the
+   Google account checks in the runbook are recorded.
 4. Run `npm run dev` in `server/`. Enter `http://127.0.0.1:8787` in the panel,
    use **Allow gateway access**, then enter the token and use **Use demo session**.
    The token input is cleared; it remains only in background memory. Use the
    explicit screenshot buttons and list visible image numbers before describing.
-5. Verify sensitive fields, cancellation and changed-page rejection on the
-   [synthetic fixture](../tests/fixtures/page-understanding.html). No screenshot,
+5. Use public pages with no personal information while testing. No screenshot,
    page text or credentials are persisted. No database is required.
 
 Sessions expire on the server within 15 minutes of operator provisioning.
@@ -144,9 +139,10 @@ Do not paste real requests into dashboards or retain screenshot fixtures from us
 
 Use Node 22 or newer. From the root run `npm test`, `npm run typecheck`, and
 `npm run build`; separately run the server commands above. Server tests include
-direct adapter/route tests and an actual database-free local Worker test
-using synthetic images with **all external requests blocked**. This runtime test
-opens a loopback listener. It does not read `.dev.vars` or call Gemini.
+direct adapter/route tests and an actual database-free local Worker test that
+runs the real Gemini adapter with Google's reply stood in at the network edge and
+every other external request blocked. Those stand-ins exist only inside the tests.
+This runtime test opens a loopback listener. It does not read `.dev.vars` or call Gemini.
 The dry-run build compiles only; do not remove `--dry-run` without separate approval.
 
 ## ElevenLabs session endpoint

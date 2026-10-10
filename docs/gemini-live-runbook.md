@@ -4,8 +4,8 @@ This runbook connects Iris's page understanding to the real Gemini API on one
 computer, makes one deliberate test request, and turns it off again. A person
 runs every step by hand; nothing here is automated. Allow about 45 minutes.
 
-Everything runs locally. Nothing is deployed. Until this runbook is complete,
-page understanding answers only from the synthetic provider.
+Everything runs locally. Nothing is deployed. Page understanding stays off
+until this runbook is complete; it has no offline or placeholder mode.
 
 ## What gets sent, and what does not
 
@@ -120,15 +120,13 @@ until all seven are recorded.
    ```sh
    GEMINI_MODEL=gemini-3.8-flash
    ENABLE_PAGE_UNDERSTANDING=true
-   PAGE_UNDERSTANDING_PROVIDER=gemini
    PAGE_CONTENT_APPROVED=true
    EXTENSION_ORIGIN=chrome-extension://bohipliohnmknfglnkhglngbmpiahdcn
    DEMO_SESSIONS={"<session id>":{"tokenHash":"<hash>","expiresAt":<number>}}
    ```
 
    For `DEMO_SESSIONS`, paste the printed `serverBinding` object on one line.
-   Any provider other than `synthetic` means real Gemini. Set
-   `PAGE_CONTENT_APPROVED=true` only after Part 1 is complete.
+   Set `PAGE_CONTENT_APPROVED=true` only after Part 1 is complete.
 3. Start the server and keep the terminal open:
 
    ```sh
@@ -192,7 +190,6 @@ Making Gemini's "find" answer the aimed target, ready to confirm, is future work
    ```sh
    ENABLE_PAGE_UNDERSTANDING=false
    PAGE_CONTENT_APPROVED=false
-   PAGE_UNDERSTANDING_PROVIDER=synthetic
    DEMO_SESSIONS={}
    ```
 

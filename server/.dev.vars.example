@@ -4,8 +4,6 @@ GEMINI_MODEL=gemini-3.8-flash
 # v0.1 stays disabled until the operator provisions access.
 ENABLE_PAGE_UNDERSTANDING=false
 PAGE_CONTENT_APPROVED=false
-# For no-credit synthetic checks, set to synthetic; accepted on localhost only.
-PAGE_UNDERSTANDING_PROVIDER=synthetic
 # Replace with the exact loaded extension ID; no wildcard origins.
 EXTENSION_ORIGIN=chrome-extension://replace_with_32_letter_extension_id
 # Operator-provisioned JSON: session ID -> {tokenHash, expiresAt}. No raw tokens.
