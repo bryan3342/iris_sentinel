@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { PageSnapshot } from '../../extension/src/page-understanding/page-helper';
 import { PageCoordinator } from '../../extension/src/page-understanding/coordinator';
+import { prepareImage } from '../../extension/src/page-understanding/capture';
 
 vi.mock('../../extension/src/page-understanding/capture', async () => ({
   ...await vi.importActual('../../extension/src/page-understanding/capture'),
@@ -21,6 +22,7 @@ beforeEach(() => {
     if (message.type === 'iris.page.cancel') return { ok: true, value: null };
     return { ok: true, value: { protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
       result: message.input.operation === 'describe_image' ? { operation: 'describe_image', imageId: 1, description: 'Synthetic crop.' }
+        : message.input.operation === 'describe_target' ? { operation: 'describe_target', targetId: message.input.targetId, description: 'Synthetic target.' }
         : { operation: 'find_target', targetId: 1, explanation: 'Synthetic match.' } } };
   });
   vi.stubGlobal('chrome', {
@@ -115,4 +117,22 @@ it.each([
   const previous = send.getMockImplementation()!;
   send.mockImplementation(async message => { if (message.type === 'iris.page.understand') fire(event, ...args); return previous(message); });
   await expect(new PageCoordinator().inspect(find)).rejects.toThrow('PAGE_CHANGED_OR_CANCELLED');
+});
+const aimedAt = (rect = page().targets[0]!.rect) => ({ documentToken: page().documentToken, id: 1, rect });
+const describe = { gateway: find.gateway, operation: 'describe_target' as const };
+it('describes the aimed target from an outlined crop around it, without clicking', async () => {
+  const response = await new PageCoordinator().inspect({ ...describe, aimed: aimedAt() });
+  expect(response.result.result).toEqual({ operation: 'describe_target', targetId: 1, description: 'Synthetic target.' });
+  const sent = send.mock.calls.map(([m]) => m).find(m => m.type === 'iris.page.understand').input;
+  expect([sent.targets, sent.targetId, sent.sourceRect]).toEqual([[page().targets[0]], 1, { x: 0, y: 0, width: 2, height: 2 }]);
+  expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: page().targets[0]!.rect }]);
+  expect(events).not.toContain('overlay.show');
+});
+it('sends nothing without an aimed target, or once the aimed target has moved', async () => {
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: null })).rejects.toThrow('NO_AIMED_TARGET');
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: aimedAt({ x: 10, y: 0, width: 1, height: 1 }) }))
+    .rejects.toThrow('PAGE_CHANGED');
+  await expect(new PageCoordinator().inspect({ ...describe, aimed: { ...aimedAt(), documentToken: 'other_document_abcdefgh' } }))
+    .rejects.toThrow('PAGE_CHANGED');
+  expect(events).not.toContain('iris.page.capture');
 });

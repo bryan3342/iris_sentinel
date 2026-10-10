@@ -72,6 +72,23 @@ describe('PageMarks', () => {
     marks.stop();
     expect(sent.at(-1)).toEqual({ tabId: 2, command: { type: 'clear' } });
   });
+
+  it('reports the target the user rested on, not the ones passed on the way to the panel', async () => {
+    let now = 0;
+    const marks = new PageMarks(new LiveTargetList(), () => now);
+    marks.start();
+    await vi.advanceTimersByTimeAsync(300);
+    marks.setAim(1);
+    now = 1000;
+    marks.setAim(2); // passing over
+    now = 1100;
+    marks.setAim(3); // passing over
+    now = 1200;
+    expect(marks.aimed?.target.id).toBe(1);
+    expect(marks.aimed?.list.documentToken).toBe('document_for_tab_1_abc');
+    marks.stop();
+    expect(marks.aimed).toBeNull();
+  });
 });
 
 describe('GazeSession', () => {

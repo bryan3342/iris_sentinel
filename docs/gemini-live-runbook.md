@@ -161,17 +161,20 @@ minute and ten in total.
 
 ## Part 6 (optional): Gemini and gaze together
 
-Gaze and Gemini share the numbered targets but are not yet linked: Gemini's
-outline marks its answer, and gaze aims on its own.
+Gemini can describe whatever gaze is aiming at. This uses one more request.
 
 1. In the side panel, turn on **Developer: the mouse stands in for the eyes**,
    or calibrate with **Calibrate on this page** and turn on **Aim with my eyes**.
-2. Look at (or rest the mouse on) the number Gemini recommended. Once gaze moves
-   the outline, it replaces Gemini's.
-3. Dwell on it for one second to open the link. Anything that may submit, pay,
-   delete or send asks for a second confirm.
+2. Rest your eyes (or the mouse) on the "More information" link for about a
+   second, until it is outlined.
+3. Click **What is this? (the target I rested on)** in the side panel. Moving to
+   the button does not change the target: Iris uses the one you rested on.
 
-Making Gemini's answer the aimed target, ready to confirm, is future work.
+Expected: "Target 1:" and a short description of the link. Nothing is clicked.
+Dwelling on the target for one second still opens it, and anything that may
+submit, pay, delete or send asks for a second confirm.
+
+Making Gemini's "find" answer the aimed target, ready to confirm, is future work.
 
 ## Part 7: Check usage and record the result
 

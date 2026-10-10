@@ -1,10 +1,12 @@
-import { LIMITS, validateInput, validateResult, type Operation, type PageResult } from '@iris/protocol';
+import { LIMITS, validateInput, validateResult, type NumberedTarget, type Operation, type PageResult, type Rect } from '@iris/protocol';
 import { pageOverlay, type OverlayCommand, type OverlayResult } from '../content/overlay';
-import { assertSameSnapshot, eligibleTab, prepareImage, validateSnapshot } from './capture';
+import { assertSameSnapshot, eligibleTab, prepareImage, targetCrop, validateSnapshot } from './capture';
 import { pageSnapshot, type PageSnapshot } from './page-helper';
 import { gatewayUrl } from './session';
 
-export interface DemoRequest { gateway: string; operation: Operation; request?: string; imageId?: number }
+/** The target gaze rested on, as numbered in the gaze scan. */
+export interface AimedTarget { documentToken: string; id: number; rect: Rect }
+export interface DemoRequest { gateway: string; operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null }
 export interface BrokerReply { ok: boolean; value?: unknown; code?: string }
 export async function broker(message: unknown): Promise<unknown> {
   const reply: BrokerReply = await chrome.runtime.sendMessage(message);
@@ -23,6 +25,14 @@ async function snapshot(tabId: number): Promise<PageSnapshot> {
   const result = validateSnapshot(results[0].result);
   if (result.blocked) throw new Error('UNSUPPORTED_PAGE');
   return result;
+}
+/** The aimed target in this snapshot: same document, same number, still where gaze saw it. Numbering matches the gaze scan. */
+function aimedTarget(aimed: AimedTarget | null | undefined, snapshot: PageSnapshot): NumberedTarget {
+  if (!aimed) throw new Error('NO_AIMED_TARGET');
+  const target = snapshot.targets.find(t => t.id === aimed.id);
+  if (aimed.documentToken !== snapshot.documentToken || !target ||
+    Math.abs(target.rect.x - aimed.rect.x) > 4 || Math.abs(target.rect.y - aimed.rect.y) > 4) throw new Error('PAGE_CHANGED');
+  return target;
 }
 async function overlay(tabId: number, command: OverlayCommand): Promise<OverlayResult | undefined> {
   const results = await chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [command] });
@@ -71,6 +81,8 @@ export class PageCoordinator {
       if (request.operation === 'find_target' && !before.targets.length) throw new Error('NO_TARGETS');
       const selected = request.operation === 'describe_image' ? before.images.find(i => i.id === request.imageId) : undefined;
       if (request.operation === 'describe_image' && !selected) throw new Error('IMAGE_NOT_FOUND');
+      const aimed = request.operation === 'describe_target' ? aimedTarget(request.aimed, before) : undefined;
+      const crop = selected?.rect ?? (aimed && targetCrop(aimed.rect, before.viewport));
       // Gemini sees the page itself, never Iris's own numbers or highlight. The hold stops gaze
       // from drawing them again until the screenshot is taken.
       await overlay(tabId, { type: 'hold' });
@@ -89,13 +101,15 @@ export class PageCoordinator {
         assertSameSnapshot(before, await snapshot(tabId)); signal.throwIfAborted();
       };
       await check();
-      const image = await prepareImage(captured, before, selected?.rect, request.operation === 'find_target');
+      const image = await prepareImage(captured, before, crop,
+        request.operation === 'find_target' ? 'numbers' : aimed && { outline: aimed.rect });
       await check();
       const input = validateInput({ protocolVersion: '0.1', requestId, operation: request.operation,
         binding: { tabToken: crypto.randomUUID(), documentToken: before.documentToken, revision: before.revision,
           captureId: crypto.randomUUID(), viewport: before.viewport }, image,
         ...(request.operation === 'find_target' ? { request: request.request, targets: before.targets, targetsTruncated: before.targetsTruncated } : {}),
         ...(selected ? { imageId: selected.id, sourceRect: selected.rect } : {}),
+        ...(aimed && crop ? { targets: [aimed], targetId: aimed.id, sourceRect: crop } : {}),
       });
       // No overlapping snapshot checks. Changes cancel HTTP, not just result display.
       let checking = false;
