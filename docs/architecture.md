@@ -217,10 +217,11 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 
 **Setup flow**
 1. Camera and microphone permission, requested once from an extension tab page (a side panel may not show the permission prompt); the side panel then reuses the grant.
-2. Lighting check.
-3. 5-dot calibration inside the page.
-4. Long-blink practice (optional; dwell works without it).
-5. A default resting profile is used until a personal baseline has built up.
+2. Website access, granted once from a side panel button, so Iris keeps working after a link to another site (Chrome's `activeTab` access ends there). It is used only to read target positions and draw numbers on the page.
+3. Lighting check.
+4. 5-dot calibration inside the page.
+5. Long-blink practice (optional; dwell works without it).
+6. A default resting profile is used until a personal baseline has built up.
 
 ---
 
