@@ -21,7 +21,7 @@ export async function validatePng(image: ImageInput, signal: AbortSignal): Promi
   if (bytes.length < 45 || bytes.slice(0, 8).some((b, i) => b !== [137, 80, 78, 71, 13, 10, 26, 10][i])) invalid();
   const view = new DataView(bytes.buffer); const compressed: Uint8Array[] = [];
   const ancillary = new Set<string>();
-  let offset = 8, channels = 0, ended = false, idatEnded = false;
+  let offset = 8, channels = 0, ended = false;
   while (offset < bytes.length) {
     signal.throwIfAborted();
     if (offset + 12 > bytes.length) invalid();
@@ -36,7 +36,7 @@ export async function validatePng(image: ImageInput, signal: AbortSignal): Promi
         data[8] !== 8 || ![2, 6].includes(data[9]) || data[10] !== 0 || data[11] !== 0 || data[12] !== 0) invalid();
       channels = data[9] === 6 ? 4 : 3;
     } else if (type === 'IDAT') {
-      if (idatEnded || !channels) invalid();
+      if (!channels) invalid();
       compressed.push(data);
     } else if (type === 'IEND') {
       if (length !== 0 || compressed.length === 0 || offset + 12 !== bytes.length) invalid();
@@ -47,7 +47,6 @@ export async function validatePng(image: ImageInput, signal: AbortSignal): Promi
         type === 'gAMA' && (length !== 4 || view.getUint32(offset + 8) === 0) ||
         type === 'cHRM' && length !== 32 || type === 'pHYs' && (length !== 9 || data[8] > 1)) invalid();
       ancillary.add(type);
-      if (compressed.length) idatEnded = true;
     }
     offset += length + 12;
   }
