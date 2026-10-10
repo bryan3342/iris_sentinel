@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyCalibration, CalibrationStore, FixationSmoother, snapToTarget, type SnapTarget } from '@iris/core';
+import { applyCalibration, CalibrationStore, FixationSmoother, GazeAim, GazePointer, type SnapTarget } from '@iris/core';
 import type { GazeSample, Point2 } from '@iris/protocol';
 import { DOT_LAYOUTS } from '../../extension/src/sidepanel/setup/calibration';
 import { eyeFor, scripted, SimulatedGazeProvider } from '../../extension/src/providers/simulated/gaze';
@@ -125,15 +125,10 @@ describe('simulated gaze through calibration and smoothing', () => {
       ]),
       { noise: 0.02, seed: 5 },
     );
-    const smoother = new FixationSmoother({ radius: 70 });
-    let aim: number | null = null;
+    const aim = new GazeAim(new GazePointer(store));
+    aim.setTargets(targets, VIEWPORT);
     const aims: { t: number; aim: number | null }[] = [];
-    provider.onSample((s) => {
-      const p = applyCalibration(store.model!, s.eye!, s.head, VIEWPORT);
-      const point = smoother.push({ x: p.x * VIEWPORT.width, y: p.y * VIEWPORT.height });
-      aim = snapToTarget(point, targets, aim, { maxDistance: 80, hysteresis: 20 });
-      aims.push({ t: s.t, aim });
-    });
+    provider.onSample((s) => aims.push({ t: s.t, aim: aim.update(s) }));
     await provider.start();
     vi.advanceTimersByTime(2000);
     // After a short settle, each look holds one steady aim on the intended target.
