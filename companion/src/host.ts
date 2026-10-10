@@ -67,6 +67,12 @@ export function runHost({ input, output, callerOrigin, log }: HostOptions): Prom
     input.on('end', () => resolve(0));
     input.on('close', () => resolve(0));
     input.on('error', () => resolve(1));
+    // Chrome closing its end while a message is on the way (EPIPE) lands here,
+    // so the companion exits instead of crashing on an unhandled error.
+    output.on('error', () => {
+      log('output closed, exiting');
+      resolve(1);
+    });
   });
 }
 

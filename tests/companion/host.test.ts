@@ -16,7 +16,7 @@ function startHost(callerOrigin: string | undefined = IRIS) {
   const decoder = new FrameDecoder();
   output.on('data', (chunk: Buffer) => sent.push(...decoder.push(chunk)));
   const exit = runHost({ input, output, callerOrigin, log: (line) => logs.push(line) });
-  return { input, sent, logs, exit };
+  return { input, output, sent, logs, exit };
 }
 
 /** Lets stream events run before checking what the host sent. */
@@ -69,6 +69,13 @@ describe('runHost', () => {
     const host = startHost();
     host.input.end();
     expect(await host.exit).toBe(0);
+  });
+
+  it('exits with 1 instead of crashing when Chrome closes its end of the output', async () => {
+    const host = startHost();
+    host.output.destroy(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }));
+    expect(await host.exit).toBe(1);
+    expect(host.logs.join('\n')).toContain('output closed');
   });
 
   it('exits with 1 when the input is corrupt', async () => {
