@@ -1,6 +1,8 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { isExtensionPage, openCamera } from './setup/camera';
+import { gazePanel } from './gaze-panel';
 import { numbersPanel } from './numbers';
+import { PageMarks } from './page-marks';
 import { pageAccessPanel } from './setup/page-access';
 import { LiveTargetList } from './target-list';
 import { EyeTrace } from './trace';
@@ -22,13 +24,17 @@ export function mountPanel(root: HTMLElement): void {
   status.textContent = 'Starting camera...';
 
   root.replaceChildren(preview, status);
-  if (isExtensionPage()) root.append(pageAccessPanel(), numbersPanel(new LiveTargetList()), understandingPanel());
+  const targets = new LiveTargetList();
+  const marks = new PageMarks(targets);
+  const gaze = gazePanel(marks, targets);
+  if (isExtensionPage()) root.append(pageAccessPanel(), numbersPanel(marks), gaze.element, understandingPanel());
 
   openCamera()
     .then((stream) => {
       video.srcObject = stream;
       return startTracking(video, preview, root, status);
     })
+    .then((provider) => gaze.useCamera(provider))
     .catch((error: unknown) => {
       if (video.srcObject) {
         status.textContent = 'Eye tracking failed to start.';
@@ -45,7 +51,7 @@ async function startTracking(
   preview: HTMLElement,
   root: HTMLElement,
   status: HTMLElement,
-): Promise<void> {
+): Promise<MediaPipeGazeProvider> {
   status.textContent = 'Loading eye tracking...';
   const provider = new MediaPipeGazeProvider(video);
   const trace = new EyeTrace(video);
@@ -55,6 +61,7 @@ async function startTracking(
   provider.onSample((sample) => trace.addSample(sample));
   await provider.start();
   status.textContent = 'Eye tracking on. Processing stays on this computer.';
+  return provider;
 }
 
 function grantButton(): HTMLButtonElement {

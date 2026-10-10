@@ -60,6 +60,8 @@ Open http://localhost:5173/?sim to use a simulated gaze provider instead of the 
 
 After a rebuild, click the reload arrow on the Iris card in `chrome://extensions` and reopen the panel.
 
+To try aiming on real websites before calibrating, turn on **Developer: the mouse stands in for the eyes** in the panel. Move the mouse over the page and the nearest numbered link or button is outlined. Looking only aims; nothing is clicked. **Aim with my eyes** needs a calibration saved in the extension.
+
 ## What you should see
 
 Once the camera is on, the panel shows **Eye tracking on** and:
