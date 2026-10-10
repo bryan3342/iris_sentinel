@@ -28,7 +28,7 @@ const short = `${agent.slice(0, 11)}...${agent.slice(-4)}`;
 try {
   const response = await fetch(url, {
     headers: { "xi-api-key": key },
-    redirect: "error",
+    redirect: "manual", // as the Worker does: a redirect is refused, never followed
     signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
