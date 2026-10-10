@@ -44,12 +44,16 @@ export async function setup() {
   const call = async (path, body) => {
     try {
       if (path === '/admit') return modules.json(await gate.admit(env, body.sessionToken));
-      if (path === '/release') { gate.release(env, body); return modules.json({ ok: true }); }
+      if (path === '/release') { gate.release(body); return modules.json({ ok: true }); }
       return modules.json({ error: { code: 'NOT_FOUND' } }, 404);
     } catch (error) { return modules.failure(error); }
   };
   return { env, gate, call, session: { sessionToken, expiresAt }, sessionId, advance: ms => { now += ms; } };
 }
+/** A request from the Iris extension to the server on this computer: loopback host, extension origin, no token. */
+export const localRequest = (data, origin, extra = {}) => new Request(`http://127.0.0.1:8787/v0.1/page-understanding/${data.operation}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(data), ...extra,
+});
 export const request = (data, sessionToken, extra = {}) => new Request(`https://demo.example/v0.1/page-understanding/${data.operation}`, {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify(data), ...extra,
 });

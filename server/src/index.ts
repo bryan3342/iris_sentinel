@@ -25,6 +25,16 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         return response;
       };
       let lease: Lease | undefined;
+      // The Iris extension on this computer needs no token: the request must reach the loopback
+      // address and carry the exact extension origin, which web pages cannot send. Anything else,
+      // such as a future deployed gateway, still needs an operator-issued token.
+      const local = ['localhost', '127.0.0.1', '[::1]'].includes(new URL(request.url).hostname);
+      const admit = async (): Promise<Lease> => {
+        if (local && origin === env.EXTENSION_ORIGIN) return gate.admitLocal();
+        const authorization = request.headers.get('Authorization');
+        if (!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) throw new HttpError(401, 'UNAUTHENTICATED');
+        return abortable(gate.admit(env, authorization.slice(7)), deadline);
+      };
       let retainLease = false;
       const deadline = AbortSignal.any([request.signal, AbortSignal.timeout(LIMITS.requestMs)]);
       try {
@@ -36,9 +46,7 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         if (request.method !== 'POST') throw new HttpError(405, 'USE_POST');
         if (path === '/v0.1/agent-token') {
           if (env.ENABLE_VOICE_AGENT !== 'true') throw new HttpError(503, 'VOICE_DISABLED');
-          const authorization = request.headers.get('Authorization');
-          if (!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) throw new HttpError(401, 'UNAUTHENTICATED');
-          lease = await abortable(gate.admit(env, authorization.slice(7)), deadline);
+          lease = await admit();
           const ingestion = AbortSignal.any([deadline, AbortSignal.timeout(LIMITS.ingestionMs)]);
           object(await readJson(request, 1024, ingestion), []);
           return respond(json(await abortable(agent.createSession(env, deadline), deadline)));
@@ -48,9 +56,7 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         const operation = path.slice('/v0.1/page-understanding/'.length);
         if (!path.startsWith('/v0.1/page-understanding/') || !(OPERATIONS as readonly string[]).includes(operation)) throw new HttpError(404, 'NOT_FOUND');
         if (env.PAGE_CONTENT_APPROVED !== 'true') throw new HttpError(503, 'CONTENT_NOT_APPROVED');
-        const authorization = request.headers.get('Authorization');
-        if (!authorization || !/^Bearer [A-Za-z0-9_-]{43}$/.test(authorization)) throw new HttpError(401, 'UNAUTHENTICATED');
-        lease = await abortable(gate.admit(env, authorization.slice(7)), deadline);
+        lease = await admit();
         const input = validateInput(await readJson(request, LIMITS.bodyBytes, ingestion));
         if (input.operation !== operation) throw new HttpError(400, 'INVALID_INPUT');
         await validatePng(input.image, ingestion);
@@ -74,7 +80,7 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         if (lease) {
           // Cancellation may leave provider processing. Keep the conservative lease until expiry.
           if (!retainLease && !deadline.aborted) {
-            try { gate.release(env, lease); }
+            try { gate.release(lease); }
             catch { /* Fail closed: lease expires; no logging of session credentials. */ }
           }
         }

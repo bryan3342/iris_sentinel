@@ -4,6 +4,7 @@ export {
   CompanionMessageError,
   IRIS_EXTENSION_ID,
   NATIVE_HOST_NAME,
+  VITALS_LIMITS,
   validateFromCompanion,
   validateToCompanion,
 } from './companion';

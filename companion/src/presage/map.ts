@@ -1,4 +1,4 @@
-import type { Quality, Reading } from '@iris/protocol';
+import { VITALS_LIMITS, type Quality, type Reading } from '@iris/protocol';
 
 // Translates Presage's raw output into Iris's neutral messages. Pure and free of
 // the SDK: the types below copy only the fields Iris reads from a decoded
@@ -71,10 +71,17 @@ export class QualityChanges {
   }
 }
 
-/** A Presage sample as an Iris reading: confidence 0 to 1, and null without a usable value. */
-export function toReading(sample: { value: number | null | undefined; confidence?: number | null; stable?: boolean | null }): Reading | null {
+/**
+ * A Presage sample as an Iris reading: confidence 0 to 1, and null without a
+ * usable value. A value above `max` is dropped, since the extension rejects the
+ * whole message that carries it.
+ */
+export function toReading(
+  sample: { value: number | null | undefined; confidence?: number | null; stable?: boolean | null },
+  max = Infinity,
+): Reading | null {
   const { value, confidence } = sample;
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > max) return null;
   const percent = typeof confidence === 'number' && Number.isFinite(confidence) ? confidence : 0;
   return { value, confidence: Math.min(1, Math.max(0, percent / 100)), stable: sample.stable === true };
 }
@@ -91,9 +98,9 @@ export class VitalsWindow {
   private hrv: Timed | null = null;
 
   add(metrics: PresageMetrics): void {
-    this.pulse = newer(this.pulse, newest(metrics.cardio?.pulseRate, (s) => s.value));
-    this.breathing = newer(this.breathing, newest(metrics.breathing?.rate, (s) => s.value));
-    this.hrv = newer(this.hrv, newest(metrics.cardio?.hrv, (s) => s.rmssd));
+    this.pulse = newer(this.pulse, newest(metrics.cardio?.pulseRate, (s) => s.value, VITALS_LIMITS.pulse));
+    this.breathing = newer(this.breathing, newest(metrics.breathing?.rate, (s) => s.value, VITALS_LIMITS.breathing));
+    this.hrv = newer(this.hrv, newest(metrics.cardio?.hrv, (s) => s.rmssd, VITALS_LIMITS.hrv));
   }
 
   take(): { pulse: Reading | null; breathing: Reading | null; hrv: Reading | null } {
@@ -112,10 +119,11 @@ interface Timed {
 function newest<S extends { confidence?: number | null; stable?: boolean | null; timestamp?: Int64 | null }>(
   samples: S[] | null | undefined,
   valueOf: (sample: S) => number | null | undefined,
+  max: number,
 ): Timed | null {
   let best: Timed | null = null;
   for (const sample of samples ?? []) {
-    const reading = toReading({ value: valueOf(sample), confidence: sample.confidence, stable: sample.stable });
+    const reading = toReading({ value: valueOf(sample), confidence: sample.confidence, stable: sample.stable }, max);
     const at = microseconds(sample.timestamp);
     if (reading && (best === null || at >= best.at)) best = { at, reading };
   }
