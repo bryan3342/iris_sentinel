@@ -59,6 +59,9 @@ export const VITALS_LIMITS = { pulse: MAX_PULSE, breathing: MAX_BREATHING, hrv: 
 /** The longest quality hint the extension accepts; a sender cuts anything longer. */
 export const QUALITY_HINT_LIMIT = MAX_HINT_CHARS;
 
+/** The longest blink the extension accepts, in milliseconds; a sender drops anything longer. */
+export const BLINK_LIMIT_MS = MAX_BLINK_MS;
+
 /** Thrown for a message that breaks the protocol. Never repeats the message, which may hold vitals. */
 export class CompanionMessageError extends Error {
   constructor() {

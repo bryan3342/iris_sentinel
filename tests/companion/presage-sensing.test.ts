@@ -87,6 +87,22 @@ describe('PresageSensing', () => {
     ]);
   });
 
+  it('sends each blink as soon as it ends, rounded to whole milliseconds', async () => {
+    const { start, sent, run } = setup();
+    await start();
+    const us = (ms: number) => Math.round(ms * 1000);
+    run().events.onMetrics({
+      face: {
+        blinking: [
+          { timestamp: us(0), detected: false },
+          { timestamp: us(33.3), detected: true },
+          { timestamp: us(166.7), detected: false },
+        ],
+      },
+    });
+    expect(sent.filter((m) => m.type === 'blink')).toEqual([{ type: 'blink', durationMs: 133 }]);
+  });
+
   it('reports a Presage error as a status and releases the camera', async () => {
     const { start, sent, run } = setup();
     await start();

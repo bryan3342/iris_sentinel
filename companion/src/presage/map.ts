@@ -5,7 +5,7 @@ import { VITALS_LIMITS, type Quality, type Reading } from '@iris/protocol';
 // metrics packet, so this runs in tests and CI without the SDK installed.
 
 /** A protobuf int64 timestamp, which the SDK may deliver as a Long object. */
-type Int64 = number | { toNumber(): number };
+export type Int64 = number | { toNumber(): number };
 
 /** One Presage measurement. Confidence is a percentage, 0 to 100. */
 export interface PresageMeasurement {
@@ -23,10 +23,17 @@ export interface PresageHrv {
   timestamp?: Int64 | null;
 }
 
+/** One frame of a Presage yes or no signal, such as "the eyes are closing". */
+export interface PresageDetection {
+  detected?: boolean | null;
+  timestamp?: Int64 | null;
+}
+
 /** The parts of a decoded Presage metrics packet that Iris reads. */
 export interface PresageMetrics {
   breathing?: { rate?: PresageMeasurement[] | null } | null;
   cardio?: { pulseRate?: PresageMeasurement[] | null; hrv?: PresageHrv[] | null } | null;
+  face?: { blinking?: PresageDetection[] | null } | null;
 }
 
 /** Presage validation codes by name (never by number), mapped to Iris's camera qualities. */
@@ -134,7 +141,8 @@ function newer(current: Timed | null, candidate: Timed | null): Timed | null {
   return candidate && (current === null || candidate.at >= current.at) ? candidate : current;
 }
 
-function microseconds(timestamp: Int64 | null | undefined): number {
+/** A Presage timestamp in microseconds since the epoch, or 0 when it is missing. */
+export function microseconds(timestamp: Int64 | null | undefined): number {
   if (timestamp === null || timestamp === undefined) return 0;
   return typeof timestamp === 'number' ? timestamp : timestamp.toNumber();
 }
