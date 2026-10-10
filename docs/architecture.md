@@ -62,7 +62,7 @@ manual-demo prerequisites are in [page-understanding-readiness.md](page-understa
 | `VitalsProvider` (HR, HRV, breathing rate) | Presage companion, simulated |
 | `VoiceAgent` (conversation, user talking on/off) | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
-| `SessionStore` | Local only, Tiger Data |
+| `SessionStore` | In memory (simulated), local only, Tiger Data through the Worker |
 
 ---
 
