@@ -24,6 +24,13 @@ export interface GazeSessionOptions {
   select?: Select;
   /** Told what each confirm led to, for the side panel's status line. */
   onOutcome?: (outcome: Outcome) => void;
+  /**
+   * Each selection teaches the calibration where the user was looking (the selected target's
+   * center), so the map keeps up as their posture changes. Only for a real eye calibration.
+   */
+  learn?: boolean;
+  /** Told when a selection was learned, so the calibration can be saved. */
+  onLearned?: () => void;
   /** Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face lost. */
   onGaze?: (at: Point2 | null, list: TargetList) => void;
 }
@@ -114,6 +121,11 @@ export class GazeSession {
     if (outcome.kind === 'confirm-again') {
       this.marks.setPending(outcome.target);
       this.options.onOutcome?.('CONFIRM_AGAIN');
+    }
+    if (outcome.kind === 'select' && list && target && this.options.learn) {
+      // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
+      const center = { x: target.rect.x + target.rect.width / 2, y: target.rect.y + target.rect.height / 2 };
+      if (this.aim.learn(center)) this.options.onLearned?.();
     }
     if (outcome.kind === 'select' && list && target) {
       void this.select(list, target, isRisky(target)).then(

@@ -72,8 +72,9 @@ export class GazePointer {
    * The user confirmed a target at `pixel`: the eyes' position over the last
    * few samples becomes a calibration sample for it. Returns whether the store
    * accepted it (it rejects confirms far from where the fit says the user looked).
+   * `snapped` says gaze itself had snapped to that target, which the store trusts further.
    */
-  confirm(pixel: Point2, frame: CalibrationFrame): boolean {
+  confirm(pixel: Point2, frame: CalibrationFrame, snapped = false): boolean {
     if (this.recent.length === 0) return false;
     const of = (pick: (s: { eye: Point2; head: HeadPose }) => number) => median(this.recent.map(pick));
     const eye = { x: of((s) => s.eye.x), y: of((s) => s.eye.y) };
@@ -84,6 +85,6 @@ export class GazePointer {
       eyeSpan: of((s) => s.head.eyeSpan),
     };
     const target = { x: (pixel.x + frame.left) / frame.width, y: (pixel.y + frame.top) / frame.height };
-    return this.store.addConfirmed(eye, head, target, frame);
+    return this.store.addConfirmed(eye, head, target, frame, snapped);
   }
 }

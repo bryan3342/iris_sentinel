@@ -1,3 +1,5 @@
+export { measureAccuracy } from './accuracy';
+export type { AccuracyReport } from './accuracy';
 export { applyCalibration, fitCalibration } from './calibration';
 export type { CalibrationModel, CalibrationSample, Viewport } from './calibration';
 export { CalibrationStore } from './calibration-store';

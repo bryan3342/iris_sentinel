@@ -42,6 +42,15 @@ export class GazeAim {
     return this.aimed;
   }
 
+  /**
+   * The user selected the aimed target, whose center is `pixel` on the page: the eyes' last
+   * few samples teach the calibration that this is where they were looking. Returns whether
+   * the calibration accepted it.
+   */
+  learn(pixel: Point2): boolean {
+    return this.frame ? this.pointer.confirm(pixel, this.frame, true) : false;
+  }
+
   /** Feeds one gaze sample; returns the aim after it. */
   update(sample: GazeSample): number | null {
     if (!this.frame) return null;

@@ -145,17 +145,19 @@ describe('GazeSession', () => {
 
 describe('selecting with gaze', () => {
   const RISKY_2 = TARGETS.map((t) => (t.id === 2 ? { ...t, risky: true } : t));
-  function selecting(look: () => Point2 | null) {
+  function selecting(look: () => Point2 | null, learn = false) {
     const store = new CalibrationStore();
     store.setDots(simulatedCalibration(), VIEWPORT);
     const provider = new SimulatedGazeProvider(look, { noise: 0.02, seed: 6 });
     const selected: [number, boolean][] = [];
     const outcomes: Outcome[] = [];
+    let learned = 0;
     const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
       select: async (_list, target, confirmedTwice) => { selected.push([target.id, confirmedTwice]); return 'SELECTED'; },
       onOutcome: (outcome) => outcomes.push(outcome),
+      learn, onLearned: () => { learned++; },
     });
-    return { provider, gaze, selected, outcomes };
+    return { provider, gaze, selected, outcomes, store, learned: () => learned };
   }
   const pendings = () => sent.filter((s) => s.command.type === 'show').map((s) => (s.command as { pending?: number | null }).pending ?? null);
 
@@ -165,6 +167,32 @@ describe('selecting with gaze', () => {
     await provider.start();
     await vi.advanceTimersByTimeAsync(3000);
     expect(selected).toEqual([[1, false]]);
+    gaze.stop();
+    provider.stop();
+  });
+
+  it('teaches the calibration where the user looked at each selection, when asked to learn', async () => {
+    const { provider, gaze, store, learned } = selecting(() => centerOf(1), true);
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(3000);
+    const confirms = store.samples.filter((s) => s.source === 'confirm');
+    expect(confirms).toHaveLength(1);
+    expect(learned()).toBe(1);
+    const center = centerOf(1); // the selected target's center, as a fraction of the page
+    expect(confirms[0]!.target.x).toBeCloseTo(center.x, 5);
+    expect(confirms[0]!.target.y).toBeCloseTo(center.y, 5);
+    gaze.stop();
+    provider.stop();
+  });
+
+  it('leaves the calibration alone when not asked to learn, as with the mouse', async () => {
+    const { provider, gaze, store, learned } = selecting(() => centerOf(1));
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.samples.filter((s) => s.source === 'confirm')).toHaveLength(0);
+    expect(learned()).toBe(0);
     gaze.stop();
     provider.stop();
   });

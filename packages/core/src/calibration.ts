@@ -13,6 +13,8 @@ export interface CalibrationSample {
   head: HeadPose;
   /** Where the dot was, as a fraction of the viewport (0..1). */
   target: Point2;
+  /** How much this sample counts in the fit; 1 when absent. */
+  weight?: number;
 }
 
 export interface CalibrationModel {
@@ -102,26 +104,27 @@ function solve(a: number[][], b: number[]): number[] {
 }
 
 /**
- * Fits weights for raw feature rows (bias first). Features are centered first
- * so the ridge term only damps directions the data barely covers instead of
- * shrinking the whole fit.
+ * Fits weights for raw feature rows (bias first), each row counting by its
+ * weight. Features are centered first so the ridge term only damps directions
+ * the data barely covers instead of shrinking the whole fit.
  */
-function ridgeFit(rows: number[][], targets: number[]): number[] {
+function ridgeFit(rows: number[][], targets: number[], weights: number[]): number[] {
   const n = rows[0]!.length;
-  const mean = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  const mean = (values: number[]) => values.reduce((sum, v, k) => sum + weights[k]! * v, 0) / total;
   const means = Array.from({ length: n }, (_, i) => (i === 0 ? 0 : mean(rows.map((r) => r[i]!))));
   const targetMean = mean(targets);
   const centered = rows.map((r) => r.slice(1).map((v, i) => v - means[i + 1]!));
   const ata = Array.from({ length: n - 1 }, (_, i) =>
-    Array.from({ length: n - 1 }, (_, j) => centered.reduce((sum, r) => sum + r[i]! * r[j]!, 0)),
+    Array.from({ length: n - 1 }, (_, j) => centered.reduce((sum, r, k) => sum + weights[k]! * r[i]! * r[j]!, 0)),
   );
-  for (let i = 0; i < n - 1; i++) ata[i]![i]! += RIDGE * rows.length;
+  for (let i = 0; i < n - 1; i++) ata[i]![i]! += RIDGE * total;
   const atb = Array.from({ length: n - 1 }, (_, i) =>
-    centered.reduce((sum, r, k) => sum + r[i]! * (targets[k]! - targetMean), 0),
+    centered.reduce((sum, r, k) => sum + weights[k]! * r[i]! * (targets[k]! - targetMean), 0),
   );
-  const weights = solve(ata, atb);
-  const bias = targetMean - weights.reduce((sum, w, i) => sum + w * means[i + 1]!, 0);
-  return [bias, ...weights];
+  const coefficients = solve(ata, atb);
+  const bias = targetMean - coefficients.reduce((sum, c, i) => sum + c * means[i + 1]!, 0);
+  return [bias, ...coefficients];
 }
 
 /**
@@ -135,6 +138,7 @@ export function fitCalibration(samples: CalibrationSample[], viewport: Viewport)
   const quadratic = targets >= QUADRATIC_MIN_TARGETS && kept.length >= QUADRATIC_MIN_SAMPLES;
   const head = medianHead(kept);
   const rows = kept.map((s) => features(s.eye, quadratic));
+  const weights = kept.map((s) => s.weight ?? 1);
   const seen = kept.map((s) => {
     const shift = headShift(head, s.head, viewport);
     return { x: s.target.x - shift.x, y: s.target.y - shift.y };
@@ -142,8 +146,8 @@ export function fitCalibration(samples: CalibrationSample[], viewport: Viewport)
   return {
     quadratic,
     head,
-    x: ridgeFit(rows, seen.map((t) => t.x)),
-    y: ridgeFit(rows, seen.map((t) => t.y)),
+    x: ridgeFit(rows, seen.map((t) => t.x), weights),
+    y: ridgeFit(rows, seen.map((t) => t.y), weights),
   };
 }
 

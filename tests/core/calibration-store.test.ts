@@ -87,6 +87,43 @@ describe('CalibrationStore', () => {
     expect(store.samples.filter((s) => s.source === 'confirm')).toHaveLength(1);
   });
 
+  it('follows a posture change within a few confirms, though the dots outnumber them', () => {
+    // After the lid tilts, the same look reads 0.05 further right and down in the eye.
+    const moved = (t: Point2): Point2 => ({ x: eyeFor(t).x + 0.05, y: eyeFor(t).y + 0.05 });
+    const store = new CalibrationStore(dots(), VIEWPORT); // 100 dot samples
+    const errorNow = (t: Point2) => {
+      const p = applyCalibration(store.model!, moved(t), LEVEL, VIEWPORT);
+      return Math.hypot(p.x - t.x, p.y - t.y);
+    };
+    const probe = { x: 0.4, y: 0.4 };
+    const before = errorNow(probe);
+    expect(before).toBeGreaterThan(0.08);
+    for (const target of [{ x: 0.3, y: 0.3 }, { x: 0.7, y: 0.3 }, { x: 0.3, y: 0.7 }, { x: 0.7, y: 0.7 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.2 }]) {
+      store.addConfirmed(moved(target), LEVEL, target, VIEWPORT, true);
+    }
+    expect(errorNow(probe)).toBeLessThan(before / 3);
+  });
+
+  it('lets newer confirms outweigh older ones', () => {
+    const store = new CalibrationStore(dots(), VIEWPORT);
+    const shifted = (dx: number) => (t: Point2): Point2 => ({ x: eyeFor(t).x + dx, y: eyeFor(t).y });
+    const targets = [{ x: 0.3, y: 0.4 }, { x: 0.7, y: 0.4 }, { x: 0.5, y: 0.7 }];
+    for (let round = 0; round < 3; round++) for (const t of targets) store.addConfirmed(shifted(-0.04)(t), LEVEL, t, VIEWPORT, true);
+    for (let round = 0; round < 3; round++) for (const t of targets) store.addConfirmed(shifted(0.04)(t), LEVEL, t, VIEWPORT, true);
+    const p = applyCalibration(store.model!, shifted(0.04)({ x: 0.5, y: 0.5 }), LEVEL, VIEWPORT);
+    const q = applyCalibration(store.model!, shifted(-0.04)({ x: 0.5, y: 0.5 }), LEVEL, VIEWPORT);
+    expect(Math.abs(p.x - 0.5)).toBeLessThan(Math.abs(q.x - 0.5)); // the current posture reads truer than the old one
+  });
+
+  it('trusts a confirm of the target gaze snapped to further than an arbitrary one', () => {
+    const store = new CalibrationStore(dots(), VIEWPORT);
+    const lookingAt = { x: 0.4, y: 0.4 };
+    const selected = { x: 0.6, y: 0.5 }; // about 0.22 away: drifted past the usual limit
+    expect(store.addConfirmed(eyeFor(lookingAt), LEVEL, selected, VIEWPORT)).toBe(false);
+    expect(store.addConfirmed(eyeFor(lookingAt), LEVEL, selected, VIEWPORT, true)).toBe(true);
+    expect(store.addConfirmed(eyeFor(lookingAt), LEVEL, { x: 0.95, y: 0.95 }, VIEWPORT, true)).toBe(false); // still not a wild one
+  });
+
   it('rebuilds the same fit from its saved samples', () => {
     const store = new CalibrationStore(dots(0.02), VIEWPORT);
     store.addConfirmed(eyeFor({ x: 0.5, y: 0.3 }), LEVEL, { x: 0.5, y: 0.3 }, VIEWPORT);
