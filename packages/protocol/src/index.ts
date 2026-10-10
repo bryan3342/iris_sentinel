@@ -1,3 +1,12 @@
 export type { Point2, Unsubscribe } from './common';
+export {
+  COMPANION_PROTOCOL_VERSION,
+  CompanionMessageError,
+  validateFromCompanion,
+  validateToCompanion,
+} from './companion';
+export type { CompanionState, FromCompanion, ToCompanion } from './companion';
+export type { BlinkEvent, FaceProvider, Quality, QualityStatus } from './face';
 export type { GazeProvider, GazeSample, HeadPose } from './gaze';
+export type { Reading, VitalsProvider, VitalsSample } from './vitals';
 export * from './page-understanding';
