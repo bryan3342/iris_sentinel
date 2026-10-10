@@ -92,13 +92,32 @@ describe('PageMarks', () => {
 });
 
 describe('GazeSession', () => {
-  function session(look: Parameters<typeof scripted>[0]) {
+  function session(look: Parameters<typeof scripted>[0], options: ConstructorParameters<typeof GazeSession>[3] = {}) {
     const store = new CalibrationStore();
     store.setDots(simulatedCalibration(), VIEWPORT);
     const provider = new SimulatedGazeProvider(scripted(look), { noise: 0.02, seed: 4 });
-    const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()));
+    const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), options);
     return { provider, gaze };
   }
+
+  it('reports where the user looks for the live cursor, and nothing to show while the eyes are away', async () => {
+    const seen: (Point2 | null)[] = [];
+    const tabs = new Set<number>();
+    const { provider, gaze } = session([{ at: centerOf(2), ms: 1500 }, { at: null, ms: 500 }],
+      { onGaze: (at, list) => { seen.push(at); tabs.add(list.tabId); } });
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1400);
+    const looking = seen.at(-1)!;
+    const target = TARGETS[1]!.rect;
+    expect(Math.abs(looking.x - (target.x + target.width / 2))).toBeLessThan(60);
+    expect(Math.abs(looking.y - (target.y + target.height / 2))).toBeLessThan(60);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(seen.at(-1)).toBeNull();
+    expect([...tabs]).toEqual([1]);
+    gaze.stop();
+    provider.stop();
+  });
 
   it('highlights the target the user looks at, messaging the page only when the aim moves', async () => {
     const { provider, gaze } = session([{ at: centerOf(1), ms: 1500 }, { at: centerOf(3), ms: 1500 }]);
