@@ -63,3 +63,13 @@ it('still erases a drawing that did not come from a gaze scan on any change', as
   await frame();
   expect(badges()).toBe(0);
 });
+
+it('does not let a frame check pending from an earlier drawing erase a calibration dot', async () => {
+  await show(pageSnapshot('targets'));
+  document.getElementById('clock')!.textContent = '12:01';
+  await Promise.resolve(); // the mutation observer has fired; the frame check is pending
+  document.querySelector('a')!.setAttribute('data-box', '10 210 100 20'); // would fail the check
+  await pageOverlay({ type: 'dot', at: { x: 0.5, y: 0.5 } });
+  await frame();
+  expect(g.__irisOverlayV01?.layer.querySelector('.dot')).not.toBeNull();
+});

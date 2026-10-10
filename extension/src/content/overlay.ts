@@ -55,7 +55,10 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     const overlay = host.__irisOverlayV01;
     const drawn = Boolean(overlay && (overlay.layer.firstChild || !overlay.cursor.hidden));
     overlay?.layer.replaceChildren();
-    if (overlay) overlay.cursor.hidden = true;
+    if (overlay) {
+      overlay.cursor.hidden = true;
+      overlay.drawing = undefined; // retires a pending frame check
+    }
     return drawn;
   };
   const mount = (): Overlay => {
@@ -135,6 +138,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
   const overlay = mount();
   if (command.type === 'dot') {
     if (state) state.onChange = undefined; // a page change must not erase a calibration dot
+    overlay.drawing = undefined; // nor a frame check still pending from an earlier drawing
     if (!command.at) {
       overlay.layer.replaceChildren();
       return 'CLEARED';
