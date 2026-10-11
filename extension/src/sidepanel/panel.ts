@@ -1,4 +1,5 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
+import { companionLink } from '../providers/companion/link';
 import { companionPanel } from './companion-status';
 import { fatiguePanel } from './fatigue-panel';
 import { isExtensionPage, openCamera } from './setup/camera';
@@ -36,8 +37,11 @@ export function mountPanel(root: HTMLElement): void {
   if (isExtensionPage()) {
     // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
-    root.append(microphonePanel(), conversationPanel({ coordinator, marks, gaze }), pageAccessPanel(), numbersPanel(marks), gaze.element,
-      understandingPanel(marks, coordinator), companionPanel(), fatiguePanel());
+    const voice = conversationPanel({ coordinator, marks, gaze });
+    // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
+    const link = companionLink();
+    root.append(microphonePanel(), voice.element, pageAccessPanel(), numbersPanel(marks), gaze.element,
+      understandingPanel(marks, coordinator), companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state) }));
   }
 
   openCamera()

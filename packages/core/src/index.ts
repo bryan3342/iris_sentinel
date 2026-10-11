@@ -33,6 +33,8 @@ export { CLUE_SETTINGS, FATIGUE_CLUES, FatigueEngine } from './fatigue';
 export type { ClueSettings, ClueState, FatigueClue, FatigueEngineOptions, FatiguePause, FatigueState } from './fatigue';
 export { explain, fatigueResponse } from './fatigue-response';
 export type { FatigueResponse } from './fatigue-response';
+export { CheckIn } from './check-in';
+export type { CheckInOptions } from './check-in';
 export { decideSelection } from './selection';
 export { RestingPoint } from './resting-point';
 export type { RestingPointOptions } from './resting-point';

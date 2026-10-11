@@ -131,6 +131,20 @@ describe('CompanionLink', () => {
     expect(link.state).toBe('disconnected');
   });
 
+  it('tells a listener that joins late the current quality, and forgets it once disconnected', async () => {
+    const { link, port } = setup();
+    await link.start();
+    port().receive(HELLO);
+    port().receive({ type: 'quality', quality: 'ok', hint: 'Looking good' });
+    const late: QualityStatus[] = [];
+    link.onQuality((status) => late.push(status));
+    expect(late).toEqual([{ t: 1234, quality: 'ok', hint: 'Looking good' }]);
+    port().close();
+    const after: QualityStatus[] = [];
+    link.onQuality((status) => after.push(status));
+    expect(after).toEqual([]);
+  });
+
   it('keeps one connection when started twice', async () => {
     const { link, ports } = setup();
     await link.start();

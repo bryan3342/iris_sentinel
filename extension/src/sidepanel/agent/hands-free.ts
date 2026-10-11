@@ -58,6 +58,11 @@ export class HandsFree {
     else this.halt();
   }
 
+  /** A conversation is connecting or open. */
+  get talking(): boolean {
+    return this.phase === 'connecting' || this.phase === 'connected';
+  }
+
   /** Connects as soon as listening is up, without waiting for speech, and has the agent say `message`. */
   greet(message: string): void {
     this.greeting = message;
