@@ -221,8 +221,14 @@ type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
 | `reload_page` | none | Reloads the active tab |
 | `zoom_page` | `direction`: `in`, `out`, `reset` | Steps Chrome's page zoom through its own levels, or back to the default; calibration already divides zoom out |
 
-Each tool answers in words the agent can say, and the side panel shows the same
-words. Scrolling, history, tabs, addresses, search, reload and zoom change the
+Each tool answers in words, and the side panel shows the same words. The agent
+stays quiet when a command works: after scrolling, history, tabs, addresses,
+search, reload, zoom or a click succeeds, it calls ElevenLabs' `skip_turn`
+system tool instead of replying, so the person sees the result rather than
+hearing about it. It speaks when a command could not be done (what went wrong
+and what to do), says "Blink twice to confirm." when something waits for the
+person's double blink, and answers questions such as summaries, descriptions
+and finding. Scrolling, history, tabs, addresses, search, reload and zoom change the
 browser at once, since none can submit, pay, delete or send anything; closing a
 tab, which can lose unsaved work, waits for the user's double blink. A spoken
 click is the user's own deliberate request, so a safe target opens at once,

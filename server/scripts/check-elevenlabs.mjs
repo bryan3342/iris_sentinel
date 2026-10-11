@@ -52,7 +52,7 @@ try {
       console.log("Signed URL minted and validated: true");
       const missing = await missingTools(key, agent);
       if (missing.length) {
-        console.error(`The agent cannot act on the page yet; missing client tools: ${missing.join(", ")}. Run npm run setup:elevenlabs.`);
+        console.error(`The agent is not set up as Iris expects; missing tools: ${missing.join(", ")}. Run npm run setup:elevenlabs.`);
         process.exitCode = 1;
       } else {
         console.log("Iris's browser tools attached: true");
