@@ -37,11 +37,40 @@ describe('status line', () => {
 
   it('forgets what the companion said once the connection drops', () => {
     expect(bodySignalsView(withLink(measuring(), 'disconnected'), 0)).toEqual({
-      status: 'Body signals: companion stopped. Close and reopen this panel to try again.',
+      status: 'Body signals: companion stopped. Start again to retry.',
+      action: 'start',
       camera: null,
       signals: [],
       note: null,
     });
+  });
+});
+
+describe('start and stop button', () => {
+  const connected = () => withLink(initialBodySignals('connecting'), 'connected');
+
+  it('offers Start while off, so opening the panel uses no Presage credit', () => {
+    expect(bodySignalsView(initialBodySignals('idle'), 0)).toMatchObject({ status: 'Body signals: off.', action: 'start' });
+  });
+
+  it('offers Stop while connecting, starting and measuring', () => {
+    expect(bodySignalsView(initialBodySignals('connecting'), 0).action).toBe('stop');
+    expect(bodySignalsView(connected(), 0).action).toBe('stop');
+    expect(bodySignalsView(withStatus(connected(), 'starting', 0), 0).action).toBe('stop');
+    expect(bodySignalsView(measuring(), 0).action).toBe('stop');
+  });
+
+  it('offers Start again after any problem, even while the connection is still open', () => {
+    for (const problem of ['key-missing', 'key-invalid', 'offline', 'credits-exhausted', 'camera-unavailable', 'error'] as const) {
+      expect(bodySignalsView(withStatus(connected(), problem, 0), 0).action).toBe('start');
+    }
+    for (const link of ['not-installed', 'outdated', 'disconnected'] as const) {
+      expect(bodySignalsView(initialBodySignals(link), 0).action).toBe('start');
+    }
+  });
+
+  it('has no button where there is no companion, as in the localhost playground', () => {
+    expect(bodySignalsView(initialBodySignals('unavailable'), 0).action).toBeNull();
   });
 });
 
