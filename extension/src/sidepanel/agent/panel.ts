@@ -1,4 +1,5 @@
 import { CheckIn, type FatigueState } from '@iris/core';
+import { validateTabMatch } from '@iris/protocol';
 import { broker, type PageCoordinator } from '../../page-understanding/coordinator';
 import { GATEWAY } from '../../page-understanding/gateway';
 import { watchPageAccess } from '../setup/page-access';
@@ -7,6 +8,7 @@ import type { GazePanel } from '../gaze-panel';
 import type { PageMarks } from '../page-marks';
 import { HandsFree, type HandsFreeStatus } from './hands-free';
 import { micLevels } from './mic-level';
+import { navigationTools } from './navigation';
 import { browserTools } from './tools';
 import { playLine, VOICE_LINES } from './voice-lines';
 
@@ -41,15 +43,24 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
-  notice.textContent = 'Just speak. Iris listens for your voice on this laptop, and only once you start talking does it send microphone audio to ElevenLabs; it hangs up after a minute of quiet. Say things like "scroll down", "go to the top", "go back", "summarize this", "what is this", "find the sign-in link" or "click number 12". Summaries and descriptions send the visible page to Gemini and their text to the voice agent. Iris never clicks on its own: a found or named number is selected, and you open it by blinking twice. Turn off Listening, or close this panel, to stop all microphone use.';
+  notice.textContent = 'Just speak. Iris listens for your voice on this laptop, and only once you start talking does it send microphone audio to ElevenLabs; it hangs up after a minute of quiet. Say things like "scroll down", "go back", "go to the tab with the recipe", "next tab", "open YouTube", "search for the weather", "zoom in", "summarize this", "what is this", "click the sign-in link" or "click number 12". Summaries, descriptions and clicking by description send the visible page to Gemini, and finding a tab sends your open tabs\' titles and site names; their text goes to the voice agent. A link or button you ask for opens at once, but anything that may submit, pay, delete or send, and closing a tab, waits for you to blink twice. Turn off Listening, or close this panel, to stop all microphone use.';
   const label = document.createElement('label');
   const listening = document.createElement('input'); listening.type = 'checkbox';
   label.append(listening, ' Listening');
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const action = document.createElement('p'); action.setAttribute('aria-live', 'polite');
+  const report = (said: string) => { action.textContent = said; };
   const handsFree = new HandsFree({
     agent: elevenLabsVoice,
-    tools: browserTools({ ...page, report: (said) => { action.textContent = said; } }),
+    tools: {
+      ...browserTools({ ...page, report }),
+      ...navigationTools({
+        // The background asks the Iris server; the answer is checked again here before any tab changes.
+        matchTab: async (input) => validateTabMatch(await broker({ type: 'iris.tabs.match', input }), input),
+        confirm: (tabId, run) => page.gaze.confirm(tabId, run),
+        report,
+      }),
+    },
     listen: micLevels,
     // Access to the local server comes from the one-time page access grant: no prompt without a click.
     getUrl: async () => {

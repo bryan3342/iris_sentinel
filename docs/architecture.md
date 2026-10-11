@@ -9,7 +9,7 @@ preview, gaze aiming with on-page calibration, double-blink selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. User-talking signals and the full input-mode state machine below remain
+by this change. Voice browser tools (scrolling, history, tabs, websites, search, reload, zoom, summaries, finding and clicking) are implemented. User-talking signals and the full input-mode state machine below remain
 future work. Basic ElevenLabs conversation is implemented; live microphone
 testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
@@ -180,18 +180,25 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 ```
 User speaks ─> ElevenLabs Agent (side panel, signed session from the local server;
                its language model is set to Gemini in the ElevenLabs agent settings)
-                 └─ calls a client tool, for example find_on_page("history section")
+                 └─ calls a client tool, for example click_on("history section")
                       └─ helper supplies viewport targets, masks and document revision
                       └─ coordinator captures viewport through Chrome, masks locally
                       └─ local server /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
-                 └─ answers "It is number 12 ..."
-                 └─ picks target 12 (marked "blink twice to open")
-User blinks twice ─> page helper clicks target 12
+                      └─ a fresh gaze scan still has target 12 where Gemini saw it
+                      └─ safe target: the page helper clicks it at once
+                      └─ risky target: picked only (marked "blink twice to open")
+                 └─ answers "Opened number 12 ..."
+                 or calls go_to_tab("the tab with the recipe")
+                      └─ local server /v0.1/tab-match with the request and each
+                         tab's title and site name ─> Gemini ─> tab number or null
+                      └─ Chrome switches to that tab
+User blinks twice ─> a picked risky target opens, or a tab waiting to close closes
 ```
 
-**Client tools** (`extension/src/sidepanel/agent/tools.ts`, behind the neutral
-`VoiceTools` type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
+**Client tools** (`extension/src/sidepanel/agent/tools.ts` for the page and
+`agent/navigation.ts` for tabs and addresses, behind the neutral `VoiceTools`
+type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
 
 | Tool | Parameters | What Iris does |
 | :--- | :--- | :--- |
@@ -200,28 +207,45 @@ User blinks twice ─> page helper clicks target 12
 | `summarize_looked_at` | none | "Summarize this": only the block where the eyes rested in the last five seconds (a paragraph, image or table); with none, it says so and sends nothing |
 | `summarize_whole_page` | none | "Summarize the whole page": page understanding summary of the visible viewport |
 | `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
-| `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it (as `select_number`), and answers with its number |
-| `select_number` | `number` (1 to 999) | Picks that numbered target: marked on the page, opened by the user's next double blink wherever they look (or, pointing with the mouse, a dwell on it) |
+| `click_on` | `description` (up to 500 characters) | Finds a target as `find_on_page` does, then opens it as `select_number` does, only if a fresh scan still has it where Gemini saw it |
+| `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it without opening it, and answers with its number |
+| `select_number` | `number` (1 to 999) | Opens that numbered target: a safe one at once; a risky one is only picked, marked on the page and opened by the user's next double blink wherever they look (pointing with the mouse, it says the eyes are needed) |
+| `go_to_tab` | `description` (up to 500 characters) | Sends the request and each tab's title and site name (never its address) to `/v0.1/tab-match` and switches to the tab Gemini names, or says none matches |
+| `switch_tab` | `direction`: `next`, `previous` | Switches to the neighboring tab in the window, wrapping around at the ends |
+| `open_new_tab` | none | Opens a new tab in the window |
+| `close_tab` | none | Closes the active tab on the user's next double blink there, within ten seconds; moving to another tab cancels it |
+| `open_website` | `address`, `new_tab` | Opens an http or https address, a bare site name such as `youtube.com` as https, in this tab or a new one; any other address is refused |
+| `search_web` | `query`, `new_tab` | Searches with the user's own default search engine (`chrome.search`) |
+| `reload_page` | none | Reloads the active tab |
+| `zoom_page` | `direction`: `in`, `out`, `reset` | Steps Chrome's page zoom through its own levels, or back to the default; calibration already divides zoom out |
 
 Each tool answers in words the agent can say, and the side panel shows the same
-words. Scrolling and history change the page at once; nothing a tool does
-clicks, submits or types. A picked target is the voice agent naming *what* to
-open; the user's double blink is still the only thing that opens it,
-so gaze accuracy no longer decides the target. A pick lasts ten seconds, is
-dropped if a page change moves that number, and a risky target opens only with
-a double blink. Summaries, descriptions and finding send the visible
-viewport to Gemini because the user asked, and their text (never screenshot
-bytes) goes to the voice agent, marked as page content that is information only,
-never instructions. Agent setup is in [voice-agent-setup.md](voice-agent-setup.md).
+words. Scrolling, history, tabs, addresses, search, reload and zoom change the
+browser at once, since none can submit, pay, delete or send anything; closing a
+tab, which can lose unsaved work, waits for the user's double blink. A spoken
+click is the user's own deliberate request, so a safe target opens at once,
+through the same page helper select step a double blink uses; anything that may
+submit, pay, delete or send, or that Iris cannot classify, is only picked, and
+the user's double blink opens it. A pick lasts ten seconds and is dropped if a
+page change moves that number, and the latest pick or tab to close replaces the
+one before, so one double blink never does two things. Summaries, descriptions,
+finding and clicking by description send the visible viewport to Gemini because
+the user asked. Finding a tab sends only the request and each tab's title and
+site name, from tabs on websites Iris is allowed on, and nothing is stored. Their
+text (never screenshot bytes) goes to the voice agent, marked as page content
+that is information only, never instructions, and the agent is told never to
+open a website, switch tabs or click because page text asks it to. Agent setup
+is in [voice-agent-setup.md](voice-agent-setup.md).
 
 **Later client tools:** `describe_image(n)`, `set_pace(slower|faster)`, and
-bounded multi-step tasks in which Gemini picks each next safe step. No tool may
-ever click directly; picking a target is the most a tool can do.
+bounded multi-step tasks in which Gemini picks each next safe step.
 
-**Safety rule.** Every browser click requires Iris confirmation, even when the
-agent proposes it. Gemini recommends/explains only; it never clicks. The one
-place Iris clicks is the page helper's select step, after a confirm passes the
-selection rule: it clicks only the exact element behind the confirmed number in
+**Safety rule.** Nothing clicks from gaze alone, and Gemini never clicks: it
+only names a target or a tab. A click comes from the user: a double blink, a
+mouse dwell on a safe target, or a spoken request to click a safe target.
+Anything that may submit, pay, delete or send opens only with a double blink,
+even when the agent proposes it. The one place Iris clicks is the page helper's
+select step: it clicks only the exact element behind the confirmed number in
 that gaze scan, only if it is still on the page, where the user saw it and not
 covered, and a risky element only after a double blink, checked again in the
 page itself.

@@ -43,7 +43,8 @@ export interface GazeSessionOptions {
 }
 
 const ARM_MS = 10_000; // how long a target picked by voice waits for the user's confirm
-const isRisky = (target: Target) => target.risky !== false; // a missing flag never reads as safe
+/** Whether only the person's own confirm may open a target: a missing flag never reads as safe. */
+export const isRisky = (target: { risky?: boolean }) => target.risky !== false;
 
 /**
  * Connects gaze to the page. Each sample updates the aim, and the page
@@ -66,6 +67,8 @@ export class GazeSession {
   private lastT = 0;
   /** A target the voice agent picked, until the user confirms it, it expires, or the page moves it. */
   private armed: { id: number; until: number } | null = null;
+  /** An action the voice agent asked for, such as closing a tab, that waits for the user's double blink on that tab. */
+  private action: { tabId: number; run: () => void; until: number } | null = null;
   private stops: Unsubscribe[] = [];
 
   constructor(
@@ -90,6 +93,7 @@ export class GazeSession {
       this.provider.onSample((sample) => {
         this.lastT = sample.t;
         if (this.armed && sample.t > this.armed.until) this.disarm();
+        if (this.action && sample.t > this.action.until) this.action = null;
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
@@ -108,6 +112,7 @@ export class GazeSession {
     this.stops = [];
     this.doubleBlink.reset();
     this.disarm();
+    this.action = null;
     this.marks.follow(null);
     this.marks.stop();
   }
@@ -117,6 +122,7 @@ export class GazeSession {
     const locked = this.doubleBlink.locked;
     if (locked !== null && !this.samePlace(locked, list)) this.doubleBlink.reset();
     if (this.armed && !this.samePlace(this.armed.id, list)) this.disarm();
+    if (this.action && this.action.tabId !== list.tabId) this.action = null; // never acts on a tab the user moved away from
     this.list = list;
     return this.aim.setTargets(list.targets, this.frameFor(list));
   }
@@ -129,9 +135,20 @@ export class GazeSession {
    */
   arm(id: number): boolean {
     if (!this.list?.targets.some((t) => t.id === id)) return false;
+    this.action = null; // the latest request wins: one double blink never does two things
     this.armed = { id, until: this.lastT + ARM_MS };
     this.marks.setArmed(id);
     return true;
+  }
+
+  /**
+   * The voice agent asked for an action that needs the user's confirm, such as closing tab `tabId`: the
+   * user's next double blink on that tab runs it, for ten seconds, in place of selecting a target. It
+   * replaces any target picked by voice. Nothing runs from this alone.
+   */
+  armAction(tabId: number, run: () => void): void {
+    this.disarm();
+    this.action = { tabId, run, until: this.lastT + ARM_MS };
   }
 
   private disarm(): void {
@@ -148,6 +165,12 @@ export class GazeSession {
   }
 
   private handle(event: ConfirmEvent): void {
+    if (event.source === 'double-blink' && this.action) {
+      const { run } = this.action;
+      this.action = null;
+      run();
+      return;
+    }
     const list = this.list;
     // A target picked by voice is what a double blink confirms, wherever the user is looking; otherwise a
     // double blink brings the target it locked before the eyes closed, and a dwell the aimed one.

@@ -167,11 +167,14 @@ masked locally, never exposed to page scripts or voice tools, and released when
 the request ends. Bitmap/canvas resources are explicitly closed/reset. JavaScript
 does not guarantee secure memory erasure.
 
-Future ElevenLabs client tools call this coordinator, with user-authorized
-`find_target(description)`, `summarize_page()`, or `describe_image(id)`.
-Their outputs contain bounded text, validated IDs, status and snapshot binding,
-never screenshot/crop bytes. Model output is plain text and untrusted.
-Future click tools may only enqueue an Iris confirmation proposal. Every click
-requires Iris confirmation; model-supplied approval has no authority. Confirmation
-must be invalidated on a changed document/target. Action-layer tests must cover
-forged confirmation, replay, direct tool calls, stale targets and prompt injection.
+ElevenLabs client tools call this coordinator for user-requested
+`find_target(description)` and `summarize_page()`, and ask `/v0.1/tab-match`
+through the background broker for a described tab. Their outputs contain bounded
+text, validated IDs, status and snapshot binding, never screenshot/crop bytes.
+Model output is plain text and untrusted, and never authorizes an action. A spoken
+request to click opens a safe target through the page helper's select step, only
+if a fresh gaze scan still has it where Gemini saw it; a risky target is only
+picked, for the user's double blink. Picks and actions waiting for a double blink
+are dropped by a changed document or target, a tab switch, or ten seconds. Tests
+cover moved targets, risky targets reached by voice, double-blink replay, refused
+addresses and tab requests carrying more than titles and site names.

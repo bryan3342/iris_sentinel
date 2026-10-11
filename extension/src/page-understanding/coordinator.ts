@@ -57,7 +57,8 @@ export class PageCoordinator {
     this.pending.controller.abort();
     void broker({ type: 'iris.page.cancel', requestId: this.pending.requestId }).catch(() => {});
   }
-  async inspect(request: DemoRequest): Promise<{ result: PageResult; targetsTruncated: boolean; highlighted: boolean }> {
+  /** `found` is where a found target was in the examined page, so acting on it later can check it has not moved. */
+  async inspect(request: DemoRequest): Promise<{ result: PageResult; targetsTruncated: boolean; highlighted: boolean; found: Rect | null }> {
     if (this.pending) throw new Error('REQUEST_IN_FLIGHT');
     const requestId = crypto.randomUUID(), controller = new AbortController();
     this.pending = { requestId, controller };
@@ -132,7 +133,8 @@ export class PageCoordinator {
       const targetId = result.result.operation === 'find_target' ? result.result.targetId : null;
       const highlighted = targetId !== null && await overlay(tabId, { type: 'show', documentToken: before.documentToken,
         revision: before.revision, targets: before.targets, highlight: targetId }).then(r => r === 'SHOWN', () => false);
-      return { result, targetsTruncated: before.targetsTruncated, highlighted };
+      const found = targetId === null ? null : before.targets.find(t => t.id === targetId)?.rect ?? null;
+      return { result, targetsTruncated: before.targetsTruncated, highlighted, found };
     } catch (error) {
       if (signal.aborted) throw new Error('PAGE_CHANGED_OR_CANCELLED');
       throw error;
