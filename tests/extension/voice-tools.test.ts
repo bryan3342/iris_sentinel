@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { browserTools } from '../../extension/src/sidepanel/agent/tools';
 
@@ -19,6 +20,13 @@ afterEach(() => vi.unstubAllGlobals());
 
 it('offers scrolling, history, summaries, descriptions, finding and picking, and no way to click', () => {
   expect(Object.keys(tools()).sort()).toEqual(['describe_looked_at', 'find_on_page', 'navigate_history', 'scroll_page', 'select_number', 'summarize_page']);
+});
+
+it('matches the agent setup, so the voice agent is offered exactly these tools and told when to use each', () => {
+  const agent = JSON.parse(readFileSync(new URL('../../server/scripts/voice-agent.json', import.meta.url), 'utf8')) as { prompt: string; tools: { name: string }[] };
+  const names = agent.tools.map((t) => t.name);
+  expect(names.sort()).toEqual(Object.keys(tools()).sort());
+  for (const name of names) expect(agent.prompt).toContain(name);
 });
 
 it('scrolls the active tab and says what happened, including when there is nowhere to go', async () => {
