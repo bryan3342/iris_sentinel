@@ -97,6 +97,37 @@ describe('FatigueEngine', () => {
     expect(play(engine, 120_000, 130_000, rested).at(-1)!.paused).toBe('poor-view');
   });
 
+  it('pauses at once while the user talks, holding the score and level', () => {
+    const engine = warmedUp();
+    const before = play(engine, 120_000, 240_000, () => 0.6).at(-1)!;
+    engine.setTalking(240_000, true);
+    const talking = play(engine, 240_000, 300_000, tired);
+    expect(talking.every((s) => s.paused === 'talking' && s.level === before.level && s.score === before.score)).toBe(true);
+    expect(talking.at(-1)!.clues.hrv.value).toBeNull();
+  });
+
+  it('stays paused for 30 seconds after the user stops talking, then resumes', () => {
+    const engine = warmedUp();
+    engine.setTalking(120_000, true);
+    play(engine, 120_000, 150_000, rested);
+    engine.setTalking(150_000, false);
+    const after = play(engine, 150_000, 210_000, rested);
+    expect(after.slice(0, 30).every((s) => s.paused === 'talking')).toBe(true); // 150 to 179 s
+    expect(after.at(-1)!.paused).toBeNull();
+    expect(after.at(-1)!.clues.hrv.value).toBe(45);
+  });
+
+  it('learns the baselines only from readings taken while the user was not talking', () => {
+    const engine = new FatigueEngine();
+    view(engine, 0, 'ok');
+    engine.setTalking(0, true);
+    play(engine, 0, 120_000, tired); // two tired-looking minutes, all while talking
+    engine.setTalking(120_000, false);
+    const last = play(engine, 120_000, 300_000, rested).at(-1)!;
+    expect(last.clues.hrv).toMatchObject({ personal: true, baseline: 45 });
+    expect(last.clues.breathing).toMatchObject({ personal: true, baseline: 14 });
+  });
+
   it('ignores readings that are not stable yet', () => {
     const engine = new FatigueEngine();
     view(engine, 0, 'ok');
@@ -138,6 +169,7 @@ describe('FatigueEngine', () => {
 
   it('forgets everything on reset', () => {
     const engine = warmedUp();
+    engine.setTalking(125_000, true);
     engine.reset();
     const state = engine.update(130_000);
     expect(state).toMatchObject({ score: null, level: 'fresh', paused: 'warming-up' });
