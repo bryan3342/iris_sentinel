@@ -155,9 +155,7 @@ Gemini can describe whatever gaze is aiming at. This uses one more request.
 
 Expected: "Target 1:" and a short description of the link. Nothing is clicked.
 Dwelling on the target for one second still opens it, and anything that may
-submit, pay, delete or send asks for a second confirm.
-
-Making Gemini's "find" answer the aimed target, ready to confirm, is future work.
+submit, pay, delete or send opens only with a double blink.
 
 ## Part 7: Check usage and record the result
 

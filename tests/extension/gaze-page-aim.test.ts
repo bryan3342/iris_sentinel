@@ -159,7 +159,6 @@ describe('selecting with gaze', () => {
     });
     return { provider, gaze, selected, outcomes, store, learned: () => learned };
   }
-  const pendings = () => sent.filter((s) => s.command.type === 'show').map((s) => (s.command as { pending?: number | null }).pending ?? null);
 
   it('selects a safe target the user dwells on, once', async () => {
     const { provider, gaze, selected } = selecting(() => centerOf(1));
@@ -197,51 +196,14 @@ describe('selecting with gaze', () => {
     provider.stop();
   });
 
-  it('asks again for a risky target, marks it on the page, and selects it after a look away and back', async () => {
+  it('does not open a risky target with a dwell, however long, and says a double blink is needed', async () => {
     targets = RISKY_2;
-    let looking = 2;
-    const { provider, gaze, selected, outcomes } = selecting(() => centerOf(looking));
+    const { provider, gaze, selected, outcomes } = selecting(() => centerOf(2));
     gaze.start();
     await provider.start();
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(outcomes).toEqual(['CONFIRM_AGAIN']);
-    expect(pendings()).toContain(2);
-    looking = 1; // a glance shorter than a dwell
-    await vi.advanceTimersByTimeAsync(600);
-    looking = 2;
-    await vi.advanceTimersByTimeAsync(1500);
-    expect(selected).toEqual([[2, true]]);
-    gaze.stop();
-    provider.stop();
-  });
-
-  it('selects through any confirm method exactly as through dwell', async () => {
-    const { provider, gaze, selected } = selecting(() => centerOf(1));
-    gaze.start();
-    await provider.start();
-    await vi.advanceTimersByTimeAsync(500); // aimed, but no dwell yet
-    gaze.confirms.emit({ t: 500, source: 'stand-in' });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(selected).toEqual([[1, false]]);
-    gaze.stop();
-    provider.stop();
-  });
-
-  it('forgets a waiting risky target when the page moves it, so one confirm cannot select what is there now', async () => {
-    targets = RISKY_2;
-    let looking = 2;
-    const { provider, gaze, selected, outcomes } = selecting(() => centerOf(looking));
-    gaze.start();
-    await provider.start();
-    await vi.advanceTimersByTimeAsync(1500);
-    targets = RISKY_2.map((t) => (t.id === 2 ? { ...t, rect: { ...t.rect, y: 400 } } : t)); // the page moved it
-    revision = 1;
-    looking = 1;
-    await vi.advanceTimersByTimeAsync(600);
-    looking = 2;
-    await vi.advanceTimersByTimeAsync(1500);
+    await vi.advanceTimersByTimeAsync(4000);
     expect(selected).toEqual([]);
-    expect(outcomes).toEqual(['CONFIRM_AGAIN', 'CONFIRM_AGAIN']);
+    expect(outcomes).toEqual(['NEEDS_DOUBLE_BLINK']); // one dwell, one message: holding still never repeats it
     gaze.stop();
     provider.stop();
   });
@@ -278,6 +240,25 @@ describe('confirming with a double blink', () => {
     expect(selected).toEqual([]); // one blink so far: nothing yet
     await vi.advanceTimersByTimeAsync(150);
     expect(selected).toEqual([1]); // the locked target, the moment the eyes open after the second blink
+    gaze.stop();
+    provider.stop();
+  });
+
+  it('opens a risky target with a double blink, telling the page it was a double blink', async () => {
+    targets = TARGETS.map((t) => (t.id === 1 ? { ...t, risky: true } : t));
+    const on = (blinking: boolean) => (t: number): GazeSample =>
+      ({ t, eye: eyeFor(centerOf(1)), head: SIMULATED_HEAD, blink: blinking ? { left: 0.9, right: 0.9 } : { left: 0.05, right: 0.05 } });
+    const provider = new ScriptedEyes((t) => on((t > 500 && t <= 650) || (t > 800 && t <= 950))(t));
+    const store = new CalibrationStore();
+    store.setDots(simulatedCalibration(), VIEWPORT);
+    const selected: [number, boolean][] = [];
+    const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+      select: async (_list, target, blinked) => { selected.push([target.id, blinked]); return 'SELECTED'; },
+    });
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(selected).toEqual([[1, true]]);
     gaze.stop();
     provider.stop();
   });

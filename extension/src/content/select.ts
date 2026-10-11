@@ -7,18 +7,18 @@ export interface SelectCommand {
   id: number;
   /** Where the user saw the target, in viewport pixels. */
   rect: Rect;
-  /** True only after the selection gate saw a second confirm. */
-  confirmedTwice: boolean;
+  /** True when the confirm was a double blink, the only confirm that opens a risky element. */
+  blinked: boolean;
 }
-export type SelectResult = 'SELECTED' | 'STALE' | 'NEEDS_SECOND_CONFIRM';
+export type SelectResult = 'SELECTED' | 'STALE' | 'NEEDS_DOUBLE_BLINK';
 
 /**
  * The one place Iris clicks. Runs in Chrome's isolated world and must remain
  * self-contained for executeScript. It clicks only the exact element behind
  * the confirmed target number in that gaze scan, and only if it is still on
  * the page, still where the user saw it and not covered. A risky element is
- * clicked only after a second confirm, checked here again in case the side
- * panel gets it wrong. Anything else returns without clicking.
+ * clicked only when the confirm was a double blink, checked here again in case
+ * the side panel gets it wrong. Anything else returns without clicking.
  */
 export function pageSelect(command: SelectCommand): SelectResult {
   type Scan = { revision: number; entries: { el: Element; risky: boolean }[] };
@@ -28,7 +28,7 @@ export function pageSelect(command: SelectCommand): SelectResult {
   const scan = [...(state.scans ?? [])].reverse().find((s) => s.revision === command.revision); // the latest such scan
   const entry = scan?.entries[command.id - 1];
   if (!entry || !entry.el.isConnected) return 'STALE';
-  if (entry.risky && !command.confirmedTwice) return 'NEEDS_SECOND_CONFIRM';
+  if (entry.risky && !command.blinked) return 'NEEDS_DOUBLE_BLINK';
   const vv = visualViewport;
   const b = entry.el.getBoundingClientRect();
   const left = Math.max(0, b.left - (vv?.offsetLeft ?? 0)), top = Math.max(0, b.top - (vv?.offsetTop ?? 0));

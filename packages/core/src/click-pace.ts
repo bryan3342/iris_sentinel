@@ -62,8 +62,8 @@ export class ClickPace {
 
   /**
    * Records that the aimed target was selected at time `t` after a dwell of
-   * `dwellMs`. Report only safe targets: a risky one needs a look away and
-   * back for its second confirm, which would read as a slow, shaky click.
+   * `dwellMs`. Report only safe targets: a risky one waits for a double blink,
+   * which would read as a slow click.
    */
   click(t: number, dwellMs: number): void {
     const last = this.aims.length - 1;

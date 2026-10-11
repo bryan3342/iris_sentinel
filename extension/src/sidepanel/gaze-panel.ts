@@ -40,8 +40,7 @@ function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): strin
 
 const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
-  CONFIRM_AGAIN: 'That one may submit, pay, delete or send. Look away, then dwell on it or blink twice again to confirm.',
-  NEEDS_SECOND_CONFIRM: 'That one needs a second confirm. Nothing was selected.',
+  NEEDS_DOUBLE_BLINK: 'That one may submit, pay, delete or send, so only a double blink opens it. Nothing was selected.',
   STALE: 'The page changed, so nothing was selected.',
 };
 
@@ -49,7 +48,7 @@ const OUTCOMES: Record<Outcome, string> = {
  * Side panel controls for gaze: calibrating on the page, aiming with the
  * camera, or, for development, the mouse standing in for the eyes. One at a
  * time. Looking aims; a dwell (one second on a target) confirms and selects it,
- * and a risky target needs a second confirm.
+ * and a risky target opens only with a double blink.
  */
 /** What picking a target by voice led to: ready for the eyes' or the mouse's confirm, nothing aiming, or no such number. */
 export type PickResult = 'PICKED_EYES' | 'PICKED_MOUSE' | 'NO_AIMING' | 'NO_SUCH_NUMBER';
@@ -106,7 +105,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       learn: true, onLearned: () => void saveSamples(store.samples),
     }) };
     active.session.start();
-    status.textContent = 'Looking aims at the nearest number. To select it, dwell on it for a second or blink twice quickly.';
+    status.textContent = 'Looking aims at the nearest number. To select it, dwell on it for a second or blink twice quickly. Anything that may submit, pay, delete or send opens only with a double blink.';
   };
   eyes.input.addEventListener('change', () => {
     stop();
@@ -190,7 +189,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze }), stop: sim.stop, mouse: true };
     active.session.start();
     void sim.provider.start();
-    status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it.';
+    status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it. Anything that may submit, pay, delete or send needs a double blink, so aim with your eyes for those.';
   });
   section.append(calibrate, check, eyes.label, mouse.label, status);
   return {

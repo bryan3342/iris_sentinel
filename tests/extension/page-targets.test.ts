@@ -28,7 +28,7 @@ it('reports positions only: no labels, masks, images or blocking verdict', () =>
   expect(gaze.targets.every((t) => !('label' in t))).toBe(true);
 });
 
-it('marks what selecting each target would risk, failing toward a second confirm', () => {
+it('marks what selecting each target would risk, failing toward needing a double blink', () => {
   const row = (i: number) => `data-box="10 ${10 + i * 30} 200 20"`;
   document.body.innerHTML = `
     <a href="https://example.com/news" ${row(0)}>Today's news</a>

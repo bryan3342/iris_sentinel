@@ -19,9 +19,9 @@ beforeEach(() => {
   scan = pageSnapshot('targets');
 });
 
-const command = (id: number, confirmedTwice = false): SelectCommand => {
+const command = (id: number, blinked = false): SelectCommand => {
   const target = scan.targets.find((t) => t.id === id)!;
-  return { documentToken: scan.documentToken, revision: scan.revision, id, rect: target.rect, confirmedTwice };
+  return { documentToken: scan.documentToken, revision: scan.revision, id, rect: target.rect, blinked };
 };
 
 it('clicks exactly the element behind a confirmed safe target, including inside a shadow root', () => {
@@ -30,8 +30,8 @@ it('clicks exactly the element behind a confirmed safe target, including inside 
   expect(clicked).toEqual(["Today's news", 'Menu']);
 });
 
-it('refuses a risky target without a second confirm, checked in the page itself', () => {
-  expect(pageSelect(command(2))).toBe('NEEDS_SECOND_CONFIRM');
+it('opens a risky target only after a double blink, checked in the page itself', () => {
+  expect(pageSelect(command(2))).toBe('NEEDS_DOUBLE_BLINK');
   expect(clicked).toEqual([]);
   expect(pageSelect(command(2, true))).toBe('SELECTED');
   expect(clicked).toEqual(['Delete']);

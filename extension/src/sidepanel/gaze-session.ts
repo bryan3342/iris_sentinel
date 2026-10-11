@@ -1,4 +1,4 @@
-import { ConfirmChannel, DwellDetector, DoubleBlinkDetector, SelectionGate, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
+import { ConfirmChannel, decideSelection, DwellDetector, DoubleBlinkDetector, viewportFrame, type CalibrationFrame, type ConfirmEvent, type GazeAim } from '@iris/core';
 import type { GazeProvider, Point2, Unsubscribe } from '@iris/protocol';
 import { pageSelect, type SelectResult } from '../content/select';
 import type { PageMarks } from './page-marks';
@@ -6,14 +6,15 @@ import type { TargetList } from './target-list';
 
 type Target = TargetList['targets'][number];
 /** Clicks a confirmed target. The page checks everything again before it does. */
-export type Select = (list: TargetList, target: Target, confirmedTwice: boolean) => Promise<SelectResult>;
-export type Outcome = SelectResult | 'CONFIRM_AGAIN';
+/** Clicks a confirmed target; `blinked` says the confirm was a double blink, the only one that opens a risky target. */
+export type Select = (list: TargetList, target: Target, blinked: boolean) => Promise<SelectResult>;
+export type Outcome = SelectResult;
 
-export const selectInPage: Select = async (list, target, confirmedTwice) => {
+export const selectInPage: Select = async (list, target, blinked) => {
   const [result] = await chrome.scripting.executeScript({
     target: { tabId: list.tabId },
     func: pageSelect,
-    args: [{ documentToken: list.documentToken, revision: list.revision, id: target.id, rect: target.rect, confirmedTwice }],
+    args: [{ documentToken: list.documentToken, revision: list.revision, id: target.id, rect: target.rect, blinked }],
   });
   return (result?.result as SelectResult | undefined) ?? 'STALE';
 };
@@ -42,9 +43,9 @@ const isRisky = (target: Target) => target.risky !== false; // a missing flag ne
  * Connects gaze to the page. Each sample updates the aim, and the page
  * highlight moves only when the aimed target changes. Each fresh target list
  * is aimed from the last gaze point before it is drawn. Dwell and any other
- * confirm method meet in `confirms`; each confirm goes through the selection
- * gate, so a safe target is selected at once and a risky one only after a
- * second confirm. Snapping stays in the side panel; the page learns which
+ * confirm method meet in `confirms`; each confirm goes through decideSelection,
+ * so a safe target is selected by any confirm and a risky one only by a
+ * double blink. Snapping stays in the side panel; the page learns which
  * target is aimed and which to select, and `onGaze` feeds the live cursor that
  * Iris draws inside its closed overlay. The caller owns the provider's
  * lifecycle (the camera preview shares it).
@@ -53,7 +54,6 @@ export class GazeSession {
   readonly confirms = new ConfirmChannel();
   private readonly dwell = new DwellDetector();
   private readonly doubleBlink = new DoubleBlinkDetector();
-  private readonly gate = new SelectionGate();
   private readonly frameFor: (list: TargetList) => CalibrationFrame;
   private readonly select: Select;
   private list: TargetList | null = null;
@@ -87,10 +87,9 @@ export class GazeSession {
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
-        // A dwell or a deliberate double blink confirms the aimed target; both go through the gate.
+        // A dwell or a deliberate double blink confirms the aimed target; decideSelection says what it opens.
         const event = this.dwell.update(sample, aimed) ?? this.doubleBlink.update(sample, aimed);
         if (event) this.confirms.emit(event);
-        this.marks.setPending(this.gate.pending(sample.t));
       }),
       this.confirms.onConfirm((event) => this.handle(event)),
     ];
@@ -100,21 +99,13 @@ export class GazeSession {
     if (!this.running) return;
     this.stops.forEach((stop) => stop());
     this.stops = [];
-    this.gate.reset();
     this.doubleBlink.reset();
     this.disarm();
-    this.marks.setPending(null);
     this.marks.follow(null);
     this.marks.stop();
   }
 
   private follow(list: TargetList): number | null {
-    // A risky target waiting for its second confirm stays armed only if the new scan still shows
-    // the same element in the same place; otherwise a new element under the old number could be
-    // selected with one confirm.
-    const waiting = this.gate.pending(this.lastT);
-    const same = waiting !== null && this.samePlace(waiting, list) && isRisky(list.targets.find((t) => t.id === waiting)!);
-    if (waiting !== null && !same) this.gate.reset();
     // A double blink in progress keeps its locked target only while that number still means the same element.
     const locked = this.doubleBlink.locked;
     if (locked !== null && !this.samePlace(locked, list)) this.doubleBlink.reset();
@@ -156,11 +147,8 @@ export class GazeSession {
     const byVoice = event.source === 'double-blink' && this.armed !== null;
     const id = byVoice ? this.armed!.id : event.target === undefined ? this.aim.current : event.target;
     const target = list?.targets.find((t) => t.id === id) ?? null;
-    const outcome = this.gate.confirm(event, target && { id: target.id, risky: isRisky(target) });
-    if (outcome.kind === 'confirm-again') {
-      this.marks.setPending(outcome.target);
-      this.options.onOutcome?.('CONFIRM_AGAIN');
-    }
+    const outcome = decideSelection(event, target && { id: target.id, risky: isRisky(target) });
+    if (outcome.kind === 'needs-double-blink') this.options.onOutcome?.('NEEDS_DOUBLE_BLINK');
     if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice) {
       // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
       // Never for a voice pick: the eyes were not on that target, so it would teach the aim a wrong offset.
@@ -169,7 +157,7 @@ export class GazeSession {
     }
     if (outcome.kind === 'select') this.disarm();
     if (outcome.kind === 'select' && list && target) {
-      void this.select(list, target, isRisky(target)).then(
+      void this.select(list, target, event.source === 'double-blink').then(
         (result) => this.options.onOutcome?.(result),
         () => this.options.onOutcome?.('STALE'),
       );
