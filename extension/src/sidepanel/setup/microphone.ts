@@ -9,12 +9,10 @@ export function openMicrophone(): Promise<MediaStream> {
 export function microphonePanel(): HTMLElement {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Voice setup';
-  const notice = document.createElement('p');
-  notice.textContent = 'Allow your microphone before starting a voice conversation. This setup only checks permission and immediately turns the microphone off.';
   const button = document.createElement('button'); button.textContent = 'Allow microphone';
   button.addEventListener('click', () => {
     void chrome.tabs.create({ url: chrome.runtime.getURL('permission.html?device=microphone') });
   });
-  panel.append(title, notice, button);
+  panel.append(title, button);
   return panel;
 }

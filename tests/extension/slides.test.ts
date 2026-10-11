@@ -22,6 +22,19 @@ it('shows each slide with its spoken line as the caption, over the panel, and le
   expect(root.querySelector('.setup')).toBeNull();
 });
 
+it('can cover the panel at once, blank, so the panel never shows before the opening animation and the first slide', () => {
+  const root = document.createElement('div');
+  const view = slidesView(root);
+  view.cover();
+  const overlay = root.querySelector('.setup')!;
+  expect(overlay.childElementCount).toBe(0); // no picture, title or progress dots yet
+  view.show(INTRO[0]!);
+  expect(root.querySelectorAll('.setup')).toHaveLength(1); // the first slide fills the same cover
+  expect(overlay.querySelector('h2')!.textContent).toBe(INTRO[0]!.title);
+  view.close();
+  expect(root.querySelector('.setup')).toBeNull();
+});
+
 it('says what access is missing, with a button only for website access, which Chrome grants only from a click', () => {
   const root = document.createElement('div');
   const view = slidesView(root);

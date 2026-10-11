@@ -1,6 +1,11 @@
 :root {
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
+  /* Iris teal, from the eye in the wordmark. Buttons use the deep shade, which keeps white text easy to read. */
+  --iris-teal: #0e9488;
+  --iris-teal-light: #2dd4bf;
+  --iris-teal-deep: #0f766e;
+  --iris-teal-deeper: #115e59;
 }
 
 body {
@@ -16,10 +21,34 @@ video {
   transform: scaleX(-1); /* show the user a mirror view */
 }
 
+/* Buttons and switches in Iris teal, large and rounded like the setup slides, with a clear focus ring. */
 button {
+  font: inherit;
   font-size: 1.1rem;
+  font-weight: 600;
   padding: 12px 20px;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  background: var(--iris-teal-deep);
+  cursor: pointer;
 }
+button:hover { background: var(--iris-teal-deeper); }
+button:active { transform: translateY(1px); }
+button:focus-visible, input[type='checkbox']:focus-visible { outline: 3px solid var(--iris-teal); outline-offset: 2px; }
+
+label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 1.05rem; cursor: pointer; }
+input[type='checkbox'] { width: 20px; height: 20px; margin: 0; accent-color: var(--iris-teal); cursor: pointer; }
+
+/* Heart rate and breathing graph: heart rate in red above breathing in teal, each line at least 3:1 against the background. */
+.vitals-graph { margin: 12px 0 4px; }
+.vitals-graph figcaption { margin-bottom: 4px; font-size: 0.95rem; }
+.vitals-graph svg { display: block; width: 100%; height: auto; }
+.vitals-graph path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.vitals-graph path.pulse { stroke: light-dark(#dc2626, #f87171); }
+.vitals-graph path.breathing { stroke: light-dark(var(--iris-teal), var(--iris-teal-light)); }
+.vitals-graph .axis { stroke: color-mix(in srgb, CanvasText 30%, transparent); }
+.vitals-graph text { font-size: 10px; fill: color-mix(in srgb, CanvasText 70%, transparent); }
 
 .preview {
   position: relative;
@@ -47,7 +76,7 @@ button {
   height: 28px;
   margin: -14px 0 0 -14px;
   border-radius: 50%;
-  background: #2dd4bf;
+  background: var(--iris-teal-light);
   animation: calibration-shrink 1.8s ease-out forwards;
 }
 
@@ -137,7 +166,7 @@ button {
 .setup .picture .word { font-size: 64px; }
 .setup h2 { margin: 6px 0 0; font-size: 26px; }
 .setup .caption { margin: 0; max-width: 26ch; font-size: 20px; line-height: 1.4; }
-.setup button { padding: 12px 20px; font-size: 18px; border-radius: 10px; }
+.setup button { font-size: 18px; }
 .setup .progress { display: flex; gap: 10px; margin: 10px 0 0; padding: 0; list-style: none; }
 .setup .progress li { width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, CanvasText 25%, transparent); }
-.setup .progress li.now { background: #0e9488; }
+.setup .progress li.now { background: var(--iris-teal); }

@@ -96,6 +96,9 @@ const QUALITY_TEXT: Record<Quality, string> = {
 
 const LABEL: Record<Signal, string> = { pulse: 'Heart rate', breathing: 'Breathing', hrv: 'Heart rate variability' };
 
+/** Shown with any readings or graph, so none is taken for a medical reading. */
+export const ESTIMATES_NOTE = 'Estimates from the camera, not medical readings.';
+
 /** What the section's button does. Body signals never start on their own, since every Presage session uses credits. */
 export type BodyAction = 'start' | 'stop';
 
@@ -120,7 +123,7 @@ export function bodySignalsView(state: BodySignals, now: number): BodySignalsVie
   if (state.companion !== 'running' || state.runningSince === null) return { status, action, camera, signals: [], note: null };
   const elapsed = now - state.runningSince;
   const signals = SIGNALS.map((signal) => `${LABEL[signal]}: ${signalText(signal, state.latest[signal], elapsed, now)}`);
-  return { status, action, camera, signals, note: 'Estimates from the camera, not medical readings.' };
+  return { status, action, camera, signals, note: ESTIMATES_NOTE };
 }
 
 /**

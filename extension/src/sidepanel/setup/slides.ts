@@ -50,9 +50,9 @@ function missingText(missing: { camera: boolean; websites: boolean }): string {
  * The setup slideshow over the side panel: a picture, a title and the line Iris says, shown as a
  * caption for anyone who cannot hear it, with dots for how far along setup is. When access is missing
  * it says what to allow, with a button for website access, which Chrome grants only from a click.
- * Nothing shows until there is something to show, and closing removes it.
+ * Nothing shows until there is something to show, or until `cover` puts it up blank, and closing removes it.
  */
-export function slidesView(root: HTMLElement): SetupView {
+export function slidesView(root: HTMLElement): SetupView & { cover(): void } {
   const overlay = document.createElement('div');
   overlay.className = 'setup';
   overlay.setAttribute('role', 'dialog');
@@ -73,16 +73,20 @@ export function slidesView(root: HTMLElement): SetupView {
   progress.className = 'progress';
   progress.setAttribute('aria-hidden', 'true');
   const steps = SLIDES.map(() => progress.appendChild(document.createElement('li')));
-  overlay.append(picture, title, caption, button, progress);
 
   const draw = (art: string, heading: string, text: string, at: number) => {
     if (!overlay.isConnected) root.append(overlay);
+    if (!overlay.hasChildNodes()) overlay.append(picture, title, caption, button, progress);
     picture.innerHTML = art;
     title.textContent = heading;
     caption.textContent = text;
     steps.forEach((step, i) => step.classList.toggle('now', i === at));
   };
   return {
+    /** Puts the overlay up blank right away, before anything is painted, so the panel never shows before setup does. */
+    cover() {
+      if (!overlay.isConnected) root.append(overlay);
+    },
     show(slide) {
       button.hidden = true;
       draw(PICTURES[slide.picture], slide.title, VOICE_LINES[slide.line], SLIDES.findIndex((s) => s.line === slide.line));

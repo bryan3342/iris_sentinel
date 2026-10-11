@@ -1,4 +1,4 @@
-import type { GazeSample, Point2 } from '@iris/protocol';
+import type { Point2 } from '@iris/protocol';
 
 const POINTS_PER_IRIS = 5; // center, then four contour points
 const TRAIL_LENGTH = 20;
@@ -11,7 +11,6 @@ const RED = '255, 40, 40';
  */
 export class EyeTrace {
   readonly overlay = document.createElement('canvas');
-  readonly readout = document.createElement('p');
   private trails: Point2[][] = [[], []];
 
   constructor(private readonly video: HTMLVideoElement) {
@@ -66,11 +65,5 @@ export class EyeTrace {
       ctx.arc(center.x, center.y, 2.5 * size, 0, Math.PI * 2);
       ctx.fill();
     }
-  }
-
-  addSample(sample: GazeSample): void {
-    const eye = sample.eye ? `x ${sample.eye.x.toFixed(2)}  y ${sample.eye.y.toFixed(2)}` : 'not tracked';
-    this.readout.textContent =
-      `Eyes ${eye} | Head yaw ${sample.head.yaw.toFixed(2)} pitch ${sample.head.pitch.toFixed(2)}`;
   }
 }
