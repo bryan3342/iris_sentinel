@@ -153,7 +153,7 @@ describe('selecting with gaze', () => {
     const outcomes: Outcome[] = [];
     let learned = 0;
     const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
-      select: async (_list, target, confirmedTwice) => { selected.push([target.id, confirmedTwice]); return 'SELECTED'; },
+      select: async (_list, target, blinked) => { selected.push([target.id, blinked]); return 'SELECTED'; },
       onOutcome: (outcome) => outcomes.push(outcome),
       learn, onLearned: () => { learned++; },
       dwell, // on, as for pointing with the mouse; the eyes leave it off

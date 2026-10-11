@@ -5,8 +5,7 @@ import type { PageMarks } from './page-marks';
 import type { TargetList } from './target-list';
 
 type Target = TargetList['targets'][number];
-/** Clicks a confirmed target. The page checks everything again before it does. */
-/** Clicks a confirmed target; `blinked` says the confirm was a double blink, the only one that opens a risky target. */
+/** Clicks a confirmed target; the page checks everything again before it does. `blinked` says the confirm was a double blink, the only one that opens a risky target. */
 export type Select = (list: TargetList, target: Target, blinked: boolean) => Promise<SelectResult>;
 export type Outcome = SelectResult;
 
