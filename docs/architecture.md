@@ -226,7 +226,7 @@ page itself.
 sensitive rectangles and revisions, and numbers targets exactly as the gaze scan
 does. Chrome capture runs through the background broker; during capture the
 overlay is held clear, so gaze cannot draw Iris's numbers into the screenshot. The side-panel coordinator owns transient mask/crop canvases, capture
-consistency checks and plain-text results. The background owns HTTP to the Iris server on this computer, which holds every key; the extension holds no token or key. It rejects broker
+consistency checks and plain-text results. It is reached only through the voice tools; the side panel has no separate page understanding section, and closing the panel cancels a pending request. The background owns HTTP to the Iris server on this computer, which holds every key; the extension holds no token or key. It rejects broker
 messages from content scripts and other extension pages. An in-memory limiter manages session rate/concurrency within each Worker instance;
 there is no database or distributed coordination in this smaller MVP. The Worker
 validates bounded PNGs and model output independently of the Gemini schema.

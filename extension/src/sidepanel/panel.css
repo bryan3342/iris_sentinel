@@ -69,9 +69,6 @@ button {
   pointer-events: none;
 }
 
-.understanding input { display: block; width: 100%; box-sizing: border-box; margin: 12px 0; padding: 10px; }
-.understanding button { display: block; margin: 8px 0; }
-
 /* The Iris wordmark header. The dot of the "i" is an eye that blinks and glances. */
 .brand { display: flex; align-items: flex-end; margin: 0 0 14px; }
 .brand .word { display: inline-flex; align-items: flex-end; font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }

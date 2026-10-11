@@ -130,14 +130,15 @@ until all seven are recorded.
 Use a public page with no personal information. `https://example.com` has one
 link, so the right answer is known.
 
-1. Open `https://example.com` in Chrome and keep it the active tab.
-2. Click the Iris toolbar icon to open the side panel.
-3. In **Page understanding**, type `More information` as the request and click **Send viewport to find
-   target**, once.
+Page understanding is used by voice, so set up the voice agent first
+([voice-agent-setup.md](voice-agent-setup.md)).
 
-Expected: a result starting "Recommended target 1. It is highlighted on the
-page.", then Gemini's short explanation, and the link outlined on the page.
-Nothing is clicked.
+1. Open `https://example.com` in Chrome and keep it the active tab.
+2. Click the Iris toolbar icon to open the side panel, with **Listening** on.
+3. Say "find the more information link", once.
+
+Expected: Iris says it is number 1, with Gemini's short explanation, and marks
+the link in blue on the page. Nothing is clicked.
 
 This is the only request the test needs. Iris allows one request at a time and
 ten a minute.
@@ -150,10 +151,10 @@ Gemini can describe whatever gaze is aiming at. This uses one more request.
    or calibrate with **Calibrate on this page** and turn on **Aim with my eyes**.
 2. Rest your eyes (or the mouse) on the "More information" link for about a
    second, until it is outlined.
-3. Click **What is this? (the target I rested on)** in the side panel. Moving to
-   the button does not change the target: Iris uses the one you rested on.
+3. Say "what is this". Iris uses the target you rested on, even if your eyes
+   have moved since.
 
-Expected: "Target 1:" and a short description of the link. Nothing is clicked.
+Expected: "Number 1:" and a short spoken description of the link. Nothing is clicked.
 Blinking twice on the target opens it; looking alone never does. Anything that
 may submit, pay, delete or send opens only with a double blink.
 
