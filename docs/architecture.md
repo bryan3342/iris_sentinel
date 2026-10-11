@@ -156,14 +156,14 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 
 **Fatigue score.** Combines slow body signals (blink rate up, heart rate variability down, breathing rate) with behavior (back-after-click rate, aim steadiness, time to click). It is computed against the user's own resting baseline, uses hysteresis so it does not flicker, and is paused while the voice agent hears the user talking.
 
-**Where fatigue runs today.** `FatigueEngine` (`packages/core`) runs in the side panel until a background coordinator exists. Every input is stamped on the side panel clock (`performance.now()`) when it arrives, because the camera, the companion and the simulated providers each keep their own clock. Personal baselines live in memory for the session only. The side panel's fatigue card shows the level, the "why" lines and what Iris would change; for now it runs on simulated body signals (Play, with a "Cover camera" switch), and the responses are shown, not yet applied. Back-after-click is not measured yet, and the talking pause waits for the voice agent.
+**Where fatigue runs today.** `FatigueEngine` (`packages/core`) runs in the side panel until a background coordinator exists. Every input is stamped on the side panel clock (`performance.now()`) when it arrives, because the camera, the companion and the simulated providers each keep their own clock. Personal baselines live in memory for the session only. The side panel's fatigue card shows the level, the "why" lines and what Iris would change. While the Presage companion is connected it runs on the companion's live readings (one shared link; the card never starts or stops it, and the link hands a late listener the current camera quality); otherwise Play runs simulated body signals, with a "Cover camera" switch, whose results stay on the card. The voice check-in is applied: at the fatigued or strained level, from live readings only, with Listening on, Iris connects and says one fixed phrase, "Want a hand, or a short break?" (`CheckIn` in `packages/core`: at most once every 15 minutes, never while warming up or unable to see the user, never during a conversation or within two minutes after one). Only the level and pause are read for this; no reading, score or level reaches the voice agent. The other responses are shown, not yet applied. Back-after-click is not measured yet, and the talking pause waits for the voice agent.
 
 | Fatigue level | Iris response |
 | :--- | :--- |
 | Fresh | Normal confirm timing and target size |
 | Tiring | Longer confirm timing, larger targets |
-| Fatigued | Agent offers to read the page aloud and take requests by voice |
-| Sustained strain | Suggests a break; pauses gaze confirms until the user looks back |
+| Fatigued | Iris checks in by voice with a fixed phrase and takes requests by voice (built); offers to read the page aloud |
+| Sustained strain | Iris checks in by voice with the same fixed phrase (built); pauses gaze confirms until the user looks back |
 
 **Movement level.** Derived from frame-to-frame change in Presage face points plus its "excessive motion" warning. High movement lowers trust in the other body signals and can mean the user is restless or uncomfortable.
 

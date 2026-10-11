@@ -1,4 +1,4 @@
-import { companionLink } from '../providers/companion/link';
+import { companionLink, type CompanionLink } from '../providers/companion/link';
 import {
   bodySignalsView,
   initialBodySignals,
@@ -13,7 +13,7 @@ import {
 // Iris is open. What it shows is worked out in body-signals.ts.
 
 /** Side panel section that connects to the companion as soon as it is shown. */
-export function companionPanel(): HTMLElement {
+export function companionPanel(link: CompanionLink = companionLink()): HTMLElement {
   const section = document.createElement('section');
   section.className = 'body-signals';
   // Only the status line is announced to screen readers: the countdown below
@@ -26,7 +26,6 @@ export function companionPanel(): HTMLElement {
   note.className = 'note';
   section.append(status, camera, signals, note);
 
-  const link = companionLink();
   let state = initialBodySignals(link.state);
   let ticker: ReturnType<typeof setInterval> | null = null;
 

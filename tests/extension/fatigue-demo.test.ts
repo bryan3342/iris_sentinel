@@ -1,6 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fatiguePanel } from '../../extension/src/sidepanel/fatigue-panel';
+import type { LinkState } from '../../extension/src/providers/companion/link';
+import { DEMO_WARM_UP, SimulatedBodyProvider, TIRING_DEMO } from '../../extension/src/providers/simulated/body';
+import type { FatigueState } from '@iris/core';
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -65,5 +68,43 @@ describe('fatigue demo in the side panel', () => {
     vi.advanceTimersByTime(30_000);
     expect(status()).toBe('Fatigue: not running.');
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('fatigue from the live companion', () => {
+  it('runs on the companion while it is connected, passes results on, and leaves starting and stopping it to its owner', () => {
+    const body = new SimulatedBodyProvider({ tiredness: TIRING_DEMO, warmUp: DEMO_WARM_UP });
+    let state: LinkState = 'connecting', changed: (s: LinkState) => void = () => {};
+    const live = { start: vi.fn(async () => {}), stop: vi.fn(), get state() { return state; },
+      onState: (l: (s: LinkState) => void) => { changed = l; return () => {}; },
+      onBlink: body.onBlink.bind(body), onQuality: body.onQuality.bind(body), onVitals: body.onVitals.bind(body) };
+    const results: FatigueState[] = [];
+    const section = fatiguePanel({ now: () => Date.now(), live, onFatigue: (s) => results.push(s) });
+    const button = section.querySelector('button')!;
+    vi.advanceTimersByTime(3_000);
+    expect(results).toHaveLength(0); // not connected yet: nothing runs
+
+    state = 'connected'; changed(state);
+    void body.start(); // the companion starts sensing once connected
+    vi.advanceTimersByTime(260_000);
+    expect(section.querySelector('h2')!.textContent).toBe('Fatigue (live, from Presage)');
+    expect(button.hidden).toBe(true);
+    expect(results.at(-1)!.level).toBe('strained');
+
+    state = 'disconnected'; changed(state);
+    const count = results.length;
+    vi.advanceTimersByTime(5_000);
+    expect(results).toHaveLength(count);
+    expect(button.hidden).toBe(false);
+    expect([live.start, live.stop].map((f) => f.mock.calls.length)).toEqual([0, 0]);
+    body.stop();
+  });
+
+  it('never passes on simulated results', () => {
+    const results: FatigueState[] = [];
+    const section = fatiguePanel({ now: () => Date.now(), onFatigue: (s) => results.push(s) });
+    section.querySelector('button')!.click();
+    vi.advanceTimersByTime(60_000);
+    expect(results).toHaveLength(0);
   });
 });
