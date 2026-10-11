@@ -53,18 +53,32 @@ describe('BlinkRateMeter', () => {
     expect(clear.rate(120_000)).toBe(15);
   });
 
-  it('starts over when the face is lost', () => {
+  it('counts only the time the face was in view, so losing it leaves a gap rather than a restart', () => {
     const meter = new BlinkRateMeter();
     meter.setQuality(ok(0));
-    blinkEvery(meter, 4_000, 0, 50_000);
+    blinkEvery(meter, 4_000, 0, 50_000); // 12 blinks
     meter.setQuality(lost(50_000));
-    expect(meter.rate(50_000)).toBeNull();
+    expect(meter.rate(50_000)).toBeCloseTo(14.4); // 12 blinks in 50 s of view
 
     blinkEvery(meter, 4_000, 50_000, 60_000); // seen through a poor view: ignored
     meter.setQuality(ok(60_000));
-    blinkEvery(meter, 4_000, 60_000, 120_000);
-    expect(meter.rate(89_999)).toBeNull();
-    expect(meter.rate(90_000)).toBe(14);
+    blinkEvery(meter, 4_000, 60_000, 90_000);
+    expect(meter.rate(90_000)).toBeCloseTo(14.4); // 12 blinks in the 50 s of view between 30 s and 90 s
+    blinkEvery(meter, 4_000, 88_000, 120_000); // carries on every 4 s
+    expect(meter.rate(120_000)).toBe(15);
+  });
+
+  it('shrugs off a brief camera glitch', () => {
+    const meter = steady();
+    meter.setQuality({ t: 61_000, quality: 'motion', hint: '' });
+    meter.setQuality(ok(62_000));
+    expect(meter.rate(120_000)).toBeCloseTo(15.25, 2); // 15 blinks in 59 s of view
+  });
+
+  it('still counts blinks while only the chest is out of view', () => {
+    const meter = new BlinkRateMeter();
+    meter.setQuality({ t: 0, quality: 'chest-not-visible', hint: '' });
+    blinkEvery(meter, 4_000, 0, 120_000);
     expect(meter.rate(120_000)).toBe(15);
   });
 

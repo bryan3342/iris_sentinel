@@ -47,15 +47,17 @@ describe('fatigue demo in the side panel', () => {
     expect(why().join(' ')).toMatch(/Blink rate up|Heart rate variability down|Breathing rate up/);
   });
 
-  it('pauses and holds the score while the camera is covered', () => {
+  it('pauses and holds the score a few seconds after the camera is covered', () => {
     const { button, cover, status, why } = mount();
     button.click();
     watch(status, 150, 0);
-    const before = status().match(/score (\d+)/)![1];
     cover.checked = true;
-    vi.advanceTimersByTime(2_000);
-    expect(status()).toBe(`Fatigue: paused (score ${before}).`);
+    vi.advanceTimersByTime(5_000); // a brief glitch does not pause; 3 s or more does
+    const paused = status();
+    expect(paused).toMatch(/^Fatigue: paused \(score \d+\)\.$/);
     expect(why()).toEqual(['Face out of view, paused']);
+    vi.advanceTimersByTime(30_000);
+    expect(status()).toBe(paused); // held while covered
   });
 
   it('stops cleanly', () => {

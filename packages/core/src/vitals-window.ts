@@ -6,8 +6,8 @@ import { quantile } from './stats';
  * variability) for the fatigue score: the median of the usable readings from
  * the last 30 s. A reading is usable once Presage marks it stable and at least
  * half confident. Camera-based readings spike now and then, and the median
- * shrugs off a few odd ones. Readings stay in memory only; `clear` drops them
- * when the camera view stops being trustworthy.
+ * shrugs off a few odd ones. Readings stay in memory only; they leave the
+ * window by age, and `clear` drops them all for a new session.
  */
 
 export interface VitalsWindowOptions {
