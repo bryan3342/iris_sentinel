@@ -29,13 +29,13 @@ function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; 
 }
 
 const round = (v: number) => Math.round(v);
-/** One check in plain words, with up to three earlier ones (other lid angles or seats) to compare against. */
 /** Where a check dot sat, in words: top left, middle, bottom right and so on. */
 function place(at: Point2): string {
   const row = at.y < 1 / 3 ? 'top' : at.y > 2 / 3 ? 'bottom' : 'middle';
   const column = at.x < 1 / 3 ? 'left' : at.x > 2 / 3 ? 'right' : 'center';
   return row === 'middle' && column === 'center' ? 'the middle' : row === 'middle' ? `middle ${column}` : `${row} ${column}`;
 }
+/** One check in plain words, with up to three earlier ones (other lid angles or seats) to compare against. */
 function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): string {
   const { posture, regions, worst } = report;
   const px = (v: number | null) => (v === null ? 'n/a' : `${round(v)} px`);
