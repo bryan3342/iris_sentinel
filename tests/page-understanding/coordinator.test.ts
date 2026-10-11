@@ -136,7 +136,7 @@ it('sends nothing without an aimed target, or once the aimed target has moved', 
     .rejects.toThrow('PAGE_CHANGED');
   expect(events).not.toContain('iris.page.capture');
 });
-it('summarizes only the block where the eyes rested, outlined in a crop, or the whole viewport when there is none', async () => {
+it('summarizes only the block where the eyes rested, outlined in a crop, and sends nothing when there is none', async () => {
   let region: unknown = { x: 0, y: 0, width: 1, height: 1 };
   const script = vi.mocked(chrome.scripting.executeScript);
   const original = script.getMockImplementation()!;
@@ -153,9 +153,12 @@ it('summarizes only the block where the eyes rested, outlined in a crop, or the 
   expect(sent().sourceRect).toEqual({ x: 0, y: 0, width: 2, height: 2 });
   expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: { x: 0, y: 0, width: 1, height: 1 } }]);
 
-  region = null; // nothing summarizable there
-  expect((await new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } })).result.result).toMatchObject({ scope: 'visible_viewport' });
-  region = { x: 0, y: 0, width: 50, height: 1 }; // the page reported a block outside its viewport
-  await new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } });
-  expect(sent().sourceRect).toBeUndefined();
+  events.length = 0;
+  for (const nothing of [null, { x: 0, y: 0, width: 50, height: 1 }]) { // no block there; a block outside the viewport
+    region = nothing;
+    await expect(new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } })).rejects.toThrow('NOTHING_LOOKED_AT');
+  }
+  expect(events).not.toContain('iris.page.capture');
+  // Asking for the whole page (no lookedAt) still summarizes the whole viewport.
+  expect((await new PageCoordinator().inspect({ operation: 'summarize_page' })).result.result).toMatchObject({ scope: 'visible_viewport' });
 });

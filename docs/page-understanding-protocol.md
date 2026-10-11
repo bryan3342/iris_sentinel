@@ -63,7 +63,8 @@ mouse) rested longest in the last five seconds, kept in side panel memory only, 
 finds the content block there: the paragraph, list item, figure, image or table. The
 crop is that block with room around it (as for `describe_target`), masked like any
 capture, with one drawn outline marking the block. With no resting place, no block
-there, or a block covering most of the page, the whole viewport is summarized.
+there, or a block covering most of the page, nothing is sent: the user is told, and
+the whole viewport is summarized only when they ask for the whole page.
 
 ## Limits and errors
 

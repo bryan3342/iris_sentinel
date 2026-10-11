@@ -59,15 +59,16 @@ export function browserTools({ coordinator, marks, gaze, report }: ToolDeps): Vo
       catch { throw new Error('NO_HISTORY'); }
       return to === 'back' ? 'Went back to the previous page.' : 'Went forward.';
     }),
-    summarize_page: tool(async () => {
+    summarize_whole_page: tool(async () => {
       const { result } = await coordinator.inspect({ operation: 'summarize_page' });
       return result.result.operation === 'summarize_page' ? untrusted(result.result.summary) : 'No summary.';
     }),
+    // Only what the user looked at, never the whole page instead: that takes asking for the whole page.
     summarize_looked_at: tool(async () => {
-      const { result } = await coordinator.inspect({ operation: 'summarize_page', lookedAt: gaze.lookedAt() });
-      if (result.result.operation !== 'summarize_page') return 'No summary.';
-      const whole = result.result.scope === 'visible_viewport' ? 'Your eyes had not settled on one part, so this covers the whole screen. ' : '';
-      return whole + untrusted(result.result.summary);
+      const lookedAt = gaze.lookedAt();
+      if (!lookedAt) throw new Error('NOTHING_LOOKED_AT');
+      const { result } = await coordinator.inspect({ operation: 'summarize_page', lookedAt });
+      return result.result.operation === 'summarize_page' ? untrusted(result.result.summary) : 'No summary.';
     }),
     describe_looked_at: tool(async () => {
       const aimed = marks.aimed;

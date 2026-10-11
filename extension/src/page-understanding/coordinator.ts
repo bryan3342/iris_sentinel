@@ -5,7 +5,7 @@ import { pageRegionAt, pageSnapshot, type PageSnapshot } from './page-helper';
 
 /** The target gaze rested on, as numbered in the gaze scan. */
 export interface AimedTarget { documentToken: string; id: number; rect: Rect }
-/** `lookedAt`, for a summary, is where the eyes rested (viewport pixels): only the block there is summarized. */
+/** `lookedAt`, for a summary, is where the eyes rested (viewport pixels): only the block there is summarized, never the whole viewport. */
 export interface DemoRequest { operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null; lookedAt?: Point2 | null }
 export interface BrokerReply { ok: boolean; value?: unknown; code?: string }
 export async function broker(message: unknown): Promise<unknown> {
@@ -34,7 +34,7 @@ function aimedTarget(aimed: AimedTarget | null | undefined, snapshot: PageSnapsh
     Math.abs(target.rect.x - aimed.rect.x) > 4 || Math.abs(target.rect.y - aimed.rect.y) > 4) throw new Error('PAGE_CHANGED');
   return target;
 }
-/** The content block at `at`, or null to summarize the whole viewport. */
+/** The content block at `at`, or null when there is none to summarize on its own. */
 async function regionAt(tabId: number, at: Point2, viewport: Viewport): Promise<Rect | null> {
   const [result] = await chrome.scripting.executeScript({ target: { tabId }, func: pageRegionAt, args: [at] });
   try { return result?.result ? validateRect(result.result, viewport) : null; } catch { return null; }
@@ -87,6 +87,7 @@ export class PageCoordinator {
       if (request.operation === 'describe_image' && !selected) throw new Error('IMAGE_NOT_FOUND');
       const aimed = request.operation === 'describe_target' ? aimedTarget(request.aimed, before) : undefined;
       const region = request.operation === 'summarize_page' && request.lookedAt ? await regionAt(tabId, request.lookedAt, before.viewport) : null;
+      if (request.lookedAt && !region) throw new Error('NOTHING_LOOKED_AT');
       const outlined = aimed?.rect ?? region ?? undefined; // outlined in the image, so Gemini knows which part is meant
       const crop = selected?.rect ?? (outlined && targetCrop(outlined, before.viewport));
       // Gemini sees the page itself, never Iris's own numbers or highlight. The hold stops gaze
