@@ -55,7 +55,7 @@ describe('fatigueView while measuring', () => {
     const view = fatigueView(state({ score: 47.6, level: 'tiring' }, { blink: clue(22.5, 15, 0.5), hrv: clue(31.5, 45, 2 / 3) }));
     expect(view.status).toBe('Fatigue: tiring (score 48).');
     expect(view.why).toEqual(['Heart rate variability down 30%', 'Blink rate up 50%']);
-    expect(view.response).toBe('Iris would: Slower clicks and larger targets');
+    expect(view.response).toBe('Iris would: Slower clicks'); // larger targets start at fatigued
   });
 
   it('shows how long it has been running and the scores so far, so the user can see it is tracking', () => {

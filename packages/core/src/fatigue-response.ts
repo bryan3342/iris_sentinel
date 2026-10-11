@@ -47,8 +47,10 @@ export function explain(state: FatigueState, settings: Record<FatigueClue, ClueS
 export interface FatigueResponse {
   /** Multiplier for the confirm (dwell) time. Never below 1: Iris only ever slows down. */
   dwellScale: number;
-  /** Multiplier for the size of page targets. Never below 1. */
+  /** Multiplier for the size of page targets: how far from a target gaze still aims at it. Never below 1. */
   targetScale: number;
+  /** Move the gaze ring onto the aimed target, so it is clear what a double blink opens. */
+  snapCursor: boolean;
   /** Offer to read the page aloud and take requests by voice. */
   offerReadAloud: boolean;
   /** Suggest a break. */
@@ -59,11 +61,16 @@ export interface FatigueResponse {
   summary: string;
 }
 
+// Larger targets and the snapping ring start at fatigued, not tiring: aiming changes only once the user
+// seems a lot more tired, so it never shifts under someone who is merely a little tired.
 const RESPONSES: Record<FatigueLevel, FatigueResponse> = {
-  fresh: { dwellScale: 1, targetScale: 1, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Normal pace' },
-  tiring: { dwellScale: 1.5, targetScale: 1.25, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Slower clicks and larger targets' },
-  fatigued: { dwellScale: 1.5, targetScale: 1.25, offerReadAloud: true, suggestBreak: false, pauseGazeConfirms: false, summary: 'Slower clicks, larger targets, and an offer to read the page aloud' },
-  strained: { dwellScale: 2, targetScale: 1.5, offerReadAloud: true, suggestBreak: true, pauseGazeConfirms: true, summary: 'You might be tired. Time for a break?' },
+  fresh: { dwellScale: 1, targetScale: 1, snapCursor: false, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Normal pace' },
+  tiring: { dwellScale: 1.5, targetScale: 1, snapCursor: false, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Slower clicks' },
+  fatigued: {
+    dwellScale: 1.5, targetScale: 1.25, snapCursor: true, offerReadAloud: true, suggestBreak: false, pauseGazeConfirms: false,
+    summary: 'Slower clicks, larger targets the ring snaps to, and an offer to read the page aloud',
+  },
+  strained: { dwellScale: 2, targetScale: 1.5, snapCursor: true, offerReadAloud: true, suggestBreak: true, pauseGazeConfirms: true, summary: 'You might be tired. Time for a break?' },
 };
 
 /** What Iris changes at a fatigue level. Each level keeps the help of the levels below it. */

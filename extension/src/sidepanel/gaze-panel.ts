@@ -1,13 +1,17 @@
-import { CalibrationStore, GazeAim, GazePointer, RestingPoint } from '@iris/core';
+import { CalibrationStore, GazeAim, GazePointer, RestingPoint, type FatigueResponse } from '@iris/core';
 import type { GazeProvider, Point2, Rect } from '@iris/protocol';
-import { GazeCursor } from './gaze-cursor';
+import { GazeCursor, ringPoint } from './gaze-cursor';
 import { HeadScroller } from './head-scroll';
 import { GazeSession, selectInPage, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
 import { loadSamples, saveSamples } from './setup/calibration-storage';
 import { calibrateOnPage, screenFrame } from './setup/page-calibration';
-import type { LiveTargetList } from './target-list';
+import type { LiveTargetList, TargetList } from './target-list';
 import { openByVoice, type OpenResult } from './voice-open';
+
+/** The part of a fatigue response that changes aiming. */
+export type AimHelp = Pick<FatigueResponse, 'targetScale' | 'snapCursor'>;
+const NORMAL_AIM: AimHelp = { targetScale: 1, snapCursor: false };
 
 const screenSize = () => ({ width: screen.width, height: screen.height });
 
@@ -37,6 +41,11 @@ export interface GazePanel {
   confirm(tabId: number, run: () => void): boolean;
   /** Where on the page the eyes rested in the last few seconds, or null. */
   lookedAt(): Point2 | null;
+  /**
+   * Makes aiming easier while the user seems fatigued: targets count as aimed from `targetScale` times
+   * as far, and the red ring snaps onto the aimed target when `snapCursor` is set. Normal help undoes it.
+   */
+  adapt(help: AimHelp): void;
 }
 
 /**
@@ -61,13 +70,15 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   // Recent gaze on the current tab, for "summarize this". Kept in memory only, for five seconds.
   const rest = new RestingPoint();
   let restTab: number | null = null;
-  const onGaze = (at: Point2 | null, list: { tabId: number }) => {
-    cursor.move(list.tabId, at);
+  let help = NORMAL_AIM;
+  const onGaze = (at: Point2 | null, list: TargetList, aimed: number | null) => {
+    // The ring may snap onto the aimed target; "summarize this" still uses where the eyes actually rest.
+    cursor.move(list.tabId, ringPoint(at, list.targets.find((t) => t.id === aimed) ?? null, help.snapCursor));
     if (list.tabId !== restTab) { rest.clear(); restTab = list.tabId; }
     rest.push(at, performance.now());
   };
   let camera: GazeProvider | null = null;
-  let active: { session: GazeSession; stop: () => void } | null = null;
+  let active: { session: GazeSession; aim: GazeAim; stop: () => void } | null = null;
   const headScroll = new HeadScroller();
 
   let generation = 0; // bumps on every stop, so a slow calibration load cannot start a stale session
@@ -83,11 +94,13 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   };
   /** Aims with the camera through a calibration saved in screen positions. */
   const aimWithEyes = (provider: GazeProvider, store: CalibrationStore) => {
-    active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, {
+    const aim = new GazeAim(new GazePointer(store));
+    aim.setScale(help.targetScale);
+    active = { session: new GazeSession(provider, aim, marks, {
       frameFor: screenFrame, onOutcome: report, onGaze,
       // Every gaze selection refines the calibration for the posture the user is in now.
       learn: true, onLearned: () => void saveSamples(store.samples),
-    }), stop: provider.onSample((sample) => {
+    }), aim, stop: provider.onSample((sample) => {
       if (tilt.checked) headScroll.update(sample, targets.list?.tabId ?? null);
     }) };
     active.session.start();
@@ -146,6 +159,10 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       if (!active) return false; // only a double blink confirms an action, and it needs the eyes aiming
       active.session.armAction(tabId, run);
       return true;
+    },
+    adapt(next) {
+      help = { targetScale: next.targetScale, snapCursor: next.snapCursor };
+      active?.aim.setScale(help.targetScale); // the ring follows the new help from the next sample
     },
   };
 }

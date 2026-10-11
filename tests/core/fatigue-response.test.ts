@@ -49,13 +49,17 @@ describe('explain', () => {
 
 describe('fatigueResponse', () => {
   it('keeps the normal pace when fresh', () => {
-    expect(fatigueResponse('fresh')).toEqual({ dwellScale: 1, targetScale: 1, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Normal pace' });
+    expect(fatigueResponse('fresh')).toEqual({
+      dwellScale: 1, targetScale: 1, snapCursor: false, offerReadAloud: false, suggestBreak: false, pauseGazeConfirms: false, summary: 'Normal pace',
+    });
   });
 
-  it('adds help level by level, as in the architecture', () => {
-    expect(fatigueResponse('tiring')).toMatchObject({ dwellScale: 1.5, targetScale: 1.25, offerReadAloud: false });
-    expect(fatigueResponse('fatigued')).toMatchObject({ offerReadAloud: true, suggestBreak: false });
-    expect(fatigueResponse('strained')).toMatchObject({ suggestBreak: true, pauseGazeConfirms: true, summary: 'You might be tired. Time for a break?' });
+  it('adds help level by level: from fatigued on, larger targets that the gaze ring snaps onto', () => {
+    expect(fatigueResponse('tiring')).toMatchObject({ dwellScale: 1.5, targetScale: 1, snapCursor: false, offerReadAloud: false });
+    expect(fatigueResponse('fatigued')).toMatchObject({ targetScale: 1.25, snapCursor: true, offerReadAloud: true, suggestBreak: false });
+    expect(fatigueResponse('strained')).toMatchObject({
+      targetScale: 1.5, snapCursor: true, suggestBreak: true, pauseGazeConfirms: true, summary: 'You might be tired. Time for a break?',
+    });
   });
 
   it('only ever slows down and enlarges, never the other way, as the level rises', () => {
