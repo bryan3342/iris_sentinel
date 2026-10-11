@@ -70,13 +70,25 @@ describe('FatigueEngine', () => {
     expect(states.at(-1)!.clues.hrv.strain).toBe(1);
   });
 
-  it('pauses and holds the score and level while the face is lost', () => {
+  it('pauses and holds the score and level once the face has been lost for 3 seconds', () => {
     const engine = warmedUp();
-    const tiring = play(engine, 120_000, 240_000, () => 0.6).at(-1)!;
+    play(engine, 120_000, 240_000, () => 0.6);
     view(engine, 240_000, 'no-face');
     const lost = play(engine, 240_000, 360_000, tired);
-    expect(lost.every((s) => s.paused === 'no-face' && s.level === tiring.level && s.score === tiring.score)).toBe(true);
+    expect(lost.slice(0, 3).every((s) => s.paused === null)).toBe(true); // 240 to 242 s: still within the grace
+    const held = lost[3]!;
+    expect(held.paused).toBe('no-face');
+    expect(lost.slice(3).every((s) => s.paused === 'no-face' && s.level === held.level && s.score === held.score)).toBe(true);
     expect(lost.at(-1)!.clues.hrv.value).toBeNull();
+  });
+
+  it('does not pause or lose readings over a brief camera glitch', () => {
+    const engine = warmedUp();
+    view(engine, 120_000, 'motion');
+    view(engine, 121_500, 'ok');
+    const states = play(engine, 120_000, 130_000, rested);
+    expect(states.every((s) => s.paused === null)).toBe(true);
+    expect(states.every((s) => s.clues.hrv.value !== null && s.clues.blink.value !== null)).toBe(true);
   });
 
   it('pauses for a poor view too', () => {

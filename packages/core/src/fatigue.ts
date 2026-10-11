@@ -14,9 +14,11 @@ import { VitalsWindow } from './vitals-window';
  *
  * Feed it everything as it arrives, all stamped on one clock, and call
  * `update` about once a second: each update is one sample toward the
- * baselines. Body clues count only while the camera view is trustworthy; while
- * the face is lost or the view is poor, the engine pauses and the score and
- * level hold still. The talking pause waits for the voice agent.
+ * baselines. Body clues count only while the camera view is trustworthy; once
+ * the face has been lost or the view poor for a few seconds, the engine pauses
+ * and the score and level hold still. A shorter glitch neither pauses nor
+ * throws readings away, since Presage's view status flickers. The talking pause
+ * waits for the voice agent.
  */
 
 export const FATIGUE_CLUES = ['blink', 'hrv', 'breathing', 'timeToClick', 'landings'] as const;
@@ -80,6 +82,8 @@ export interface FatigueEngineOptions {
   minCoverage?: number;
   /** Smoothing cutoff for the score in hertz: lower is smoother. 0.016 lags about 10 s. */
   smoothingHz?: number;
+  /** How long a lost face or poor view must last before the engine pauses, in milliseconds. */
+  viewGraceMs?: number;
 }
 
 /** Views that pause the engine. `ok` and `chest-not-visible` (breathing alone stops) do not. */
@@ -105,9 +109,13 @@ export class FatigueEngine {
   private readonly smoother: OneEuroFilter;
   private readonly minCoverage: number;
   private quality: Quality | null = null;
+  /** When the current view began. */
+  private qualitySince = 0;
+  private readonly viewGraceMs: number;
   private score: number | null = null;
 
-  constructor({ clues = {}, level, minCoverage = 0.3, smoothingHz = 0.016 }: FatigueEngineOptions = {}) {
+  constructor({ clues = {}, level, minCoverage = 0.3, smoothingHz = 0.016, viewGraceMs = 3_000 }: FatigueEngineOptions = {}) {
+    this.viewGraceMs = viewGraceMs;
     this.settings = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, { ...CLUE_SETTINGS[c], ...clues[c] }])) as Record<FatigueClue, ClueSettings>;
     this.baselines = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, new Baseline(this.settings[c])])) as Record<FatigueClue, Baseline>;
     this.levels = new FatigueLevelTracker(level);
@@ -130,11 +138,11 @@ export class FatigueEngine {
     this.blinks.addConfirm(event);
   }
 
+  /** Readings are skipped while the view is poor, but kept: they leave the 30 s windows by themselves. */
   setQuality(status: QualityStatus): void {
+    if (status.quality !== this.quality) this.qualitySince = status.t;
     this.quality = status.quality;
     this.blinks.setQuality(status);
-    if (PAUSING_VIEWS[status.quality]) this.hrv.clear();
-    if (status.quality !== 'ok') this.breathing.clear();
   }
 
   /** The aimed target changed. */
@@ -148,7 +156,8 @@ export class FatigueEngine {
   }
 
   update(t: number): FatigueState {
-    const viewPause = this.quality === null ? null : (PAUSING_VIEWS[this.quality] ?? null);
+    const bad = this.quality === null ? null : (PAUSING_VIEWS[this.quality] ?? null);
+    const viewPause = bad && t - this.qualitySince >= this.viewGraceMs ? bad : null; // a short glitch does not pause
     const current: Record<FatigueClue, number | null> = {
       blink: this.blinks.rate(t),
       hrv: this.hrv.value(t),
@@ -182,6 +191,7 @@ export class FatigueEngine {
     this.levels.reset();
     this.smoother.reset();
     this.quality = null;
+    this.qualitySince = 0;
     this.score = null;
   }
 }

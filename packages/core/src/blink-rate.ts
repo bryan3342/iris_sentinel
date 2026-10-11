@@ -1,4 +1,4 @@
-import type { BlinkEvent, QualityStatus } from '@iris/protocol';
+import type { BlinkEvent, Quality, QualityStatus } from '@iris/protocol';
 import type { ConfirmEvent } from './confirm';
 
 /**
@@ -6,15 +6,16 @@ import type { ConfirmEvent } from './confirm';
  * blink rate rises as people tire. Presage misses some blinks, but the rate is
  * only ever compared with the same user's own baseline, so a steady undercount
  * cancels out. A blink close to a double-blink confirm is dropped, so confirming
- * never reads as tiredness. Nothing counts until the camera view is reported
- * `ok`, and the window starts over whenever it stops being `ok`. Blink times
- * stay in memory only.
+ * never reads as tiredness. Only blinks seen while the face is in view count,
+ * and the rate divides them by the time the face was in view within the
+ * window, so a brief camera glitch costs a few seconds of coverage instead of
+ * starting the count over. Blink times stay in memory only.
  */
 
 export interface BlinkRateOptions {
   /** Length of the rolling window, in milliseconds. */
   windowMs?: number;
-  /** How long the view must have been `ok` before a rate is reported, in milliseconds. */
+  /** How much of the window the face must have been in view before a rate is reported, in milliseconds. */
   minCoverageMs?: number;
   /** A blink this long before a double-blink confirm is dropped, in milliseconds; both blinks of the pair come before it. */
   confirmBeforeMs?: number;
@@ -23,6 +24,8 @@ export interface BlinkRateOptions {
 }
 
 const MINUTE_MS = 60_000;
+/** Views with the face in sight, so its blinks can be trusted. Without the chest, only breathing is lost. */
+const FACE_IN_VIEW: readonly Quality[] = ['ok', 'chest-not-visible'];
 
 export class BlinkRateMeter {
   private readonly windowMs: number;
@@ -31,8 +34,8 @@ export class BlinkRateMeter {
   private readonly confirmAfterMs: number;
   private blinks: number[] = [];
   private confirms: number[] = [];
-  /** Start of the current stretch of `ok` view, or null while the view is not `ok`. */
-  private since: number | null = null;
+  /** Stretches with the face in view; the last one is open (`end` null) while it still is. */
+  private views: { start: number; end: number | null }[] = [];
 
   constructor({ windowMs = 60_000, minCoverageMs = 30_000, confirmBeforeMs = 900, confirmAfterMs = 2_000 }: BlinkRateOptions = {}) {
     this.windowMs = windowMs;
@@ -42,7 +45,7 @@ export class BlinkRateMeter {
   }
 
   addBlink(blink: BlinkEvent): void {
-    if (this.since === null) return; // a blink seen through a poor view is not trusted
+    if (!this.inView) return; // a blink seen through a poor view is not trusted
     this.blinks = [...this.keepRecent(this.blinks, blink.t), blink.t];
   }
 
@@ -53,27 +56,32 @@ export class BlinkRateMeter {
   }
 
   setQuality(status: QualityStatus): void {
-    if (status.quality === 'ok') {
-      this.since ??= status.t;
-    } else {
-      this.since = null;
-      this.blinks = [];
+    const inView = FACE_IN_VIEW.includes(status.quality);
+    if (inView && !this.inView) {
+      const oldest = status.t - this.windowMs;
+      this.views = [...this.views.filter((v) => v.end !== null && v.end > oldest), { start: status.t, end: null }];
+    } else if (!inView && this.inView) {
+      this.views = this.views.map((v) => (v.end === null ? { ...v, end: status.t } : v));
     }
   }
 
-  /** Blinks per minute at time `t`, or null until the view has been `ok` for `minCoverageMs`. */
+  /** Blinks per minute at time `t`, or null until the face has been in view for `minCoverageMs` of the window. */
   rate(t: number): number | null {
-    if (this.since === null || t - this.since < this.minCoverageMs) return null;
-    const from = Math.max(this.since, t - this.windowMs);
-    if (t <= from) return null;
+    const from = t - this.windowMs;
+    const coverage = this.views.reduce((total, v) => total + Math.max(Math.min(v.end ?? t, t) - Math.max(v.start, from), 0), 0);
+    if (coverage < this.minCoverageMs || coverage <= 0) return null;
     const counted = this.blinks.filter((b) => b > from && b <= t && !this.nearConfirm(b)).length;
-    return counted / ((t - from) / MINUTE_MS);
+    return counted / (coverage / MINUTE_MS);
   }
 
   reset(): void {
     this.blinks = [];
     this.confirms = [];
-    this.since = null;
+    this.views = [];
+  }
+
+  private get inView(): boolean {
+    return this.views.at(-1)?.end === null;
   }
 
   private nearConfirm(blink: number): boolean {
