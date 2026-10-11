@@ -1,7 +1,7 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { readLight, SteadyGaze, type LightAdvice } from '@iris/core';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
-import { ClosureTimer, faceCenter, holdThroughBlink, irisPoints, pickFace, toGazeSample, type FaceFrame } from './eye-feature';
+import { ClosureTimer, holdThroughBlink, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
 
 // WASM and model are bundled by scripts/setup-mediapipe.mjs; nothing loads remotely.
 async function createLandmarker(): Promise<FaceLandmarker> {
@@ -9,7 +9,10 @@ async function createLandmarker(): Promise<FaceLandmarker> {
   return FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task', delegate: 'GPU' },
     runningMode: 'VIDEO',
-    numFaces: 2, // someone else in the picture is told apart from the user (see pickFace)
+    // One face only: MediaPipe smooths the landmarks (iris and lids included, and so the blink
+    // scores built from them) only when it tracks a single face, and it keeps tracking that face
+    // without searching the picture for others.
+    numFaces: 1,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
   });
@@ -20,9 +23,8 @@ const LIGHT_SIZE = 16; // the face and the picture are each shrunk to this many 
 
 /**
  * GazeProvider backed by MediaPipe Face Landmarker, run on every video frame. Each sample is
- * steadied (SteadyGaze) before anyone reads it, harder when the light on the face is poor, and the
- * user's face is followed when someone else is in the picture. Pixels are measured here and never
- * leave the computer.
+ * steadied (SteadyGaze) before anyone reads it, harder when the light on the face is poor. Pixels
+ * are measured here and never leave the computer.
  */
 export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
@@ -32,7 +34,6 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private lastSeen: GazeSample | null = null;
   private readonly closure = new ClosureTimer();
   private readonly steady = new SteadyGaze();
-  private followed: Point2 | null = null;
   private frames = 0;
   private trust = 1;
   private advice: LightAdvice = null;
@@ -81,9 +82,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
   private processFrame(now: number): void {
     if (!this.landmarker) return;
     const result = this.landmarker.detectForVideo(this.video, now);
-    const face = pickFace(result.faceLandmarks, this.followed);
-    const landmarks = result.faceLandmarks[face];
-    this.followed = landmarks ? faceCenter(landmarks) : null;
+    const landmarks = result.faceLandmarks[0];
     if (!landmarks) {
       // No face: publish a null eye so listeners do not keep aiming at the last
       // sample, and open eyes so a missing face never reads as a double blink.
@@ -92,7 +91,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
       return;
     }
     const blendshapes: Record<string, number> = {};
-    for (const c of result.faceBlendshapes[face]?.categories ?? []) blendshapes[c.categoryName] = c.score;
+    for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
     if (this.frames++ % LIGHT_EVERY === 0) this.measureLight(landmarks);
     // A blink is not a closed eye: hold the last eye reading and the markers through it, but report
     // the closure so a double blink can be seen.
@@ -103,7 +102,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
     const frame: FaceFrame = {
       landmarks,
       blendshapes,
-      matrix: result.facialTransformationMatrixes[face]?.data ?? [],
+      matrix: result.facialTransformationMatrixes[0]?.data ?? [],
       aspect: this.video.videoWidth / this.video.videoHeight,
     };
     this.publish(this.steady.filter(toGazeSample(frame, now), this.trust));
