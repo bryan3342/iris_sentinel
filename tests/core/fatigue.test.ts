@@ -102,11 +102,11 @@ describe('FatigueEngine', () => {
     expect(last.paused).toBeNull();
   });
 
-  it('keeps a long-blink confirm out of the blink rate', () => {
+  it('keeps a double-blink confirm out of the blink rate', () => {
     const engine = warmedUp();
     const before = play(engine, 120_000, 180_000, rested).at(-1)!.clues.blink.value!;
-    // Each blink in the next minute comes with a long-blink confirm.
-    for (let t = 180_000; t < 240_000; t += 4_000) engine.addConfirm({ t, source: 'long-blink' });
+    // Each blink in the next minute comes with a double-blink confirm.
+    for (let t = 180_000; t < 240_000; t += 4_000) engine.addConfirm({ t, source: 'double-blink' });
     const after = play(engine, 180_000, 240_000, rested).at(-1)!.clues.blink.value!;
     expect(after).toBeLessThan(before / 2);
   });

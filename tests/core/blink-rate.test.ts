@@ -37,19 +37,19 @@ describe('BlinkRateMeter', () => {
     expect(meter.rate(120_000)).toBeNull();
   });
 
-  it('drops a blink 1 second after a long-blink confirm, so confirming is not read as tiredness', () => {
+  it('drops a blink 1 second after a double-blink confirm, so confirming is not read as tiredness', () => {
     const meter = steady();
-    meter.addConfirm({ t: 99_000, source: 'long-blink' }); // the blink at 100 s is that confirm
+    meter.addConfirm({ t: 99_000, source: 'double-blink' }); // the blink at 100 s is that confirm
     expect(meter.rate(120_000)).toBe(14);
   });
 
-  it('keeps blinks near a dwell confirm, and blinks well clear of a long-blink confirm', () => {
+  it('keeps blinks near a dwell confirm, and blinks well clear of a double-blink confirm', () => {
     const dwell = steady();
     dwell.addConfirm({ t: 99_000, source: 'dwell' });
     expect(dwell.rate(120_000)).toBe(15);
 
     const clear = steady();
-    clear.addConfirm({ t: 97_000, source: 'long-blink' }); // blinks at 96 s and 100 s are 1 s before and 3 s after
+    clear.addConfirm({ t: 97_000, source: 'double-blink' }); // blinks at 96 s and 100 s are 1 s before and 3 s after
     expect(clear.rate(120_000)).toBe(15);
   });
 

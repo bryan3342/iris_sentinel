@@ -1,4 +1,4 @@
-import type { HeadPose, Point2 } from '@iris/protocol';
+import type { EyeReading, HeadPose, Point2 } from '@iris/protocol';
 import { applyCalibration, fitCalibration, type CalibrationModel, type CalibrationSample, type Viewport } from './calibration';
 
 /**
@@ -77,7 +77,7 @@ export class CalibrationStore {
    * case the sample is dropped. Before any fit exists, every confirm is
    * accepted: that is how a run with no dots gets started.
    */
-  addConfirmed(eye: Point2, head: HeadPose, target: Point2, viewport: Viewport, snapped = false): boolean {
+  addConfirmed(eye: EyeReading, head: HeadPose, target: Point2, viewport: Viewport, snapped = false): boolean {
     if (this.fitted) {
       const p = applyCalibration(this.fitted, eye, head, viewport);
       if (Math.hypot(p.x - target.x, p.y - target.y) > (snapped ? this.snappedTolerance : this.tolerance)) return false;

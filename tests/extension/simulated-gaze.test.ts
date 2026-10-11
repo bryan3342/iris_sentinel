@@ -45,7 +45,7 @@ describe('SimulatedGazeProvider', () => {
     expect(at(900)).toEqual(eyeFor({ x: 0.9, y: 0.1 }));
   });
 
-  it('reports open eyes even while the look is null, so it never fakes a long blink', async () => {
+  it('reports open eyes even while the look is null, so it never fakes a double blink', async () => {
     const provider = new SimulatedGazeProvider(scripted([{ at: null, ms: 1000 }]), { noise: 0 });
     const samples = record(provider);
     await provider.start();

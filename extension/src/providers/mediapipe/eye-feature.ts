@@ -18,43 +18,72 @@ interface EyeLandmarks {
   iris: number[];
   cornerA: number;
   cornerB: number;
+  /** Upper and lower eyelid at the middle of the eye, for the lid opening. */
+  lidTop: number;
+  lidBottom: number;
   /** Suffix of this eye's blendshape names (MediaPipe uses the user's own left and right). */
   side: 'Left' | 'Right';
 }
 
 // Corners are listed image-left first. "Right" is the user's right eye.
 // Iris lists the center then its four contour points; averaging them steadies the center.
-const RIGHT_EYE: EyeLandmarks = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133, side: 'Right' };
-const LEFT_EYE: EyeLandmarks = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263, side: 'Left' };
+const RIGHT_EYE: EyeLandmarks = { iris: [468, 469, 470, 471, 472], cornerA: 33, cornerB: 133, lidTop: 159, lidBottom: 145, side: 'Right' };
+const LEFT_EYE: EyeLandmarks = { iris: [473, 474, 475, 476, 477], cornerA: 362, cornerB: 263, lidTop: 386, lidBottom: 374, side: 'Left' };
 const EYE_CLOSED = 0.5;
 const BLINK_MS = 400; // a blink shuts the lids for well under this; longer means the eye is closed
+// A blink's lid moves fast: closure rising this much from one frame to the next is a blink starting,
+// while looking down lowers the lids slowly and never trips it, so aiming low is not frozen.
+const CLOSING_FAST = 0.15;
+const SETTLE_MS = 120; // after the lids start a blink or reopen, the iris points take this long to settle
 
 const isClosed = (blendshapes: Record<string, number>, eye: EyeLandmarks) =>
   (blendshapes[`eyeBlink${eye.side}`] ?? 0) > EYE_CLOSED;
 
 /**
- * Tells a blink from a closed eye by how long each lid has been shut. While
- * either eye's closure is still short enough to be a blink, the caller holds
- * its last output, since the iris points under a closing lid are not worth
- * reading. Each eye is timed on its own, so an eye that has been closed for a
- * while does not stop the other eye's blinks from being recognised. Holding
- * through blinks also means a published sample with a closed eye has already
- * outlasted a blink, which is what the long-blink confirm reads.
+ * The sample to publish during a blink: the last eye reading held, so aiming and dwell stay
+ * still, with the lids' current closure reported, so quick blinks can be counted for the
+ * double-blink click.
+ */
+export function holdThroughBlink(last: GazeSample, blendshapes: Record<string, number>, t: number): GazeSample {
+  return { ...last, t, blink: { left: blendshapes.eyeBlinkLeft ?? 0, right: blendshapes.eyeBlinkRight ?? 0 } };
+}
+
+/**
+ * Tells when the eye readings are not worth reading because a lid is moving
+ * through a blink. The caller then holds its last eye reading (see
+ * `holdThroughBlink`), so the gaze point does not snap as the lids cover the
+ * iris, and no distorted reading reaches calibration or learning. It holds:
+ * - from the frame a lid starts closing fast, before it counts as closed;
+ * - while either eye's closure is still short enough to be a blink;
+ * - for a moment after a lid reopens, while the iris points settle.
+ * A longer closure is closed eyes, not a blink, and is reported as such. Each
+ * eye is timed on its own, so an eye that has been closed for a while does not
+ * stop the other eye's blinks from being recognised.
  */
 export class ClosureTimer {
   private readonly closedSince: Record<EyeLandmarks['side'], number | null> = { Left: null, Right: null };
+  private readonly last: Record<EyeLandmarks['side'], number> = { Left: 0, Right: 0 };
+  private settleUntil = -Infinity;
 
-  /** True while either eye is in a closure shorter than a blink. */
+  /** True while a blink makes the eye readings unreliable. */
   blinking(blendshapes: Record<string, number>, now: number): boolean {
     const states = [RIGHT_EYE, LEFT_EYE].map((eye) => {
+      const closure = blendshapes[`eyeBlink${eye.side}`] ?? 0;
+      const closingFast = closure - this.last[eye.side] > CLOSING_FAST;
+      this.last[eye.side] = closure;
+      if (closingFast) this.settleUntil = now + SETTLE_MS;
       if (!isClosed(blendshapes, eye)) {
+        if (this.closedSince[eye.side] !== null) this.settleUntil = now + SETTLE_MS; // just reopened
         this.closedSince[eye.side] = null;
         return false;
       }
       const since = (this.closedSince[eye.side] ??= now);
       return now - since < BLINK_MS;
     });
-    return states.some(Boolean);
+    if (states.some(Boolean)) return true;
+    // A closure held past a blink is closed eyes, reported as such rather than held.
+    if (this.closedSince.Left !== null && this.closedSince.Right !== null) return false;
+    return now < this.settleUntil;
   }
 }
 
@@ -75,6 +104,8 @@ interface EyeReading {
   offset: Point2;
   /** Look-down minus look-up score for this eye. */
   lookDown: number;
+  /** Lid gap over eye width, when both lid points were found. */
+  lid?: number;
   /**
    * Trust in this eye. Landmark noise is roughly constant in pixels and the
    * offset is divided by eye width, so its variance falls with width squared:
@@ -109,10 +140,13 @@ function readEye(frame: FaceFrame, eye: EyeLandmarks): EyeReading | null {
   // Position along the corner line (0..1) and distance off it, both in eye widths.
   const along = (dx * ax + dy * ay) / lengthSq;
   const across = (ax * dy - ay * dx) / lengthSq;
+  // The upper lid follows the eyes up and down, so its gap from the lower lid is a vertical cue.
+  const top = at(eye.lidTop), bottom = at(eye.lidBottom);
   return {
     offset: { x: 2 * along - 1, y: across * VERTICAL_SCALE },
     lookDown: (b[`eyeLookDown${eye.side}`] ?? 0) - (b[`eyeLookUp${eye.side}`] ?? 0),
     weight: lengthSq,
+    ...(top && bottom ? { lid: Math.hypot(top.x - bottom.x, top.y - bottom.y) / Math.sqrt(lengthSq) } : {}),
   };
 }
 
@@ -159,5 +193,9 @@ export function toGazeSample(frame: FaceFrame, t: number): GazeSample {
   // model's own look-down minus look-up scores.
   // Image x grows toward the user's left, so flip it: positive x is the user's right.
   const eye = { x: -mean((r) => r.offset.x), y: (mean((r) => r.offset.y) + mean((r) => r.lookDown)) / 2 };
-  return { t, eye, head, blink };
+  // Lid opening, weighted like the rest, from the eyes whose lid points were found.
+  const withLid = eyes.filter((r) => r.lid !== undefined);
+  const lidWeight = withLid.reduce((sum, r) => sum + r.weight, 0);
+  const lid = lidWeight > 0 ? withLid.reduce((sum, r) => sum + r.weight * r.lid!, 0) / lidWeight : undefined;
+  return { t, eye: lid === undefined ? eye : { ...eye, lid }, head, blink };
 }

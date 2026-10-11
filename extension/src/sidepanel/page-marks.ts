@@ -23,7 +23,7 @@ export class PageMarks {
   private users = 0;
   private list: TargetList | null = null;
   private aim: number | null = null;
-  private pending: number | null = null;
+  private armed: number | null = null;
   private drawnTab: number | null = null;
   private stopListening: (() => void) | null = null;
   private aimFor: ((list: TargetList) => number | null) | null = null;
@@ -56,10 +56,10 @@ export class PageMarks {
     return this.settled.get(this.now());
   }
 
-  /** Marks a risky target that waits for its second confirm, or nothing. */
-  setPending(id: number | null): void {
-    if (id === this.pending) return;
-    this.pending = id;
+  /** Marks the target the voice agent picked, which the user's next confirm opens, or nothing. */
+  setArmed(id: number | null): void {
+    if (id === this.armed) return;
+    this.armed = id;
     this.draw();
   }
 
@@ -96,6 +96,6 @@ export class PageMarks {
     const target = list?.targets.find((t) => t.id === this.aim);
     this.settled.update(list && target ? { list, target } : null, this.now());
     if (!list) return;
-    send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim, pending: this.pending });
+    send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim, armed: this.armed });
   }
 }

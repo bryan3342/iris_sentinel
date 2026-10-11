@@ -1,5 +1,5 @@
 import type { HeadPose, Point2 } from '@iris/protocol';
-import { applyCalibration, type CalibrationModel, type CalibrationSample, type Viewport } from './calibration';
+import { applyCalibration, CALIBRATION_DISTANCE_CM, CSS_PX_PER_CM, type CalibrationModel, type CalibrationSample, type Viewport } from './calibration';
 
 /**
  * How far the calibrated gaze lands from known check dots, measured through the
@@ -19,8 +19,22 @@ export interface AccuracyReport {
   meanYPx: number;
   /** Mean error as a fraction of the viewport width. */
   share: number;
+  /**
+   * Mean error in degrees of visual angle, the standard measure for eye trackers (webcam trackers
+   * typically reach 1 to 2 degrees, research systems 0.3 to 0.5). Approximate: it assumes the user
+   * sits about 60 cm away and that a CSS pixel is 1/96 inch, as the calibration does.
+   */
+  meanDeg: number;
   /** The head during the check: turn and tilt in degrees, and eye span (a distance cue; larger is closer). */
   posture: { yawDeg: number; pitchDeg: number; eyeSpan: number };
+  /**
+   * Mean error by where the dots sit, in pixels, or null where the check had no dots. On a grid,
+   * corners are the outermost dots both ways, edges the rest of the outer ring, and middle the dots
+   * between them; top and bottom split the dots by height.
+   */
+  regions: { corners: number | null; edges: number | null; middle: number | null; top: number | null; bottom: number | null };
+  /** The dot gaze missed by the most, and by how much. */
+  worst: { target: Point2; px: number } | null;
 }
 
 const median = (values: number[]): number => {
@@ -40,12 +54,14 @@ export function measureAccuracy(model: CalibrationModel, samples: CalibrationSam
     byDot.set(key, entry);
   }
   // Each dot is scored at its middle reading, so a stray glance or blink does not count.
-  const errors = [...byDot.values()].map(({ target, points }) => ({
-    x: Math.abs(median(points.map((p) => p.x)) - target.x) * viewport.width,
-    y: Math.abs(median(points.map((p) => p.y)) - target.y) * viewport.height,
-  }));
+  const errors = [...byDot.values()].map(({ target, points }) => {
+    const x = Math.abs(median(points.map((p) => p.x)) - target.x) * viewport.width;
+    const y = Math.abs(median(points.map((p) => p.y)) - target.y) * viewport.height;
+    return { target, x, y, px: Math.hypot(x, y) };
+  });
   const mean = (values: number[]) => (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
-  const distances = errors.map((e) => Math.hypot(e.x, e.y));
+  const distances = errors.map((e) => e.px);
+  const worst = errors.reduce<(typeof errors)[number] | null>((w, e) => (!w || e.px > w.px ? e : w), null);
   const head = (pick: (h: HeadPose) => number) => median(samples.map((s) => pick(s.head)));
   return {
     dots: errors.length,
@@ -54,6 +70,31 @@ export function measureAccuracy(model: CalibrationModel, samples: CalibrationSam
     meanXPx: mean(errors.map((e) => e.x)),
     meanYPx: mean(errors.map((e) => e.y)),
     share: mean(distances) / viewport.width,
+    meanDeg: visualAngle(mean(distances)),
     posture: { yawDeg: degrees(head((h) => h.yaw)), pitchDeg: degrees(head((h) => h.pitch)), eyeSpan: head((h) => h.eyeSpan) },
+    regions: regions(errors),
+    worst: worst && { target: worst.target, px: worst.px },
+  };
+}
+
+/** Degrees of visual angle for an on-screen distance in CSS pixels, seen from the assumed seat distance. */
+export function visualAngle(px: number, distanceCm = CALIBRATION_DISTANCE_CM): number {
+  return (Math.atan(px / CSS_PX_PER_CM / distanceCm) * 180) / Math.PI;
+}
+
+/** Mean error by region of the check grid. */
+function regions(errors: { target: Point2; px: number }[]): AccuracyReport['regions'] {
+  const xs = errors.map((e) => e.target.x), ys = errors.map((e) => e.target.y);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const outerX = (e: { target: Point2 }) => e.target.x === minX || e.target.x === maxX;
+  const outerY = (e: { target: Point2 }) => e.target.y === minY || e.target.y === maxY;
+  const midY = (minY + maxY) / 2;
+  const meanOf = (picked: { px: number }[]) => (picked.length ? picked.reduce((sum, e) => sum + e.px, 0) / picked.length : null);
+  return {
+    corners: meanOf(errors.filter((e) => outerX(e) && outerY(e))),
+    edges: meanOf(errors.filter((e) => outerX(e) !== outerY(e))),
+    middle: meanOf(errors.filter((e) => !outerX(e) && !outerY(e))),
+    top: meanOf(errors.filter((e) => e.target.y < midY)),
+    bottom: meanOf(errors.filter((e) => e.target.y > midY)),
   };
 }

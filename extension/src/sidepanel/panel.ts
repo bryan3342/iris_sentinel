@@ -35,7 +35,7 @@ export function mountPanel(root: HTMLElement): void {
   if (isExtensionPage()) {
     // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
-    root.append(microphonePanel(), conversationPanel({ coordinator, marks }), pageAccessPanel(), numbersPanel(marks), gaze.element,
+    root.append(microphonePanel(), conversationPanel({ coordinator, marks, gaze }), pageAccessPanel(), numbersPanel(marks), gaze.element,
       understandingPanel(marks, coordinator), companionPanel());
   }
 

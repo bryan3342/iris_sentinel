@@ -1,4 +1,4 @@
-import type { GazeSample, HeadPose, Point2 } from '@iris/protocol';
+import type { EyeReading, GazeSample, HeadPose, Point2 } from '@iris/protocol';
 import { applyCalibration, type Viewport } from './calibration';
 import type { CalibrationStore } from './calibration-store';
 import { FixationSmoother } from './fixation';
@@ -43,7 +43,7 @@ function median(values: number[]): number {
 
 export class GazePointer {
   private readonly smoother: FixationSmoother;
-  private recent: { eye: Point2; head: HeadPose }[] = [];
+  private recent: { eye: EyeReading; head: HeadPose }[] = [];
   private last: Point2 | null = null;
 
   constructor(
@@ -76,8 +76,10 @@ export class GazePointer {
    */
   confirm(pixel: Point2, frame: CalibrationFrame, snapped = false): boolean {
     if (this.recent.length === 0) return false;
-    const of = (pick: (s: { eye: Point2; head: HeadPose }) => number) => median(this.recent.map(pick));
-    const eye = { x: of((s) => s.eye.x), y: of((s) => s.eye.y) };
+    const of = (pick: (s: { eye: EyeReading; head: HeadPose }) => number) => median(this.recent.map(pick));
+    const lids = this.recent.map((s) => s.eye.lid);
+    const eye: EyeReading = { x: of((s) => s.eye.x), y: of((s) => s.eye.y),
+      ...(lids.every((v) => typeof v === 'number') ? { lid: median(lids as number[]) } : {}) };
     const head: HeadPose = {
       yaw: of((s) => s.head.yaw),
       pitch: of((s) => s.head.pitch),

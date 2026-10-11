@@ -18,6 +18,16 @@ export interface HeadPose {
   eyeSpan: number;
 }
 
+/** Where the eyes point in the head, plus how open the eyelids are. */
+export interface EyeReading extends Point2 {
+  /**
+   * Eyelid opening: the gap between upper and lower lid over the eye's width (about 0.2 to 0.4 when
+   * open). The upper lid follows the eyes up and down, so it helps tell where on the page someone
+   * looks vertically. Absent from providers that do not measure it.
+   */
+  lid?: number;
+}
+
 export interface GazeSample {
   /** Monotonic timestamp in milliseconds. */
   t: number;
@@ -26,12 +36,12 @@ export interface GazeSample {
    * user's right, positive y is down). Null when no face is visible or both
    * eyes are closed. Calibration maps this to screen coordinates.
    */
-  eye: Point2 | null;
+  eye: EyeReading | null;
   head: HeadPose;
   /**
    * Closure of the user's own left and right eye, 0 (open) to 1 (closed).
-   * Drives the long-blink confirm. Reads as open when no face is visible, so a
-   * missing face can never look like a long blink.
+   * Drives the double-blink confirm. Reads as open when no face is visible, so a
+   * missing face can never look like a double blink.
    */
   blink: { left: number; right: number };
 }

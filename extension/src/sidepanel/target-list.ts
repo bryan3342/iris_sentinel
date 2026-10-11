@@ -7,6 +7,8 @@ export interface TargetList extends PageTargets {
   tabId: number;
   /** The browser window's position on the screen, which places a screen-position calibration on the page. */
   window: { left: number; top: number };
+  /** The tab's page zoom (1 at 100%); a zoomed page's CSS pixels are larger or smaller on screen. */
+  zoom: number;
 }
 
 const POLL_MS = 250; // a few refreshes a second at most
@@ -64,8 +66,10 @@ export class LiveTargetList {
     if (!tab?.id || !eligibleTab(tab)) return null;
     const tabId = tab.id;
     const { left = 0, top = 0 } = await chrome.windows.get(tab.windowId);
+    // Chrome remembers zoom per site; reading it keeps a zoomed page aiming as well as one at 100%.
+    const zoom = await Promise.resolve().then(() => chrome.tabs.getZoom(tabId)).then((z) => (z > 0 ? z : 1), () => 1);
     const known = this.current;
-    if (known?.tabId === tabId) {
+    if (known?.tabId === tabId && known.zoom === zoom) {
       const [probe] = await chrome.scripting.executeScript({ target: { tabId }, func: pageRevision });
       const seen = probe?.result;
       if (seen?.documentToken === known.documentToken && seen.revision === known.revision) {
@@ -74,7 +78,7 @@ export class LiveTargetList {
     }
     const [scan] = await chrome.scripting.executeScript({ target: { tabId }, func: pageSnapshot, args: ['targets'] });
     if (scan?.frameId !== 0) return null;
-    return { tabId, window: { left, top }, ...validateTargets(scan.result, true) };
+    return { tabId, window: { left, top }, zoom, ...validateTargets(scan.result, true) };
   }
 
   private publish(list: TargetList | null): void {

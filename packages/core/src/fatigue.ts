@@ -125,7 +125,7 @@ export class FatigueEngine {
     this.blinks.addBlink(blink);
   }
 
-  /** Every confirm: a long-blink confirm keeps its blink out of the blink rate. */
+  /** Every confirm: a double-blink confirm keeps its blink out of the blink rate. */
   addConfirm(event: ConfirmEvent): void {
     this.blinks.addConfirm(event);
   }
