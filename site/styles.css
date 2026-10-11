@@ -1,13 +1,15 @@
-/* Iris: one dark screen. Teal from the logo on a black gradient. */
+/* Iris: one dark screen with a gold undertone over a black gradient. */
 :root {
   color-scheme: dark;
-  --bg: #050807;
-  --glow: rgb(14 148 136 / 0.28);
-  --text: #f2f7f6;
-  --muted: #b3c4c1;
-  --teal-1: #36e0cc;
-  --teal-2: #0e9488;
-  font-family: system-ui, sans-serif;
+  --bg: #070605;
+  --glow: rgb(201 160 72 / 0.22);
+  --text: #f7f3ea;
+  --muted: #c9bfa8;
+  --gold-1: #f3d88a;
+  --gold-2: #b8892c;
+  --font-display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-body: "Manrope", system-ui, sans-serif;
+  font-family: var(--font-body);
 }
 
 * { box-sizing: border-box; }
@@ -19,7 +21,7 @@ body {
   color: var(--text);
   background:
     radial-gradient(ellipse 80% 60% at 50% 0%, var(--glow), transparent 70%),
-    linear-gradient(180deg, #0a1312 0%, var(--bg) 45%, #000 100%);
+    linear-gradient(180deg, #120f0a 0%, var(--bg) 45%, #000 100%);
   background-color: var(--bg);
   line-height: 1.6;
 }
@@ -28,7 +30,7 @@ p { margin: 0; }
 
 /* Full-screen background video under a black gradient that keeps the text readable. */
 .bg-video, .bg-shade { position: fixed; inset: 0; width: 100%; height: 100%; z-index: -1; }
-.bg-video { object-fit: cover; filter: grayscale(0.4); }
+.bg-video { object-fit: cover; filter: grayscale(0.6) sepia(0.35); }
 .bg-shade {
   background:
     radial-gradient(ellipse 80% 60% at 50% 0%, var(--glow), transparent 70%),
@@ -47,7 +49,7 @@ p { margin: 0; }
 }
 
 /* Wordmark, same drawing and motion as the extension's first-open splash. */
-.word { display: inline-flex; align-items: flex-end; margin: 0 0 12px; font-size: clamp(88px, 18vw, 160px); font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+.word { display: inline-flex; align-items: flex-end; margin: 0 0 12px; font-size: clamp(88px, 18vw, 160px); font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
 .word__i { display: inline-block; width: 0.46em; height: 1em; position: relative; animation: eye-in 0.6s ease-out both; }
 .word__svg { position: absolute; bottom: -0.02em; left: 0; width: 100%; height: auto; overflow: visible; }
 .word__rest {
@@ -64,7 +66,7 @@ p { margin: 0; }
 .look { animation: drift 7.5s ease-in-out 4s infinite; }
 .stem { transform-origin: top; animation: stem 0.5s ease-out 1.4s both; }
 
-.tagline { font-size: clamp(1.5rem, 4vw, 2.4rem); font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; animation: rise 0.8s ease-out 2.4s both; }
+.tagline { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 600; line-height: 1.15; letter-spacing: 0; text-wrap: balance; animation: rise 0.8s ease-out 2.4s both; }
 .lead { max-width: 36em; color: var(--muted); font-size: 1.1rem; text-wrap: balance; animation: rise 0.8s ease-out 2.7s both; }
 
 .features {
@@ -78,22 +80,24 @@ p { margin: 0; }
   text-align: left;
   animation: rise 0.8s ease-out 3s both;
 }
-.features li { display: grid; gap: 4px; border-top: 2px solid var(--teal-2); padding-top: 14px; }
+.features li { display: grid; gap: 4px; border-top: 1px solid var(--gold-2); padding-top: 14px; }
+.features strong { font-weight: 600; letter-spacing: 0.02em; }
 .features span { color: var(--muted); font-size: 0.95rem; }
 
 .demo-link {
   margin-top: 12px;
   padding: 14px 28px;
   border-radius: 999px;
-  background: linear-gradient(135deg, var(--teal-1), var(--teal-2));
-  color: #04110f;
-  font-weight: 700;
+  background: linear-gradient(135deg, var(--gold-1), var(--gold-2));
+  color: #1a1407;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-decoration: none;
   transition: transform 0.2s, box-shadow 0.2s;
   animation: rise 0.8s ease-out 3.3s both;
 }
-.demo-link:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgb(54 224 204 / 0.35); }
-.demo-link:focus-visible { outline: 2px solid var(--teal-1); outline-offset: 4px; }
+.demo-link:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgb(201 160 72 / 0.4); }
+.demo-link:focus-visible { outline: 2px solid var(--gold-1); outline-offset: 4px; }
 
 @keyframes eye-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes blink-once { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.08); } }
