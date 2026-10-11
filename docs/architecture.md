@@ -56,7 +56,9 @@ immediately stops all tracks without sending audio. Voice is hands-free: while
 (`SpeechGate` in `packages/core`; nothing recorded or sent). When the user starts
 speaking it connects to the local Worker's signed-session endpoint and ElevenLabs over
 WebSocket through a neutral VoiceAgent interface, and after a minute with neither side
-speaking it hangs up and listens locally again. Starts are capped at three a minute.
+speaking it hangs up and listens locally again. The microphone is muted while the agent
+speaks, so it takes the user's voice only once it has finished: it cannot be interrupted,
+and its own voice from the speakers never reaches it as the user's. Starts are capped at three a minute.
 Audio worklets ship inside the extension. Turning Listening off or closing the panel
 ends the session, including late connections, and stops all microphone use. Audio is
 sent to ElevenLabs only while a conversation is connected, which begins only when the
