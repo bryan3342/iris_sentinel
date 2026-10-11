@@ -1,9 +1,11 @@
 import { fatigueResponse, type FatigueState, type LightAdvice } from '@iris/core';
 import type { GazeProvider } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
+import { MediaPipePointerProvider } from '../providers/mediapipe/hand-provider';
 import { companionLink } from '../providers/companion/link';
 import { companionPanel } from './companion-status';
 import { fatiguePanel } from './fatigue-panel';
+import { fingerPanel } from './finger-panel';
 import { cameraAllowed, isExtensionPage, openCamera, watchCamera } from './setup/camera';
 import { gazePanel, type GazePanel } from './gaze-panel';
 import { numbersPanel } from './numbers';
@@ -74,12 +76,15 @@ export function mountPanel(root: HTMLElement): void {
       gaze.adapt(fatigueResponse(state.level));
     };
     const numbers = numbersPanel(marks);
-    // A sudden, held rise in heart rate or breathing: Iris says so and turns the numbers on.
+    // Finger tracing reads the same camera; it aims on the page the eyes aim on.
+    const finger = fingerPanel({ makeProvider: () => new MediaPipePointerProvider(video), list: () => marks.current, gaze });
+    // A sudden, held rise in heart rate or breathing: Iris says so and turns the numbers and finger tracing on.
     watchStruggle(link, () => voice.talking, () => {
       voice.onStruggle();
       numbers.turnOn();
+      finger.turnOn();
     });
-    root.append(microphonePanel(), voice.element, numbers.element, gaze.element,
+    root.append(microphonePanel(), voice.element, numbers.element, finger.element, gaze.element,
       companionPanel(link), fatiguePanel({ live: link, onFatigue, talking: () => voice.talking }));
   }
 }

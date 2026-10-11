@@ -185,6 +185,42 @@ describe('selecting with gaze', () => {
     return { provider, gaze, selected, outcomes, store, learned: () => learned };
   }
 
+  it('aims with the finger while a hand is in view, and with the eyes again once it leaves', async () => {
+    const { provider, gaze } = selecting(() => centerOf(1), false, false);
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(shows().at(-1)).toBe(1); // the eyes aim
+    gaze.pointWith(3);
+    expect(shows().at(-1)).toBe(3); // the finger takes over at once
+    await vi.advanceTimersByTimeAsync(500);
+    expect(shows().at(-1)).toBe(3); // and keeps the aim while the eyes stay elsewhere
+    gaze.pointWith(undefined);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(shows().at(-1)).toBe(1);
+    gaze.stop();
+    provider.stop();
+  });
+
+  it('opens a safe target with a pinch, a risky one only with a double blink, and never learns the eyes from the finger', async () => {
+    targets = RISKY_2;
+    const { provider, gaze, selected, outcomes, learned } = selecting(() => centerOf(1), true, false);
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1500);
+    gaze.pointWith(3);
+    gaze.confirms.emit({ t: 1500, source: 'pinch', target: 3 });
+    await vi.advanceTimersByTimeAsync(10);
+    gaze.pointWith(2);
+    gaze.confirms.emit({ t: 1600, source: 'pinch', target: 2 });
+    await vi.advanceTimersByTimeAsync(10);
+    expect(selected).toEqual([[3, false]]);
+    expect(outcomes).toEqual(['SELECTED', 'NEEDS_DOUBLE_BLINK']);
+    expect(learned()).toBe(0); // the eyes were not on what the finger chose
+    gaze.stop();
+    provider.stop();
+  });
+
   it('never selects anything when the eyes just rest on a target, however long', async () => {
     const { provider, gaze, selected, outcomes } = selecting(() => centerOf(1), false, false);
     gaze.start();
