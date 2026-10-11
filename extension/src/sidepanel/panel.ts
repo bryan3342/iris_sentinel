@@ -45,7 +45,7 @@ export function mountPanel(root: HTMLElement): void {
   const targets = new LiveTargetList();
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
-  const camera = startCamera(video, preview, root, status);
+  const camera = startCamera(video, preview, status);
   camera.then((provider) => gaze.useCamera(provider), (error: unknown) => {
     status.textContent = 'Eye tracking failed to start.';
     console.error('Iris: eye tracking failed', error);
@@ -56,9 +56,13 @@ export function mountPanel(root: HTMLElement): void {
     addEventListener('pagehide', () => coordinator.cancel(), { once: true }); // closing the panel ends a pending request
     // The first opening ever starts with the Iris animation and setup; listening waits for both, and
     // still starts if setup could not finish (eye tracking failing to load, say), since voice needs no camera.
+    // Setup covers the panel before its first paint and the animation plays over that cover, so the panel
+    // never flashes before them; it shows once setup has nothing left to show.
+    const slides = slidesView(document.body);
+    slides.cover();
     const setup = firstOpenSplash(document.body)
-      .then(() => runSetup(slidesView(document.body), setupDeps(gaze, camera, targets)))
-      .catch(() => ({ spoke: false }));
+      .then(() => runSetup(slides, setupDeps(gaze, camera, targets)))
+      .catch(() => { slides.close(); return { spoke: false }; });
     const voice = conversationPanel({ coordinator, marks, gaze }, setup);
     // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
     const link = companionLink();
@@ -80,7 +84,7 @@ const CAMERA_RETRY_MS = 3_000;
  * Starts eye tracking. Without camera access it waits until access is allowed (setup asks for it);
  * with access but no picture, as when another app is using the camera, it tries again every few seconds.
  */
-async function startCamera(video: HTMLVideoElement, preview: HTMLElement, root: HTMLElement, status: HTMLElement): Promise<MediaPipeGazeProvider> {
+async function startCamera(video: HTMLVideoElement, preview: HTMLElement, status: HTMLElement): Promise<MediaPipeGazeProvider> {
   for (;;) {
     try {
       video.srcObject = await openCamera();
@@ -101,22 +105,15 @@ async function startCamera(video: HTMLVideoElement, preview: HTMLElement, root: 
       });
     }
   }
-  return startTracking(video, preview, root, status);
+  return startTracking(video, preview, status);
 }
 
-async function startTracking(
-  video: HTMLVideoElement,
-  preview: HTMLElement,
-  root: HTMLElement,
-  status: HTMLElement,
-): Promise<MediaPipeGazeProvider> {
+async function startTracking(video: HTMLVideoElement, preview: HTMLElement, status: HTMLElement): Promise<MediaPipeGazeProvider> {
   status.textContent = 'Loading eye tracking...';
   const provider = new MediaPipeGazeProvider(video);
   const trace = new EyeTrace(video);
   preview.append(trace.overlay);
-  root.append(trace.readout);
   provider.onTracePoints((points) => trace.drawPoints(points));
-  provider.onSample((sample) => trace.addSample(sample));
   await provider.start();
   const ON = 'Eye tracking on. Processing stays on this computer.';
   status.textContent = ON;

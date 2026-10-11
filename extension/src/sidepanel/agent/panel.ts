@@ -47,8 +47,6 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   opening: Promise<{ spoke: boolean }> = Promise.resolve({ spoke: false })): ConversationPanel {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
-  const notice = document.createElement('p');
-  notice.textContent = 'Just speak. Iris listens for your voice on this laptop, and only once you start talking does it send microphone audio to ElevenLabs; it hangs up after a minute of quiet. Say things like "scroll down", "go back", "go to the tab with the recipe", "next tab", "open YouTube", "search for the weather", "zoom in", "summarize this", "what is this", "click the sign-in link" or "click number 12". Summaries, descriptions and clicking by description send the visible page to Gemini, and finding a tab sends your open tabs\' titles and site names; their text goes to the voice agent. A link or button you ask for opens at once, but anything that may submit, pay, delete or send, and closing a tab, waits for you to blink twice. Turn off Listening, or close this panel, to stop all microphone use.';
   const label = document.createElement('label');
   const listening = document.createElement('input'); listening.type = 'checkbox';
   label.append(listening, ' Listening');
@@ -93,7 +91,7 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
     permission.addEventListener('change', () => { if (permission.state === 'granted') handsFree.retry(); });
   }, () => {});
   addEventListener('pagehide', () => handsFree.setOn(false), { once: true });
-  panel.append(title, notice, label, status, action);
+  panel.append(title, label, status, action);
   const checkIn = new CheckIn();
   return {
     element: panel,

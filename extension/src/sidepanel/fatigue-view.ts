@@ -3,8 +3,8 @@ import { duration, sessionLines, type FatigueSession } from './fatigue-session';
 
 // What the side panel's fatigue card shows, as a pure function of the engine's
 // state: the level and score, the "why" lines, each body signal against the
-// user's normal, and what Iris would change; once a run ends (the demo is
-// stopped or the companion disconnects), a summary of it. No DOM here, so it
+// user's normal, and what Iris would change; once a run ends (the companion
+// stops or disconnects), a summary of it. No DOM here, so it
 // is tested directly; fatigue-panel.ts renders it.
 // Wording is plain and never medical, and none of it leaves the side panel.
 
@@ -29,8 +29,6 @@ export interface FatigueViewOptions {
   /** False once a run ends: the session summary replaces the live view. */
   running?: boolean;
   session?: FatigueSession | null;
-  /** What is running, for the progress line. */
-  mode?: 'live' | 'demo';
 }
 
 /** The body clues the card reports on. Click clues join once clicks feed the engine. */
@@ -52,15 +50,15 @@ function signalLine(state: FatigueState, { clue, name, unit }: (typeof BODY_CLUE
   return `${name}: ${Math.round(value)}${unit} (${normal} ${Math.round(baseline)}, ${change > 0 ? '+' : ''}${change}%)`;
 }
 
-export function fatigueView(state: FatigueState | null, { running = true, session = null, mode = 'live' }: FatigueViewOptions = {}): FatigueCardView {
+export function fatigueView(state: FatigueState | null, { running = true, session = null }: FatigueViewOptions = {}): FatigueCardView {
   const empty = { why: [], signals: [], response: null, summary: [], note: null, progress: null };
   if (!running) {
     if (session && session.startT !== null) return { ...empty, status: 'Fatigue: stopped.', summary: sessionLines(session) };
-    return { ...empty, status: 'Fatigue: not running.' };
+    return { ...empty, status: 'Fatigue: waiting for body signals.' };
   }
   const elapsed = session?.startT != null && session.lastT != null ? duration(session.lastT - session.startT) : '0 s';
   const soFar = session && session.scoreCount > 0 ? `, average ${Math.round(session.scoreSum / session.scoreCount)}, highest ${Math.round(session.peak ?? 0)}` : '';
-  const progress = `${mode === 'demo' ? 'Demo running' : 'Measuring'} for ${elapsed}${soFar}`;
+  const progress = `Measuring for ${elapsed}${soFar}`;
   if (!state) return { ...empty, status: 'Fatigue: starting.', progress };
 
   const status = state.paused ? `Fatigue: paused${scoreText(state)}.` : `Fatigue: ${state.level}${scoreText(state)}.`;

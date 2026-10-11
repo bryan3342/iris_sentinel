@@ -61,7 +61,6 @@ describe('fatigueView while measuring', () => {
   it('shows how long it has been running and the scores so far, so the user can see it is tracking', () => {
     const session = addToSession(emptySession(0), state({ t: 45_000 }));
     expect(fatigueView(state({ t: 45_000 }), { session }).progress).toBe('Measuring for 45 s, average 3, highest 3');
-    expect(fatigueView(state({ t: 45_000 }), { session, mode: 'demo' }).progress).toBe('Demo running for 45 s, average 3, highest 3');
     const warming = addToSession(emptySession(0), state({ t: 10_000, score: null, paused: 'warming-up' }));
     expect(fatigueView(state({ t: 10_000, score: null, paused: 'warming-up' }), { session: warming }).progress).toBe('Measuring for 10 s');
     expect(fatigueView(null, { session: emptySession(0) }).progress).toBe('Measuring for 0 s');
@@ -76,8 +75,8 @@ describe('fatigueView while measuring', () => {
 });
 
 describe('fatigueView after Stop', () => {
-  it('says it is not running when nothing was measured', () => {
-    expect(fatigueView(null, { running: false })).toMatchObject({ status: 'Fatigue: not running.', summary: [], signals: [] });
+  it('says it is waiting for body signals before anything was measured', () => {
+    expect(fatigueView(null, { running: false })).toMatchObject({ status: 'Fatigue: waiting for body signals.', summary: [], signals: [] });
   });
 
   it('replaces the live view with the session summary', () => {

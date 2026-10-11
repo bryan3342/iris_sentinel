@@ -44,17 +44,15 @@ function mount() {
 const HELLO = { type: 'hello', version: COMPANION_PROTOCOL_VERSION };
 
 describe('body signals section', () => {
-  it('does not start the companion when the panel opens', () => {
+  it('starts the companion as soon as the panel opens, so the fatigue monitor is always on', () => {
     const { ports, button, status } = mount();
-    expect(ports).toHaveLength(0);
-    expect(status()).toBe('Body signals: off.');
-    expect(button.textContent).toBe('Start body signals');
+    expect(ports).toHaveLength(1);
+    expect(status()).toBe('Body signals: connecting to the companion...');
+    expect(button.textContent).toBe('Stop body signals');
   });
 
-  it('starts the companion on Start and ends it on Stop', () => {
+  it('ends the companion on Stop, saving Presage credit, and starts a fresh one on Start', () => {
     const { ports, button, status } = mount();
-    button.click();
-    expect(ports).toHaveLength(1);
     ports[0]!.receive(HELLO);
     ports[0]!.receive({ type: 'status', state: 'running' });
     expect(status()).toBe('Body signals: measuring.');
@@ -64,11 +62,14 @@ describe('body signals section', () => {
     expect(ports[0]!.disconnected).toBe(true);
     expect(status()).toBe('Body signals: off.');
     expect(button.textContent).toBe('Start body signals');
+
+    button.click();
+    expect(ports).toHaveLength(2);
+    expect(status()).toBe('Body signals: connecting to the companion...');
   });
 
   it('starts a fresh companion when started again after a problem', () => {
     const { ports, button, status } = mount();
-    button.click();
     ports[0]!.receive(HELLO);
     ports[0]!.receive({ type: 'status', state: 'credits-exhausted' });
     expect(status()).toContain('no Presage credit');

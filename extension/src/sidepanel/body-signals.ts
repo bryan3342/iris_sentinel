@@ -96,7 +96,7 @@ const QUALITY_TEXT: Record<Quality, string> = {
 
 const LABEL: Record<Signal, string> = { pulse: 'Heart rate', breathing: 'Breathing', hrv: 'Heart rate variability' };
 
-/** What the section's button does. Body signals never start on their own, since every Presage session uses credits. */
+/** What the section's button does. Body signals start as the panel opens; Stop saves Presage credits, and Start measures again. */
 export type BodyAction = 'start' | 'stop';
 
 export interface BodySignalsView {

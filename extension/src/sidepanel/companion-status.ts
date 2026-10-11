@@ -9,13 +9,14 @@ import {
   withVitals,
 } from './body-signals';
 
-// Side panel section for the Presage companion. Body signals stay off until the
-// user presses Start, because every Presage session uses credits (1 credit is 30
-// seconds of measuring). Stop, or closing the panel, ends the companion and
-// Presage with it, so body sensing only runs while Iris is open. What it shows
-// is worked out in body-signals.ts.
+// Side panel section for the Presage companion. Body signals start as the panel
+// opens, so the fatigue monitor is always on while Iris is. Every Presage session
+// uses credits (1 credit is 30 seconds of measuring), so Stop ends the companion
+// and Presage with it until Start, or until the panel next opens; closing the
+// panel ends them too, so body sensing only runs while Iris is open. What it
+// shows is worked out in body-signals.ts.
 
-/** Side panel section with the body signals and a button to start or stop them. */
+/** Side panel section with the body signals, started at once, and a button to stop or start them again. */
 export function companionPanel(link: CompanionLink = companionLink()): HTMLElement {
   const section = document.createElement('section');
   section.className = 'body-signals';
@@ -87,5 +88,6 @@ export function companionPanel(link: CompanionLink = companionLink()): HTMLEleme
     render();
   });
   render();
+  void link.start();
   return section;
 }
