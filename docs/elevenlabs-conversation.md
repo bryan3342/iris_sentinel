@@ -1,7 +1,8 @@
 # ElevenLabs conversation milestone
 
 Basic conversation is implemented: signed-session minting, microphone access,
-Start/Stop, listening/speaking status, and cleanup on panel closure.
+hands-free listening (connects when the user speaks, hangs up after a minute of
+quiet), listening/speaking status, and cleanup on panel closure.
 Browser tools are connected: run `npm run setup:elevenlabs` in `server/` to give
 the agent its tools and prompt (see [voice-agent-setup.md](voice-agent-setup.md)).
 User-talking signals are not connected yet.
@@ -15,11 +16,11 @@ User-talking signals are not connected yet.
    opening a microphone conversation. Then run `npm run dev` there.
 3. Run `npm run build` from the root and reload the unpacked `extension/dist`
    extension in Chrome. Open its side panel and grant microphone permission.
-4. Select Start conversation, speak, and verify you hear Iris reply.
+4. With **Listening** on, speak, and verify Iris connects and replies.
    This sends audio to ElevenLabs and uses conversation quota.
-5. Select Stop during a reply and check that playback and microphone use end.
-   Restart, then close the side panel and check that microphone use ends again.
-6. Stop while connecting; a late session must close. Deny microphone access or
+5. Turn Listening off during a reply and check that playback and microphone use end.
+   Turn it on again, then close the side panel and check that microphone use ends again.
+6. Turn Listening off while connecting; a late session must close. Deny microphone access or
    stop the local server and check that the status shows a recoverable error.
 
 Automated checks: root `npm test`, `npm run typecheck`, `npm run build`;
