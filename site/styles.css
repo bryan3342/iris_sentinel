@@ -1,18 +1,18 @@
-/* Iris: one dark page. Teal from the logo, red gaze ring from the extension overlay. */
+/* Iris: one dark screen. Teal from the logo on a black gradient. */
 :root {
   color-scheme: dark;
   --bg: #050807;
   --glow: rgb(14 148 136 / 0.28);
   --text: #f2f7f6;
   --muted: #8fa3a0;
-  --line: rgb(255 255 255 / 0.1);
   --teal-1: #36e0cc;
   --teal-2: #0e9488;
-  --gaze: #ff2828;
   font-family: system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
+
+html, body { height: 100%; }
 
 body {
   margin: 0;
@@ -24,20 +24,17 @@ body {
   line-height: 1.6;
 }
 
-main { max-width: 960px; margin: 0 auto; padding-inline: 24px; }
-h2 { margin: 0 0 8px; font-size: 1.25rem; letter-spacing: -0.01em; }
 p { margin: 0; }
 
-/* Hero */
 .hero {
-  min-height: 92vh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
+  padding: 48px 24px;
   text-align: center;
-  gap: 18px;
-  position: relative;
 }
 
 /* Wordmark, same drawing and motion as the extension's first-open splash. */
@@ -59,29 +56,21 @@ p { margin: 0; }
 .stem { transform-origin: top; animation: stem 0.5s ease-out 1.4s both; }
 
 .tagline { font-size: clamp(1.5rem, 4vw, 2.4rem); font-weight: 600; letter-spacing: -0.02em; text-wrap: balance; animation: rise 0.8s ease-out 2.4s both; }
-.lead { max-width: 34em; color: var(--muted); font-size: 1.1rem; text-wrap: balance; animation: rise 0.8s ease-out 2.7s both; }
+.lead { max-width: 36em; color: var(--muted); font-size: 1.1rem; text-wrap: balance; animation: rise 0.8s ease-out 2.7s both; }
 
-.scroll-cue {
-  position: absolute;
-  bottom: 28px;
-  width: 22px;
-  height: 36px;
-  border: 2px solid var(--line);
-  border-radius: 12px;
-  animation: rise 0.8s ease-out 3.2s both;
+.demo-link {
+  margin-top: 12px;
+  padding: 14px 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--teal-1), var(--teal-2));
+  color: #04110f;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: rise 0.8s ease-out 3s both;
 }
-.scroll-cue::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 7px;
-  width: 4px;
-  height: 7px;
-  margin-left: -2px;
-  border-radius: 2px;
-  background: var(--teal-1);
-  animation: cue 1.8s ease-in-out infinite;
-}
+.demo-link:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgb(54 224 204 / 0.35); }
+.demo-link:focus-visible { outline: 2px solid var(--teal-1); outline-offset: 4px; }
 
 @keyframes eye-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
 @keyframes blink-once { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.08); } }
@@ -90,81 +79,11 @@ p { margin: 0; }
 @keyframes stem { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 @keyframes pull { from { max-width: 0; opacity: 0; clip-path: inset(0 100% 0 0); } to { max-width: 2.5em; opacity: 1; clip-path: inset(0 0 0 0); } }
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
-@keyframes cue { 0% { opacity: 0; transform: translateY(0); } 40% { opacity: 1; } 100% { opacity: 0; transform: translateY(12px); } }
 
-/* How it works */
-.how { padding-block: 96px; display: grid; gap: 56px; }
-.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; }
-.step { border-top: 2px solid var(--teal-2); padding-top: 18px; }
-.step p { color: var(--muted); }
-
-/* Demo */
-.demo { max-width: 560px; width: 100%; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; background: rgb(255 255 255 / 0.03); overflow: hidden; }
-.demo__page { position: relative; padding: 24px; }
-.demo__line { height: 10px; border-radius: 5px; background: var(--line); margin-bottom: 10px; }
-.demo__line--title { width: 50%; height: 14px; }
-.demo__targets { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
-.target {
-  position: relative;
-  font: inherit;
-  padding: 14px;
-  border-radius: 10px;
-  border: 2px solid var(--line);
-  background: transparent;
-  color: var(--text);
-  transition: border-color 0.25s, background 0.25s, transform 0.25s;
-}
-.target::before {
-  content: attr(data-n);
-  position: absolute;
-  top: -9px;
-  left: -9px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--teal-2);
-  color: #fff;
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 22px;
-}
-.target.is-aimed { border-color: var(--teal-1); background: rgb(54 224 204 / 0.1); }
-.target.is-clicked { transform: scale(0.95); background: rgb(54 224 204 / 0.3); }
-.gaze {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
-  border: 3px solid var(--gaze);
-  border-radius: 50%;
-  box-shadow: 0 0 12px var(--gaze);
-  pointer-events: none;
-  transition: left 0.9s cubic-bezier(0.4, 0, 0.2, 1), top 0.9s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s;
-}
-.gaze.is-hidden { opacity: 0; }
-.demo__status { padding: 12px 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
-
-/* Privacy */
-.privacy { padding-block: 40px 120px; text-align: center; }
-.privacy h2 { font-size: clamp(1.5rem, 3.5vw, 2rem); margin-bottom: 12px; }
-.privacy p { color: var(--muted); max-width: 34em; margin: 0 auto; }
-
-.footer { display: flex; justify-content: center; gap: 24px; padding: 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.9rem; }
-.footer a { color: var(--teal-1); text-decoration: none; }
-a:focus-visible { outline: 2px solid var(--teal-1); outline-offset: 4px; }
-
-/* Scroll reveal: content is visible at rest and only slides into place. */
-.reveal { transform: translateY(24px); transition: transform 0.8s ease, opacity 0.8s ease; opacity: 0.4; }
-.reveal.is-visible { transform: none; opacity: 1; }
-
-@media (max-width: 720px) {
-  .steps { grid-template-columns: 1fr; gap: 28px; }
-  main { padding-inline: 16px; }
+@media (max-width: 560px) {
+  .hero { padding-inline: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
-  .reveal { transform: none; opacity: 1; }
 }
