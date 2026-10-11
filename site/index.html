@@ -33,7 +33,7 @@
       </div>
 
       <!-- Live demo: the gaze ring moves between numbered targets, a double blink opens one. -->
-      <div class="demo reveal" aria-hidden="true">
+      <div class="demo reveal" aria-hidden="true" inert>
         <div class="demo__bar"><span></span><span></span><span></span><em>example.org</em></div>
         <div class="demo__page" id="demo-page">
           <div class="demo__line demo__line--title"></div>
@@ -81,14 +81,14 @@
         <li class="step reveal">
           <span class="step__n">4</span>
           <h3>Rest</h3>
-          <p>Iris watches for fatigue and adapts: slower timing, larger targets, then a short check-in by voice.</p>
+          <p>Iris watches for fatigue through the camera. When it rises, Iris checks in by voice and offers a hand or a short break.</p>
         </li>
       </ol>
     </section>
 
     <section id="flow" class="flow">
       <h2 class="reveal">Architecture</h2>
-      <p class="section-lead reveal">Two paths meet at one click. Sensing stays on the laptop; only an explicit voice request reaches the cloud.</p>
+      <p class="section-lead reveal">Two paths meet at one click. Sensing stays on the laptop; only a voice conversation or a page request you make reaches the cloud.</p>
 
       <div class="diagram reveal" id="diagram">
         <div class="lane">
