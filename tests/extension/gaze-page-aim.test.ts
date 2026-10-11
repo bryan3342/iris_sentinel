@@ -310,6 +310,22 @@ describe('confirming with a double blink', () => {
       provider.stop();
     });
 
+    it('says so when a double blink comes with no number aimed and none picked', async () => {
+      const provider = new ScriptedEyes(doubleBlinkAt(away, 1000));
+      const store = new CalibrationStore();
+      store.setDots(simulatedCalibration(), VIEWPORT);
+      const outcomes: Outcome[] = [];
+      const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+        select: async () => 'SELECTED', onOutcome: (outcome) => outcomes.push(outcome),
+      });
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(outcomes).toEqual(['NO_TARGET']);
+      gaze.stop();
+      provider.stop();
+    });
+
     it('never teaches the calibration, since the eyes were not on that target', async () => {
       const { provider, gaze, selected, learned } = picking(doubleBlinkAt(away, 1000), true);
       gaze.start();
@@ -348,5 +364,77 @@ describe('confirming with a double blink', () => {
       gaze.stop();
       provider.stop();
     });
+  });
+
+  describe('an action asked for by voice, such as closing a tab', () => {
+    const eyesOn = (point: Point2, blinking: boolean) => (t: number): GazeSample =>
+      ({ t, eye: eyeFor(point), head: SIMULATED_HEAD, blink: blinking ? { left: 0.9, right: 0.9 } : { left: 0.05, right: 0.05 } });
+    /** Looks at target 1, blinking twice quickly starting at `blinkAt` ms. */
+    const doubleBlinkAt = (blinkAt: number) => (t: number) =>
+      eyesOn(centerOf(1), (t > blinkAt && t <= blinkAt + 150) || (t > blinkAt + 300 && t <= blinkAt + 450))(t);
+    function acting(blinkAt: number) {
+      const provider = new ScriptedEyes(doubleBlinkAt(blinkAt));
+      const store = new CalibrationStore();
+      store.setDots(simulatedCalibration(), VIEWPORT);
+      const selected: number[] = [];
+      const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+        select: async (_list, target) => { selected.push(target.id); return 'SELECTED'; },
+      });
+      return { provider, gaze, selected, done: () => { gaze.stop(); provider.stop(); } };
+    }
+
+    it('runs on the next double blink instead of selecting the aimed target', async () => {
+      const { provider, gaze, selected, done } = acting(1000);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      let closed = 0;
+      gaze.armAction(1, () => { closed++; });
+      await vi.advanceTimersByTimeAsync(1100);
+      expect(closed).toBe(1);
+      expect(selected).toEqual([]);
+      done();
+    });
+
+    it('is dropped when the user moves to another tab, so it never acts on a tab they are not looking at', async () => {
+      const { provider, gaze, done } = acting(1500);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      let closed = 0;
+      gaze.armAction(1, () => { closed++; });
+      active = 2;
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(closed).toBe(0);
+      done();
+    });
+
+    it('expires after ten seconds', async () => {
+      const { provider, gaze, selected, done } = acting(11_000);
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(500);
+      let closed = 0;
+      gaze.armAction(1, () => { closed++; });
+      await vi.advanceTimersByTimeAsync(11_200);
+      expect(closed).toBe(0);
+      expect(selected).toEqual([1]); // the double blink went back to clicking the aimed target
+      done();
+    });
+
+    for (const actionLast of [false, true]) {
+      it(`gives way to ${actionLast ? 'nothing picked before it' : 'a target picked by voice after it'}: one double blink never does two things`, async () => {
+        const { provider, gaze, selected, done } = acting(1000);
+        gaze.start();
+        await provider.start();
+        await vi.advanceTimersByTimeAsync(500);
+        let closed = 0;
+        if (actionLast) { gaze.arm(3); gaze.armAction(1, () => { closed++; }); }
+        else { gaze.armAction(1, () => { closed++; }); gaze.arm(3); }
+        await vi.advanceTimersByTimeAsync(1100);
+        expect([closed, selected]).toEqual(actionLast ? [1, []] : [0, [3]]);
+        done();
+      });
+    }
   });
 });

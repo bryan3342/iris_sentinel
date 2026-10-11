@@ -22,14 +22,16 @@ ElevenLabs dashboard. It takes about 15 minutes.
 1. In `server/.dev.vars`, set `ENABLE_VOICE_AGENT=true`, `ELEVENLABS_API_KEY`
    (starts with `sk_`) and `ELEVENLABS_AGENT_ID`.
 2. From `server/`, give the agent Iris's tools and system prompt:
-   `npm run setup:elevenlabs`. It creates or updates six client tools, attaches
-   them to the agent with **Wait for response** on, and sets the system prompt.
+   `npm run setup:elevenlabs`. It creates or updates every client tool in
+   `voice-agent.json`, attaches them to the agent with **Wait for response** on,
+   and sets the system prompt.
    It also empties the agent's first message, so the agent waits for you, and
    allows Iris to set the first message, which it does only for a check-in when
    you seem tired.
    It leaves the voice, language model and other settings alone, and is safe to
    run again. The tools and prompt live in `server/scripts/voice-agent.json`; a
-   test keeps their names in step with the extension.
+   test keeps their names in step with the extension. Run it again whenever that
+   file changes, such as when Iris gains a new command.
 3. Check it: `npm run check:elevenlabs`. It should end with
    `Iris's browser tools attached: true`. If a tool is missing or does not wait
    for a response, the agent can talk but cannot act on the page.

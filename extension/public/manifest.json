@@ -8,7 +8,7 @@
   "action": { "default_title": "Open Iris" },
   "background": { "service_worker": "background.js", "type": "module" },
   "side_panel": { "default_path": "sidepanel.html" },
-  "permissions": ["sidePanel", "activeTab", "scripting", "nativeMessaging", "storage", "offscreen"],
+  "permissions": ["sidePanel", "activeTab", "scripting", "nativeMessaging", "storage", "offscreen", "search"],
   "incognito": "not_allowed",
   "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "content_security_policy": {

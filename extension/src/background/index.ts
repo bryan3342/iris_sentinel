@@ -1,4 +1,4 @@
-import { LIMITS, object, token, validateInput, validateResult } from '@iris/protocol';
+import { LIMITS, object, token, validateInput, validateResult, validateTabInput, validateTabResult } from '@iris/protocol';
 import { eligibleTab } from '../page-understanding/capture';
 import { GATEWAY, responseJson } from '../page-understanding/gateway';
 
@@ -26,6 +26,17 @@ chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
       if (url.protocol !== 'wss:' || url.host !== 'api.elevenlabs.io' || url.username || url.password || url.hash ||
           url.pathname !== '/v1/convai/conversation' || !url.searchParams.get('conversation_signature')) throw new Error('INVALID_RESPONSE');
       return { signedUrl: value.signedUrl };
+    }
+    if (base.type === 'iris.tabs.match') {
+      // Which open tab a spoken request means: the request and each tab's title and site go to the
+      // Iris server and on to the model, never full addresses, and the answer only names a tab.
+      object(message, ['type', 'input']);
+      const input = validateTabInput(base.input);
+      const response = await fetch(`${GATEWAY}/v0.1/tab-match`, {
+        method: 'POST', signal: AbortSignal.timeout(LIMITS.requestMs), credentials: 'omit', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+      });
+      return validateTabResult(await responseJson(response), input).match;
     }
     if (base.type === 'iris.page.cancel') {
       object(message, ['type', 'requestId']);

@@ -9,7 +9,7 @@ preview, gaze aiming with on-page calibration, double-blink selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
-by this change. Voice browser tools (scrolling, history, summaries, find) are implemented. User-talking signals and the full input-mode state machine below remain
+by this change. Voice browser tools (scrolling, history, tabs, websites, search, reload, zoom, summaries, finding and clicking) are implemented. User-talking signals and the full input-mode state machine below remain
 future work. Basic ElevenLabs conversation is implemented; live microphone
 testing remains outstanding. Page understanding is built
 and tested independently of ElevenLabs. Contracts and exact limits are in
@@ -126,7 +126,7 @@ Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/of
 
 **Who owns what.**
 - **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`.
-- **Confirms:** a double blink, never Presage, and never looking alone: the eyes rest naturally while reading, so a dwell does not click when aiming with the eyes. Pointing with the mouse keeps a one-second dwell, since resting the mouse is deliberate. The double blink comes from MediaPipe's per-eye closure. Two quick blinks of both eyes (each under 400 ms, the second ending within 800 ms of the first starting) click the moment the eyes open. From the frame a lid starts closing fast, through the blink, and for 0.12 seconds after the lids reopen, the camera adapter holds the last eye reading, so the gaze point does not snap and no distorted reading reaches calibration or learning; it still reports the lids' closure. Lids lowering slowly, as when looking down, never trigger the hold. The target is locked as the first blink starts, from the aim that held still for 0.2 seconds just before, so the closing lids' distorted reading cannot redirect the click. A single blink, a wink, a longer closure, blinks too far apart, or no steady aim never clicks, and a locked target is dropped if a page change moves it. A safe target opens with a double blink (or, pointing with the mouse, a dwell); a risky one (anything that may submit, pay, delete or send) opens only with a double blink, so staring at a Buy or Delete button never presses it. There is no second confirm: looking away and back depends on gaze accuracy a webcam cannot give. Voice requests pick a target but never confirm it. Every confirm method produces the same event, so swapping one for another changes nothing downstream; dwell fires once when one target stays aimed for one second (adjustable) with the eyes open. A confirm acts on the target aimed at that moment (or the voice-picked one), however it was proposed.
+- **Confirms:** a double blink, never Presage, and never looking alone: the eyes rest naturally while reading, so a dwell does not click when aiming with the eyes. Pointing with the mouse keeps a one-second dwell, since resting the mouse is deliberate. The double blink comes from MediaPipe's per-eye closure. Two blinks of both eyes (each closure under 600 ms, the second ending within 1.3 s of the first starting, so deliberate blinks, slower than natural ones, count) click the moment the eyes open. Between the two blinks the lids need only lift part way: in a live recording of deliberate double blinks, the closure (both eyes' mean) fell from about 0.8 only to between 0.4 and 0.6 before the second blink, so waiting for the eyes to open fully merged most pairs into one long blink that never clicked. A blink therefore also ends when that closure falls 0.15 below its peak with one eye no longer closed, and the next begins once both eyes close again after it has risen 0.12. The first blink must start from fully open eyes, so lids fluttering while the eyes rest closed never click. Closed and open are judged against each eye's own resting closure, learned slowly while no blink is under way, since resting levels differ between people, between the two eyes and with where they look. A double blink with no number aimed and none picked by voice says so in the panel, so the user knows the blinks were seen. From the frame a lid starts closing fast, through the blink, and for 0.12 seconds after the lids reopen, the camera adapter holds the last eye reading, so the gaze point does not snap and no distorted reading reaches calibration or learning; it still reports the lids' closure. Lids lowering slowly, as when looking down, never trigger the hold. The target is locked as the first blink starts, from the aim that held still for 0.2 seconds just before, so the closing lids' distorted reading cannot redirect the click. A single blink, a wink, a longer closure, blinks too far apart, or no steady aim never clicks, and a locked target is dropped if a page change moves it. A safe target opens with a double blink (or, pointing with the mouse, a dwell); a risky one (anything that may submit, pay, delete or send) opens only with a double blink, so staring at a Buy or Delete button never presses it. There is no second confirm: looking away and back depends on gaze accuracy a webcam cannot give. Voice requests pick a target but never confirm it. Every confirm method produces the same event, so swapping one for another changes nothing downstream; dwell fires once when one target stays aimed for one second (adjustable) with the eyes open. A confirm acts on the target aimed at that moment (or the voice-picked one), however it was proposed.
 - **Blink rate:** Presage only. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events for the fatigue score. MediaPipe answers "did the user close their eyes on purpose", Presage answers "how often is the user blinking", so the two never compete. Core drops a Presage blink that coincides with a confirm, so confirms do not count as fatigue.
 - **Talking:** the ElevenLabs agent, which hears the microphone. Presage's talking flag is not used. With no voice session open, Iris has no talking signal; fatigue readings get slightly noisier, and no confirm depends on it.
 - **Fatigue, focus and movement:** computed by Iris in the background coordinator from Presage signals plus behavior that only the extension sees. Presage provides the raw signals, not these scores.
@@ -143,13 +143,13 @@ Presage was tested on the demo laptop before these choices were made (#24). Its 
 
 **Companion messages.** Defined in `packages/protocol/src/companion.ts`, and every message is validated on arrival on both sides. The extension sends `start` and `stop`. The companion sends `hello` (its protocol version, checked by the extension), `status` (running, key missing, offline, credits exhausted and so on), `quality` (camera view problems with a hint to show), `vitals` (pulse, breathing rate and HRV, each with confidence and a stable flag, about once a second) and `blink` (each natural blink's length). Messages carry no timestamps; the receiver stamps them, so the two programs' clocks never need to agree. The side panel holds the connection (`extension/src/providers/companion/`), next to the gaze session that will use the signals. Body signals stay off until the user presses **Start body signals**, because every Presage session uses credits (1 credit is 30 seconds of measuring). Start opens the port, which starts the companion; **Stop body signals**, or closing the panel, closes the port, which ends the companion and Presage with it, so body sensing never runs in the background. Nothing is retried on its own, since every new session repeats Presage's warm-up and uses credits: after a dropped connection or a reported problem, Start begins a fresh session.
 
-**MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. In the extension the dots are drawn over the browsing tab and each is saved in screen positions, its place on the page plus the window's position, so moving the window or resizing the side panel needs no new dots; a side panel on the left that gets resized, or page zoom other than 100%, does, and confirms absorb small errors. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still. The missing position is not a blink signal; the double-blink confirm reads the per-eye closure carried in each sample instead. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
+**MediaPipe gaze.** In the side panel, MediaPipe Face Landmarker runs on each camera frame. The iris center (averaged with its four contour points) is measured along the line between the eye corners and as an offset from that line; up and down are blended with the model's look-down and look-up scores, where landmark geometry is weakest; the face transform gives head yaw and pitch, and the outer eye corners give the head's position and apparent size. Each eye is read on its own: an eye whose lid is closed drops out, and the two are weighted by their apparent width, so a drooping lid, a wink or an eye turned away from the camera does not pull the estimate. A closure shorter than 400 ms is a blink, not a closed eye: the sample and the iris markers hold still through it, since the iris under a closing lid is not worth reading. The camera is opened at 1280x720 so that iris movement spans enough pixels to measure against landmark noise. Every sample is steadied before calibration, aiming or a check reads it (`SteadyGaze` in core): each reading, eye and head alike, passes a median of its last three values, which drops a single-frame spike such as a flicker of light, then a One Euro filter that smooths heavily while the reading is still and barely while it moves on purpose. Head readings need it most, since a one degree wobble in head turn moves the corrected point about 40 px. About five times a second the brightness of the face and of the whole picture is measured from a 16-pixel thumbnail of each, on this computer: poor light (a dark, washed-out or flat face) makes the filters smooth harder, and the panel suggests a fix when the face is too dark, too bright, or in shadow against bright light behind it. The face model tracks one face, which keeps MediaPipe's own landmark smoothing on (it smooths only a single tracked face, and the blink scores are computed from those smoothed points) and keeps it following the face it found instead of searching every frame for others. The calibration fit maps the eye feature alone to the screen; head movement is not learned (the user holds still during calibration) but corrected geometrically afterwards: the fitted point is shifted by how far the head has moved sideways and by the viewing distance times the tangent of how far it has turned, using a 9 cm outer eye-corner span as the ruler and a 60 cm seat distance at calibration. The fit is kept as raw samples rather than weights and refitted whenever one is added: the dots are the anchor, and every target the user confirms during use adds a sample taken in whatever head position they were in, which is the coverage a still-head calibration never has. A confirm only counts when the current fit already places the gaze near that target, so a wrong selection cannot pull the map away. Samples (a few numbers each, no frames or landmarks) are saved on the device, keyed by screen size and scaling, so a returning user is tracked at once and the dots are only shown when no saved calibration fits the screen. In the extension the dots are drawn over the browsing tab and each is saved in screen positions, its place on the page plus the window's position, so moving the window or resizing the side panel needs no new dots; a side panel on the left that gets resized, or page zoom other than 100%, does, and confirms absorb small errors. These are published as `GazeProvider` samples, and nothing MediaPipe-specific leaves the provider. While both eyes are closed a sample carries no eye position, so aiming holds still. The missing position is not a blink signal; the double-blink confirm reads the per-eye closure carried in each sample instead. The WebAssembly runtime and model ship inside the extension (the model is pinned by SHA-256), so nothing loads remotely and no frames leave the page.
 
 **Gaze accuracy across postures.** MediaPipe tracks faces turned or tilted, but iris points get less reliable past roughly 35 degrees of turn, and its head pose assumes a generic camera (63 degree vertical field of view). The larger source of error is Iris's own mapping: the eye is read flat in the camera image and mapped to the screen by a fit made at one posture, with movement since then corrected from fixed assumptions (60 cm seat distance, 9 cm eye-corner span, a 1/96 inch CSS pixel). Tilting the lid or changing seat therefore moves the gaze point. The design separates the two things that decide where gaze lands, as gaze research does: which way the eyes point, read independently of head pose, and where the head is, used once in the step that finds the spot on the screen. The screen geometry a browser cannot know (lens, screen size, true distance) is learned from use rather than assumed. Selection stays target-based; the cursor is feedback. The work is staged so each step is measured against the last:
 
 | Stage | What it adds |
 | :--- | :--- |
-| Measure | **Check accuracy** shows a 4x4 grid of dots, none on a calibration dot, and reports mean error in pixels and in degrees of visual angle (the standard eye tracker measure: webcam trackers typically reach 1 to 2 degrees, research systems 0.3 to 0.5; Iris assumes a 60 cm seat and a 1/96 inch CSS pixel), left-right and up-down error, error at the corners, the edges and between the quadrants and in each half, the worst spot, and the head posture. The last ten checks per screen are kept with their samples (numbers only, on this computer), so later fits can be scored on the same data. |
+| Measure | **Check accuracy** shows a 4x4 grid of dots, none on a calibration dot, and reports mean error in pixels and in degrees of visual angle (the standard eye tracker measure: webcam trackers typically reach 1 to 2 degrees, research systems 0.3 to 0.5; Iris assumes a 60 cm seat and a 1/96 inch CSS pixel), left-right and up-down error, how far gaze wanders while the eyes hold still on a dot (shake), error at the corners, the edges and between the quadrants and in each half, the worst spot, and the head posture. The last ten checks per screen are kept with their samples (numbers only, on this computer), so later fits can be scored on the same data. |
 | Learn from use | Every gaze selection adds a calibration sample for the selected target's center, from the eyes just before the double blink. Recent confirms count most (each starts at ten dot samples and halves every ten confirms), and a confirm of the target gaze snapped to is trusted further than an arbitrary one, so a drifted fit can be pulled back. Mouse pointing never teaches the eye calibration. |
 | Posture-aware map | Head turn, tilt, position and distance (from iris diameter, about 1.2 cm) become inputs to the fit, with today's geometric correction as the starting point and a learned adjustment on top. |
 | Posture-independent eye reading | Head rotation is undone before the iris is read between the eye corners. Eyelid opening (lid gap over eye width) is already measured and is a calibration input whenever every sample carries it: the upper lid follows vertical gaze, the weakest direction. Each user's own lid-to-gaze relationship is learned during calibration, so drooping or partly closed lids are handled per person. |
@@ -180,18 +180,25 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 ```
 User speaks ─> ElevenLabs Agent (side panel, signed session from the local server;
                its language model is set to Gemini in the ElevenLabs agent settings)
-                 └─ calls a client tool, for example find_on_page("history section")
+                 └─ calls a client tool, for example click_on("history section")
                       └─ helper supplies viewport targets, masks and document revision
                       └─ coordinator captures viewport through Chrome, masks locally
                       └─ local server /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
-                 └─ answers "It is number 12 ..."
-                 └─ picks target 12 (marked "blink twice to open")
-User blinks twice ─> page helper clicks target 12
+                      └─ a fresh gaze scan still has target 12 where Gemini saw it
+                      └─ safe target: the page helper clicks it at once
+                      └─ risky target: picked only (marked "blink twice to open")
+                 └─ answers "Opened number 12 ..."
+                 or calls go_to_tab("the tab with the recipe")
+                      └─ local server /v0.1/tab-match with the request and each
+                         tab's title and site name ─> Gemini ─> tab number or null
+                      └─ Chrome switches to that tab
+User blinks twice ─> a picked risky target opens, or a tab waiting to close closes
 ```
 
-**Client tools** (`extension/src/sidepanel/agent/tools.ts`, behind the neutral
-`VoiceTools` type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
+**Client tools** (`extension/src/sidepanel/agent/tools.ts` for the page and
+`agent/navigation.ts` for tabs and addresses, behind the neutral `VoiceTools`
+type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
 
 | Tool | Parameters | What Iris does |
 | :--- | :--- | :--- |
@@ -200,28 +207,45 @@ User blinks twice ─> page helper clicks target 12
 | `summarize_looked_at` | none | "Summarize this": only the block where the eyes rested in the last five seconds (a paragraph, image or table); with none, it says so and sends nothing |
 | `summarize_whole_page` | none | "Summarize the whole page": page understanding summary of the visible viewport |
 | `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
-| `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it (as `select_number`), and answers with its number |
-| `select_number` | `number` (1 to 999) | Picks that numbered target: marked on the page, opened by the user's next double blink wherever they look (or, pointing with the mouse, a dwell on it) |
+| `click_on` | `description` (up to 500 characters) | Finds a target as `find_on_page` does, then opens it as `select_number` does, only if a fresh scan still has it where Gemini saw it |
+| `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it without opening it, and answers with its number |
+| `select_number` | `number` (1 to 999) | Opens that numbered target: a safe one at once; a risky one is only picked, marked on the page and opened by the user's next double blink wherever they look (pointing with the mouse, it says the eyes are needed) |
+| `go_to_tab` | `description` (up to 500 characters) | Sends the request and each tab's title and site name (never its address) to `/v0.1/tab-match` and switches to the tab Gemini names, or says none matches |
+| `switch_tab` | `direction`: `next`, `previous` | Switches to the neighboring tab in the window, wrapping around at the ends |
+| `open_new_tab` | none | Opens a new tab in the window |
+| `close_tab` | none | Closes the active tab on the user's next double blink there, within ten seconds; moving to another tab cancels it |
+| `open_website` | `address`, `new_tab` | Opens an http or https address, a bare site name such as `youtube.com` as https, in this tab or a new one; any other address is refused |
+| `search_web` | `query`, `new_tab` | Searches with the user's own default search engine (`chrome.search`) |
+| `reload_page` | none | Reloads the active tab |
+| `zoom_page` | `direction`: `in`, `out`, `reset` | Steps Chrome's page zoom through its own levels, or back to the default; calibration already divides zoom out |
 
 Each tool answers in words the agent can say, and the side panel shows the same
-words. Scrolling and history change the page at once; nothing a tool does
-clicks, submits or types. A picked target is the voice agent naming *what* to
-open; the user's double blink is still the only thing that opens it,
-so gaze accuracy no longer decides the target. A pick lasts ten seconds, is
-dropped if a page change moves that number, and a risky target opens only with
-a double blink. Summaries, descriptions and finding send the visible
-viewport to Gemini because the user asked, and their text (never screenshot
-bytes) goes to the voice agent, marked as page content that is information only,
-never instructions. Agent setup is in [voice-agent-setup.md](voice-agent-setup.md).
+words. Scrolling, history, tabs, addresses, search, reload and zoom change the
+browser at once, since none can submit, pay, delete or send anything; closing a
+tab, which can lose unsaved work, waits for the user's double blink. A spoken
+click is the user's own deliberate request, so a safe target opens at once,
+through the same page helper select step a double blink uses; anything that may
+submit, pay, delete or send, or that Iris cannot classify, is only picked, and
+the user's double blink opens it. A pick lasts ten seconds and is dropped if a
+page change moves that number, and the latest pick or tab to close replaces the
+one before, so one double blink never does two things. Summaries, descriptions,
+finding and clicking by description send the visible viewport to Gemini because
+the user asked. Finding a tab sends only the request and each tab's title and
+site name, from tabs on websites Iris is allowed on, and nothing is stored. Their
+text (never screenshot bytes) goes to the voice agent, marked as page content
+that is information only, never instructions, and the agent is told never to
+open a website, switch tabs or click because page text asks it to. Agent setup
+is in [voice-agent-setup.md](voice-agent-setup.md).
 
 **Later client tools:** `describe_image(n)`, `set_pace(slower|faster)`, and
-bounded multi-step tasks in which Gemini picks each next safe step. No tool may
-ever click directly; picking a target is the most a tool can do.
+bounded multi-step tasks in which Gemini picks each next safe step.
 
-**Safety rule.** Every browser click requires Iris confirmation, even when the
-agent proposes it. Gemini recommends/explains only; it never clicks. The one
-place Iris clicks is the page helper's select step, after a confirm passes the
-selection rule: it clicks only the exact element behind the confirmed number in
+**Safety rule.** Nothing clicks from gaze alone, and Gemini never clicks: it
+only names a target or a tab. A click comes from the user: a double blink, a
+mouse dwell on a safe target, or a spoken request to click a safe target.
+Anything that may submit, pay, delete or send opens only with a double blink,
+even when the agent proposes it. The one place Iris clicks is the page helper's
+select step: it clicks only the exact element behind the confirmed number in
 that gaze scan, only if it is still on the page, where the user saw it and not
 covered, and a risky element only after a double blink, checked again in the
 page itself.

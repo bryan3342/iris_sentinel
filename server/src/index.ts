@@ -5,13 +5,23 @@ import { abortable, failure, HttpError, json, readJson } from './http';
 import { GeminiMultimodal } from './multimodal';
 import { validatePng } from './png';
 import { ElevenLabsAgentSession, type AgentSessionProvider } from './routes/agent-token/index';
+import { TAB_LIMITS, validateTabInput, validateTabMatch, type TabMatching } from '../../packages/protocol/src/tab-match';
 
 /** Each operation's route segment and the provider method that answers it. */
 const METHODS: Record<Operation, keyof PageUnderstanding> = {
   find_target: 'findTarget', summarize_page: 'summarizePage', describe_image: 'describeImage', describe_target: 'describeTarget',
 };
 
-export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAccess(), agent: AgentSessionProvider = new ElevenLabsAgentSession()) {
+/** A model's answer, checked here independently of the model: an answer that fails the check is the model's fault, never the caller's. */
+async function modelAnswer<T>(answer: () => Promise<unknown>, validate: (value: unknown) => T, deadline: AbortSignal): Promise<T> {
+  try { return validate(await abortable(answer(), deadline)); }
+  catch (error) {
+    if (error instanceof ProtocolError) throw new HttpError(502, 'INVALID_MODEL_RESULT');
+    throw error;
+  }
+}
+
+export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAccess(), agent: AgentSessionProvider = new ElevenLabsAgentSession(), tabs?: TabMatching) {
   return { async fetch(request: Request, env: Env = {}): Promise<Response> {
     if (new URL(request.url).pathname === "/health" && request.method === "GET") {
       return json({ status: "ok", service: "iris-server" });
@@ -53,6 +63,14 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         }
         if (env.ENABLE_PAGE_UNDERSTANDING !== 'true') throw new HttpError(503, 'DISABLED');
         const ingestion = AbortSignal.any([deadline, AbortSignal.timeout(LIMITS.ingestionMs)]);
+        if (path === '/v0.1/tab-match') {
+          // Tab titles are browsing content, so the same approval as page screenshots applies.
+          if (env.PAGE_CONTENT_APPROVED !== 'true') throw new HttpError(503, 'CONTENT_NOT_APPROVED');
+          lease = await admit();
+          const input = validateTabInput(await readJson(request, TAB_LIMITS.bodyBytes, ingestion));
+          const match = await modelAnswer(() => (tabs ?? new GeminiMultimodal(env)).matchTab(input, deadline), (value) => validateTabMatch(value, input), deadline);
+          return respond(json({ protocolVersion: '0.1', requestId: input.requestId, match }));
+        }
         const operation = path.slice('/v0.1/page-understanding/'.length);
         if (!path.startsWith('/v0.1/page-understanding/') || !(OPERATIONS as readonly string[]).includes(operation)) throw new HttpError(404, 'NOT_FOUND');
         if (env.PAGE_CONTENT_APPROVED !== 'true') throw new HttpError(503, 'CONTENT_NOT_APPROVED');
@@ -60,18 +78,11 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
         const input = validateInput(await readJson(request, LIMITS.bodyBytes, ingestion));
         if (input.operation !== operation) throw new HttpError(400, 'INVALID_INPUT');
         await validatePng(input.image, ingestion);
-        let result;
-        try {
-          const adapter = multimodal ?? new GeminiMultimodal(env);
-          result = validateUnderstanding(await abortable(adapter[METHODS[input.operation]](input, deadline), deadline), input);
-          if (result.operation === 'summarize_page') {
-            const only = result.scope === 'visible_region' ? 'Looked-at region only' : 'Visible viewport only';
-            result = { ...result, summary: `${only}: ${result.summary}`.slice(0, 2000) };
-          }
-        }
-        catch (error) {
-          if (error instanceof ProtocolError) throw new HttpError(502, 'INVALID_MODEL_RESULT');
-          throw error;
+        const adapter = multimodal ?? new GeminiMultimodal(env);
+        let result = await modelAnswer(() => adapter[METHODS[input.operation]](input, deadline), (value) => validateUnderstanding(value, input), deadline);
+        if (result.operation === 'summarize_page') {
+          const only = result.scope === 'visible_region' ? 'Looked-at region only' : 'Visible viewport only';
+          result = { ...result, summary: `${only}: ${result.summary}`.slice(0, 2000) };
         }
         return respond(json({ protocolVersion: '0.1', requestId: input.requestId, binding: input.binding, result }));
       } catch (error) {

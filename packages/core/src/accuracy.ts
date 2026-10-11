@@ -14,6 +14,11 @@ export interface AccuracyReport {
   /** Mean and worst distance between a dot and where gaze landed, in the viewport's pixels. */
   meanPx: number;
   worstPx: number;
+  /**
+   * How much gaze wanders while the eyes hold still on a dot, in pixels: each dot's middle distance
+   * of its readings from their own middle point, averaged over the dots. Lower is steadier.
+   */
+  shakePx: number;
   /** Mean error left-right and up-down, in pixels. */
   meanXPx: number;
   meanYPx: number;
@@ -55,9 +60,11 @@ export function measureAccuracy(model: CalibrationModel, samples: CalibrationSam
   }
   // Each dot is scored at its middle reading, so a stray glance or blink does not count.
   const errors = [...byDot.values()].map(({ target, points }) => {
-    const x = Math.abs(median(points.map((p) => p.x)) - target.x) * viewport.width;
-    const y = Math.abs(median(points.map((p) => p.y)) - target.y) * viewport.height;
-    return { target, x, y, px: Math.hypot(x, y) };
+    const mid = { x: median(points.map((p) => p.x)), y: median(points.map((p) => p.y)) };
+    const x = Math.abs(mid.x - target.x) * viewport.width;
+    const y = Math.abs(mid.y - target.y) * viewport.height;
+    const shake = median(points.map((p) => Math.hypot((p.x - mid.x) * viewport.width, (p.y - mid.y) * viewport.height)));
+    return { target, x, y, px: Math.hypot(x, y), shake };
   });
   const mean = (values: number[]) => (values.length ? values.reduce((sum, v) => sum + v, 0) / values.length : 0);
   const distances = errors.map((e) => e.px);
@@ -67,6 +74,7 @@ export function measureAccuracy(model: CalibrationModel, samples: CalibrationSam
     dots: errors.length,
     meanPx: mean(distances),
     worstPx: Math.max(0, ...distances),
+    shakePx: mean(errors.map((e) => e.shake)),
     meanXPx: mean(errors.map((e) => e.x)),
     meanYPx: mean(errors.map((e) => e.y)),
     share: mean(distances) / viewport.width,

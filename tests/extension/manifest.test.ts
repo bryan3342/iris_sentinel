@@ -26,4 +26,12 @@ describe('extension manifest', () => {
   it('may keep calibrations in extension storage', () => {
     expect(manifest.permissions).toContain('storage');
   });
+
+  it('may search the web for a spoken request with the person\'s own default search engine', () => {
+    expect(manifest.permissions).toContain('search');
+  });
+
+  it('never asks to read every tab\'s address: tab titles come only from websites Iris is allowed on', () => {
+    expect(manifest.permissions).not.toContain('tabs');
+  });
 });

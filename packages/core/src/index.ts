@@ -6,6 +6,8 @@ export { CalibrationStore } from './calibration-store';
 export type { CalibrationStoreOptions, SampleSource, StoredSample } from './calibration-store';
 export { OneEuroFilter, PointFilter } from './smoothing';
 export type { OneEuroOptions } from './smoothing';
+export { readLight, SteadyGaze } from './steady-gaze';
+export type { LightAdvice, LightLevels } from './steady-gaze';
 export { FixationSmoother } from './fixation';
 export type { FixationOptions } from './fixation';
 export { distanceToRect, snapToTarget } from './snap';

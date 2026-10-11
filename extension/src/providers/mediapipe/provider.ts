@@ -1,4 +1,5 @@
 import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+import { readLight, SteadyGaze, type LightAdvice } from '@iris/core';
 import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@iris/protocol';
 import { ClosureTimer, holdThroughBlink, irisPoints, toGazeSample, type FaceFrame } from './eye-feature';
 
@@ -8,13 +9,23 @@ async function createLandmarker(): Promise<FaceLandmarker> {
   return FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: '/mediapipe/face_landmarker.task', delegate: 'GPU' },
     runningMode: 'VIDEO',
+    // One face only: MediaPipe smooths the landmarks (iris and lids included, and so the blink
+    // scores built from them) only when it tracks a single face, and it keeps tracking that face
+    // without searching the picture for others.
     numFaces: 1,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
   });
 }
 
-/** GazeProvider backed by MediaPipe Face Landmarker, run on every video frame. */
+const LIGHT_EVERY = 6; // frames between light readings, about five a second
+const LIGHT_SIZE = 16; // the face and the picture are each shrunk to this many pixels square to be measured
+
+/**
+ * GazeProvider backed by MediaPipe Face Landmarker, run on every video frame. Each sample is
+ * steadied (SteadyGaze) before anyone reads it, harder when the light on the face is poor. Pixels
+ * are measured here and never leave the computer.
+ */
 export class MediaPipeGazeProvider implements GazeProvider {
   private landmarker: FaceLandmarker | null = null;
   private frameRequest: number | null = null;
@@ -22,6 +33,12 @@ export class MediaPipeGazeProvider implements GazeProvider {
   /** The last sample with an eye reading, held through blinks. */
   private lastSeen: GazeSample | null = null;
   private readonly closure = new ClosureTimer();
+  private readonly steady = new SteadyGaze();
+  private frames = 0;
+  private trust = 1;
+  private advice: LightAdvice = null;
+  private readonly light = new OffscreenCanvas(LIGHT_SIZE, LIGHT_SIZE).getContext('2d', { willReadFrequently: true });
+  private readonly lightListeners = new Set<(advice: LightAdvice) => void>();
   private readonly sampleListeners = new Set<(sample: GazeSample) => void>();
   private readonly traceListeners = new Set<(eyes: [Point2[], Point2[]]) => void>();
 
@@ -40,6 +57,12 @@ export class MediaPipeGazeProvider implements GazeProvider {
   onSample(listener: (sample: GazeSample) => void): Unsubscribe {
     this.sampleListeners.add(listener);
     return () => this.sampleListeners.delete(listener);
+  }
+
+  /** Told when the light on the face changes enough to matter: too dim, too bright, from behind, or fine (null). */
+  onLight(listener: (advice: LightAdvice) => void): Unsubscribe {
+    this.lightListeners.add(listener);
+    return () => this.lightListeners.delete(listener);
   }
 
   /** Iris points per eye (user's right, then left) for the on-screen trace; empty for a closed eye. */
@@ -69,6 +92,7 @@ export class MediaPipeGazeProvider implements GazeProvider {
     }
     const blendshapes: Record<string, number> = {};
     for (const c of result.faceBlendshapes[0]?.categories ?? []) blendshapes[c.categoryName] = c.score;
+    if (this.frames++ % LIGHT_EVERY === 0) this.measureLight(landmarks);
     // A blink is not a closed eye: hold the last eye reading and the markers through it, but report
     // the closure so a double blink can be seen.
     if (this.closure.blinking(blendshapes, now)) {
@@ -81,9 +105,32 @@ export class MediaPipeGazeProvider implements GazeProvider {
       matrix: result.facialTransformationMatrixes[0]?.data ?? [],
       aspect: this.video.videoWidth / this.video.videoHeight,
     };
-    this.publish(toGazeSample(frame, now));
+    this.publish(this.steady.filter(toGazeSample(frame, now), this.trust));
     const eyes = irisPoints(frame);
     this.traceListeners.forEach((listener) => listener(eyes));
+  }
+
+  /** Reads the brightness of the face and of the whole picture, for how far to trust the readings. */
+  private measureLight(landmarks: Point2[]): void {
+    const context = this.light;
+    const { videoWidth: w, videoHeight: h } = this.video;
+    if (!context || !w || !h) return;
+    const level = (x: number, y: number, width: number, height: number) => {
+      context.drawImage(this.video, x, y, Math.max(1, width), Math.max(1, height), 0, 0, LIGHT_SIZE, LIGHT_SIZE);
+      const data = context.getImageData(0, 0, LIGHT_SIZE, LIGHT_SIZE).data;
+      const values: number[] = [];
+      for (let i = 0; i < data.length; i += 4) values.push(0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!);
+      const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+      return { mean, spread: Math.sqrt(values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length) };
+    };
+    const xs = landmarks.map((p) => p.x), ys = landmarks.map((p) => p.y);
+    const left = Math.max(0, Math.min(...xs)) * w, top = Math.max(0, Math.min(...ys)) * h;
+    const face = level(left, top, Math.min(1, Math.max(...xs)) * w - left, Math.min(1, Math.max(...ys)) * h - top);
+    const { trust, advice } = readLight({ face: face.mean, contrast: face.spread, scene: level(0, 0, w, h).mean });
+    this.trust = trust;
+    if (advice === this.advice) return;
+    this.advice = advice;
+    this.lightListeners.forEach((listener) => listener(advice));
   }
 
   private publish(sample: GazeSample): void {

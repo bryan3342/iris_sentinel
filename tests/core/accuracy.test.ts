@@ -31,6 +31,13 @@ describe('measureAccuracy', () => {
     expect(report.share).toBeCloseTo(0.05, 2);
   });
 
+  it('measures how much gaze wanders while the eyes hold still', () => {
+    expect(measureAccuracy(model, samples(CHECK), SCREEN).shakePx).toBeLessThan(1);
+    // Readings alternating 0.04 either side of the dot wander 50 px from their middle, wherever the dot is.
+    const wobbly = samples(CHECK).map((s, i) => ({ ...s, eye: { x: s.eye.x + (i % 2 ? 0.04 : -0.04), y: s.eye.y } }));
+    expect(measureAccuracy(model, wobbly, SCREEN).shakePx).toBeCloseTo(50, 0);
+  });
+
   it('takes each dot at its middle reading, so a glance away does not count', () => {
     const glance = samples(CHECK).map((s, i) => (i % 10 === 0 ? { ...s, eye: { x: 0.4, y: 0.3 } } : s));
     expect(measureAccuracy(model, glance, SCREEN).worstPx).toBeLessThan(1);

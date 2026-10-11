@@ -57,3 +57,11 @@ export const localRequest = (data, origin, extra = {}) => new Request(`http://12
 export const request = (data, sessionToken, extra = {}) => new Request(`https://demo.example/v0.1/page-understanding/${data.operation}`, {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionToken}` }, body: JSON.stringify(data), ...extra,
 });
+/** A tab match request: the person's words and each open tab's title and site, nothing more. */
+export const tabInput = () => ({ protocolVersion: '0.1', requestId: 'request_abcdefghijklmnop', request: 'the tab with the recipe',
+  tabs: [{ id: 1, title: 'Inbox', host: 'mail.example.com' }, { id: 2, title: 'Chocolate chip cookies', host: 'recipes.example.com' }] });
+export const tabMatch = () => ({ tabId: 2, explanation: 'The cookie recipe tab.' });
+/** A tab match request from the Iris extension on this computer. */
+export const localTabRequest = (data, origin, extra = {}) => new Request('http://127.0.0.1:8787/v0.1/tab-match', {
+  method: 'POST', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) }, body: JSON.stringify(data), ...extra,
+});

@@ -1,14 +1,15 @@
 import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, RestingPoint, type AccuracyReport } from '@iris/core';
-import type { GazeProvider, Point2 } from '@iris/protocol';
+import type { GazeProvider, Point2, Rect } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
 import { GazeCursor } from './gaze-cursor';
 import { HeadScroller } from './head-scroll';
-import { GazeSession, type Outcome } from './gaze-session';
+import { GazeSession, selectInPage, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
 import { loadSamples, saveCheck, saveSamples, type AccuracyRecord } from './setup/calibration-storage';
 import { calibrateOnPage, checkOnPage, screenFrame } from './setup/page-calibration';
 import type { LiveTargetList } from './target-list';
+import { openByVoice, type OpenResult } from './voice-open';
 
 const POINTER_POLL_MS = 50;
 const screenSize = () => ({ width: screen.width, height: screen.height });
@@ -42,11 +43,14 @@ function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): strin
   const now = `Gaze lands ${round(report.meanPx)} px from where you look on average, about ${report.meanDeg.toFixed(1)}° of visual angle ` +
     `(webcam eye trackers typically reach 1° to 2°; ${round(report.share * 100)}% of the screen width); ` +
     `left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
+    `While your eyes held still the gaze wandered about ${round(report.shakePx)} px. ` +
     `Corners ${px(regions.corners)}, edges ${px(regions.edges)}, between the quadrants ${px(regions.middle)}; ` +
     `top half ${px(regions.top)}, bottom half ${px(regions.bottom)}.` +
     (worst ? ` Worst: ${place(worst.target)} (${round(worst.px)} px).` : '') +
     ` Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
-  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°)`);
+  // Checks saved before shake was measured have none.
+  const shake = (r: AccuracyRecord) => (r.report.shakePx === undefined ? '' : `, wandered ${round(r.report.shakePx)} px`);
+  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°${shake(r)})`);
   return before.length ? `${now} Earlier checks: ${before.join(', ')}.` : now;
 }
 
@@ -54,6 +58,7 @@ const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
   NEEDS_DOUBLE_BLINK: 'That one may submit, pay, delete or send, so only a double blink opens it. Nothing was selected.',
   STALE: 'The page changed, so nothing was selected.',
+  NO_TARGET: 'Double blink seen, but no number was held under your gaze just before it. Rest your eyes on a number until it is outlined, then blink twice.',
 };
 
 /**
@@ -70,6 +75,10 @@ export interface GazePanel {
   useCamera(provider: GazeProvider): void;
   /** Picks target `id` for the user's next confirm (see GazeSession.arm). */
   pick(id: number): PickResult;
+  /** Opens target `id` for a spoken request, a risky one only after the user's confirm (see openByVoice); `seen` is where it was when found. */
+  open(id: number, seen?: Rect): Promise<OpenResult>;
+  /** Has the user's next double blink on tab `tabId` run `run` (see GazeSession.armAction); false unless the eyes are aiming. */
+  confirm(tabId: number, run: () => void): boolean;
   /** Where on the page the eyes (or mouse) rested in the last few seconds, or null. */
   lookedAt(): Point2 | null;
 }
@@ -223,6 +232,11 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it. Anything that may submit, pay, delete or send needs a double blink, so aim with your eyes for those.';
   });
+  const pick = (id: number): PickResult => {
+    if (!active) return 'NO_AIMING';
+    if (!active.session.arm(id)) return 'NO_SUCH_NUMBER';
+    return active.mouse ? 'PICKED_MOUSE' : 'PICKED_EYES';
+  };
   section.append(calibrate, check, eyes.label, tilt.label, mouse.label, status);
   return {
     element: section,
@@ -240,10 +254,12 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       });
     },
     lookedAt: () => (active ? rest.point(performance.now()) : null),
-    pick(id) {
-      if (!active) return 'NO_AIMING';
-      if (!active.session.arm(id)) return 'NO_SUCH_NUMBER';
-      return active.mouse ? 'PICKED_MOUSE' : 'PICKED_EYES';
+    pick,
+    open: (id, seen) => openByVoice(id, seen, { read: () => targets.read(), select: selectInPage, pick }),
+    confirm(tabId, run) {
+      if (!active || active.mouse) return false; // only a double blink confirms an action
+      active.session.armAction(tabId, run);
+      return true;
     },
   };
 }

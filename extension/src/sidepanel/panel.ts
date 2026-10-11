@@ -1,3 +1,4 @@
+import type { LightAdvice } from '@iris/core';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { companionLink } from '../providers/companion/link';
 import { companionPanel } from './companion-status';
@@ -63,6 +64,13 @@ export function mountPanel(root: HTMLElement): void {
     });
 }
 
+// Tracking keeps working in poor light, more slowly and less precisely, so these only suggest a fix.
+const LIGHT_ADVICE: Record<NonNullable<LightAdvice>, string> = {
+  dim: 'Your face is too dark for steady tracking. Turn on a light in front of you.',
+  backlit: 'There is bright light behind you, so your face is in shadow. Face the light, or close the blind behind you.',
+  bright: 'Your face is washed out by bright light. Dim the light pointed at you.',
+};
+
 async function startTracking(
   video: HTMLVideoElement,
   preview: HTMLElement,
@@ -77,7 +85,9 @@ async function startTracking(
   provider.onTracePoints((points) => trace.drawPoints(points));
   provider.onSample((sample) => trace.addSample(sample));
   await provider.start();
-  status.textContent = 'Eye tracking on. Processing stays on this computer.';
+  const ON = 'Eye tracking on. Processing stays on this computer.';
+  status.textContent = ON;
+  provider.onLight((advice) => { status.textContent = advice ? LIGHT_ADVICE[advice] : ON; });
   return provider;
 }
 

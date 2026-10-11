@@ -17,3 +17,4 @@ export type { Reading, VitalsProvider, VitalsSample } from './vitals';
 export { FATIGUE_LEVELS } from './session';
 export type { DailyTrend, FatigueLevel, FatigueMinute, SessionStore } from './session';
 export * from './page-understanding';
+export * from './tab-match';
