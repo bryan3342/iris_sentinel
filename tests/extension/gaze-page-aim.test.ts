@@ -156,7 +156,7 @@ describe('selecting with gaze', () => {
       select: async (_list, target, blinked) => { selected.push([target.id, blinked]); return 'SELECTED'; },
       onOutcome: (outcome) => outcomes.push(outcome),
       learn, onLearned: () => { learned++; },
-      dwell, // on, as for pointing with the mouse; the eyes leave it off
+      dwell, // on where resting is deliberate; the eyes leave it off
     });
     return { provider, gaze, selected, outcomes, store, learned: () => learned };
   }

@@ -1,8 +1,8 @@
 import { CalibrationStore } from '@iris/core';
-import type { GazeProvider, GazeSample } from '@iris/protocol';
+import type { GazeProvider } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { GazeDot } from '../sidepanel/gaze-dot';
-import { elementPresenter, runCalibration } from '../sidepanel/setup/calibration';
+import { elementPresenter, faceSteady, runCalibration } from '../sidepanel/setup/calibration';
 import * as savedCalibration from '../sidepanel/setup/calibration-storage';
 import { openCamera } from '../sidepanel/setup/camera';
 import { EyeTrace } from '../sidepanel/trace';
@@ -13,7 +13,6 @@ import { EyeTrace } from '../sidepanel/trace';
 // is steady. Clicking stands in for a confirm gesture: the click position is a
 // confirmed target and refines the fit. Press R to redo the dots, X to forget
 // everything saved. Add ?dots=5 for 5 dots.
-const STEADY_SAMPLES = 30; // about one second of a tracked face before calibrating
 
 const stage = document.getElementById('stage')!;
 const video = document.createElement('video');
@@ -64,18 +63,6 @@ async function calibrate(provider: GazeProvider): Promise<void> {
   }
 }
 
-/** Resolves once the face has been tracked for a short unbroken stretch. */
-function waitForSteadyFace(provider: GazeProvider): Promise<void> {
-  return new Promise((resolve) => {
-    let steady = 0;
-    const unsubscribe = provider.onSample((sample: GazeSample) => {
-      steady = sample.eye ? steady + 1 : 0;
-      if (steady < STEADY_SAMPLES) return;
-      unsubscribe();
-      resolve();
-    });
-  });
-}
 
 async function cameraProvider(): Promise<GazeProvider> {
   hud.textContent = 'Starting camera...';
@@ -125,7 +112,7 @@ async function start(): Promise<void> {
     return;
   }
   hud.textContent = 'Look at the screen and hold still.';
-  await waitForSteadyFace(provider);
+  await faceSteady(provider);
   await calibrate(provider);
 }
 

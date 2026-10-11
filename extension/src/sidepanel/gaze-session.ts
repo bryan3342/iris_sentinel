@@ -34,8 +34,7 @@ export interface GazeSessionOptions {
   onLearned?: () => void;
   /**
    * Whether resting on a safe target for a second selects it. Off for the eyes, which rest naturally
-   * while reading, so only a double blink clicks; on for pointing with the mouse, where resting is
-   * deliberate and the mouse has no other way to confirm.
+   * while reading, so only a double blink clicks; on only for a pointer whose resting is deliberate.
    */
   dwell?: boolean;
   /** Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face lost. */

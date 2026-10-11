@@ -60,7 +60,7 @@ it('never offers incognito or Chrome Web Store tabs, which Iris is not allowed o
 
 it('says when Iris can see no tab to match, as before it is allowed on websites', async () => {
   tabs.forEach((tab) => { delete tab.title; delete tab.url; });
-  expect(await tools().go_to_tab!({ description: 'my email' })).toBe('Could not do that. NO_TABS. Iris sees only the tabs of websites it is allowed on. Allow Iris on all websites in the panel.');
+  expect(await tools().go_to_tab!({ description: 'my email' })).toBe('Could not do that. NO_TABS. Iris sees only the tabs of websites it is allowed on. Allow Iris on all websites when setup asks.');
   expect(asked).toHaveLength(0);
 });
 
@@ -93,7 +93,7 @@ it('closes the tab only once the person confirms with a double blink, and never 
   await armed!.run();
   expect(chrome.tabs.remove).toHaveBeenCalledWith(12);
   canConfirm = false;
-  expect(await tools().close_tab!({})).toBe('Could not do that. NEEDS_EYES. This needs a double blink to confirm. Turn on Aim with my eyes first.');
+  expect(await tools().close_tab!({})).toBe('Could not do that. NEEDS_EYES. This needs a double blink to confirm, which works once setup in the side panel is finished.');
 });
 
 it('never closes a tab the person has moved away from by the time they blink, even one Iris cannot read', async () => {

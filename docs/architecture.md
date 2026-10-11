@@ -64,13 +64,14 @@ ends the session, including late connections, and stops all microphone use. Audi
 sent to ElevenLabs only while a conversation is connected, which begins only when the
 user speaks or Iris checks in. The first opening ever starts with a short animation (the
 eye appears in the middle and blinks, then the rest of the wordmark pulls out of it to
-the right and settles centered; a still wordmark with reduced motion). On opening, after
-any animation, Iris speaks one fixed line, output only: the full intro (also shown as
-text) until it has played once, then "Iris here!". These lines are audio files in the
-agent's voice that ship inside the extension (generated once by `npm run voice:lines`)
-and play from an offscreen document, which Chrome lets play sound without a click; no
-microphone, server, network or conversation is involved. Listening starts only after
-the line ends, so Iris never hears itself. The agent's own first message is empty, so
+the right and settles centered; a still wordmark with reduced motion). Setup follows it
+(section 4): until setup has been completed once, Iris introduces itself over a
+slideshow, one short line per slide, each slide staying until its line has played and
+showing it as a caption. On later openings Iris says "Iris here!", output only. These
+lines are audio files in the agent's voice that ship inside the extension (generated
+once by `npm run voice:lines`) and play from an offscreen document, which Chrome lets
+play sound without a click; no microphone, server, network or conversation is
+involved. Listening starts only after setup and any line, so Iris never hears itself. The agent's own first message is empty, so
 a connection made on speech waits for the user. No transcripts are stored or logged.
 Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
@@ -126,7 +127,7 @@ Mic ────> Side panel: ElevenLabs agent ─> requests, user talking on/of
 
 **Who owns what.**
 - **Where the user looks:** MediaPipe only. The calibration fit and target snapping live in `packages/core/`.
-- **Confirms:** a double blink, never Presage, and never looking alone: the eyes rest naturally while reading, so a dwell does not click when aiming with the eyes. Pointing with the mouse keeps a one-second dwell, since resting the mouse is deliberate. The double blink comes from MediaPipe's per-eye closure. Two blinks of both eyes (each closure under 600 ms, the second ending within 1.3 s of the first starting, so deliberate blinks, slower than natural ones, count) click the moment the eyes open. Between the two blinks the lids need only lift part way: in a live recording of deliberate double blinks, the closure (both eyes' mean) fell from about 0.8 only to between 0.4 and 0.6 before the second blink, so waiting for the eyes to open fully merged most pairs into one long blink that never clicked. A blink therefore also ends when that closure falls 0.15 below its peak with one eye no longer closed, and the next begins once both eyes close again after it has risen 0.12. The first blink must start from fully open eyes, so lids fluttering while the eyes rest closed never click. Closed and open are judged against each eye's own resting closure, learned slowly while no blink is under way, since resting levels differ between people, between the two eyes and with where they look. A double blink with no number aimed and none picked by voice says so in the panel, so the user knows the blinks were seen. From the frame a lid starts closing fast, through the blink, and for 0.12 seconds after the lids reopen, the camera adapter holds the last eye reading, so the gaze point does not snap and no distorted reading reaches calibration or learning; it still reports the lids' closure. Lids lowering slowly, as when looking down, never trigger the hold. The target is locked as the first blink starts, from the aim that held still for 0.2 seconds just before, so the closing lids' distorted reading cannot redirect the click. A single blink, a wink, a longer closure, blinks too far apart, or no steady aim never clicks, and a locked target is dropped if a page change moves it. A safe target opens with a double blink (or, pointing with the mouse, a dwell); a risky one (anything that may submit, pay, delete or send) opens only with a double blink, so staring at a Buy or Delete button never presses it. There is no second confirm: looking away and back depends on gaze accuracy a webcam cannot give. Voice requests pick a target but never confirm it. Every confirm method produces the same event, so swapping one for another changes nothing downstream; dwell fires once when one target stays aimed for one second (adjustable) with the eyes open. A confirm acts on the target aimed at that moment (or the voice-picked one), however it was proposed.
+- **Confirms:** a double blink, never Presage, and never looking alone: the eyes rest naturally while reading, so a dwell does not click when aiming with the eyes. The double blink comes from MediaPipe's per-eye closure. Two blinks of both eyes (each closure under 600 ms, the second ending within 1.3 s of the first starting, so deliberate blinks, slower than natural ones, count) click the moment the eyes open. Between the two blinks the lids need only lift part way: in a live recording of deliberate double blinks, the closure (both eyes' mean) fell from about 0.8 only to between 0.4 and 0.6 before the second blink, so waiting for the eyes to open fully merged most pairs into one long blink that never clicked. A blink therefore also ends when that closure falls 0.15 below its peak with one eye no longer closed, and the next begins once both eyes close again after it has risen 0.12. The first blink must start from fully open eyes, so lids fluttering while the eyes rest closed never click. Closed and open are judged against each eye's own resting closure, learned slowly while no blink is under way, since resting levels differ between people, between the two eyes and with where they look. A double blink with no number aimed and none picked by voice says so in the panel, so the user knows the blinks were seen. From the frame a lid starts closing fast, through the blink, and for 0.12 seconds after the lids reopen, the camera adapter holds the last eye reading, so the gaze point does not snap and no distorted reading reaches calibration or learning; it still reports the lids' closure. Lids lowering slowly, as when looking down, never trigger the hold. The target is locked as the first blink starts, from the aim that held still for 0.2 seconds just before, so the closing lids' distorted reading cannot redirect the click. A single blink, a wink, a longer closure, blinks too far apart, or no steady aim never clicks, and a locked target is dropped if a page change moves it. A safe target opens with a double blink, or when the user asks for it by voice; a risky one (anything that may submit, pay, delete or send) opens only with a double blink, so staring at a Buy or Delete button never presses it. There is no second confirm: looking away and back depends on gaze accuracy a webcam cannot give. Voice requests pick a target but never confirm it. Every confirm method produces the same event, so swapping one for another changes nothing downstream; dwell fires once when one target stays aimed for one second (adjustable) with the eyes open. A confirm acts on the target aimed at that moment (or the voice-picked one), however it was proposed.
 - **Blink rate:** Presage only. Presage reports blinking as a per-frame flag; the companion groups those frames into single blink events for the fatigue score. MediaPipe answers "did the user close their eyes on purpose", Presage answers "how often is the user blinking", so the two never compete. Core drops a Presage blink that coincides with a confirm, so confirms do not count as fatigue.
 - **Talking:** the ElevenLabs agent, which hears the microphone. Presage's talking flag is not used. With no voice session open, Iris has no talking signal; fatigue readings get slightly noisier, and no confirm depends on it.
 - **Fatigue, focus and movement:** computed by Iris in the background coordinator from Presage signals plus behavior that only the extension sees. Presage provides the raw signals, not these scores.
@@ -149,7 +150,7 @@ Presage was tested on the demo laptop before these choices were made (#24). Its 
 
 | Stage | What it adds |
 | :--- | :--- |
-| Measure | **Check accuracy** shows a 4x4 grid of dots, none on a calibration dot, and reports mean error in pixels and in degrees of visual angle (the standard eye tracker measure: webcam trackers typically reach 1 to 2 degrees, research systems 0.3 to 0.5; Iris assumes a 60 cm seat and a 1/96 inch CSS pixel), left-right and up-down error, how far gaze wanders while the eyes hold still on a dot (shake), error at the corners, the edges and between the quadrants and in each half, the worst spot, and the head posture. The last ten checks per screen are kept with their samples (numbers only, on this computer), so later fits can be scored on the same data. |
+| Measure | `measureAccuracy` in core scores a calibration against dots it was not made from: mean error in pixels and in degrees of visual angle (the standard eye tracker measure: webcam trackers typically reach 1 to 2 degrees, research systems 0.3 to 0.5; Iris assumes a 60 cm seat and a 1/96 inch CSS pixel), left-right and up-down error, how far gaze wanders while the eyes hold still on a dot (shake), error at the corners, the edges and between the quadrants and in each half, the worst spot, and the head posture. The side panel runs no checks: setup calibrates, and each selection refines the calibration. |
 | Learn from use | Every gaze selection adds a calibration sample for the selected target's center, from the eyes just before the double blink. Recent confirms count most (each starts at ten dot samples and halves every ten confirms), and a confirm of the target gaze snapped to is trusted further than an arbitrary one, so a drifted fit can be pulled back. Mouse pointing never teaches the eye calibration. |
 | Posture-aware map | Head turn, tilt, position and distance (from iris diameter, about 1.2 cm) become inputs to the fit, with today's geometric correction as the starting point and a learned adjustment on top. |
 | Posture-independent eye reading | Head rotation is undone before the iris is read between the eye corners. Eyelid opening (lid gap over eye width) is already measured and is a calibration input whenever every sample carries it: the upper lid follows vertical gaze, the weakest direction. Each user's own lid-to-gaze relationship is learned during calibration, so drooping or partly closed lids are handled per person. |
@@ -209,7 +210,7 @@ type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
 | `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
 | `click_on` | `description` (up to 500 characters) | Finds a target as `find_on_page` does, then opens it as `select_number` does, only if a fresh scan still has it where Gemini saw it |
 | `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it without opening it, and answers with its number |
-| `select_number` | `number` (1 to 999) | Opens that numbered target: a safe one at once; a risky one is only picked, marked on the page and opened by the user's next double blink wherever they look (pointing with the mouse, it says the eyes are needed) |
+| `select_number` | `number` (1 to 999) | Opens that numbered target: a safe one at once; a risky one is only picked, marked on the page and opened by the user's next double blink wherever they look |
 | `go_to_tab` | `description` (up to 500 characters) | Sends the request and each tab's title and site name (never its address) to `/v0.1/tab-match` and switches to the tab Gemini names, or says none matches |
 | `switch_tab` | `direction`: `next`, `previous` | Switches to the neighboring tab in the window, wrapping around at the ends |
 | `open_new_tab` | none | Opens a new tab in the window |
@@ -313,18 +314,19 @@ pinch zoom fail closed; detectable capture races and stale results are discarded
 | To... | Default | Alternatives |
 | :--- | :--- | :--- |
 | Aim | Eyes | Head pointing |
-| Confirm | Double blink | Dwell, pointing with the mouse only |
+| Confirm | Double blink | A spoken request, for a safe target |
 | Scroll | Tilt the head down or up (speed grows with the tilt) | Voice |
 | Navigate by intent | Voice request | Aim and confirm |
 | Read | Voice "read this" | Read zone |
 
-**Setup flow**
-1. Camera and microphone permission, requested once from an extension tab page (a side panel may not show the permission prompt); the side panel then reuses the grant.
-2. Website access, granted once from a side panel button, so Iris keeps working after a link to another site (Chrome's `activeTab` access ends there). It is used only to read target positions and draw numbers on the page.
-3. Lighting check.
-4. Calibration on the page: the side panel's **Calibrate on this page** shows 16 dots over the browsing tab (a 4x4 grid: every corner, two more along each edge and four in the middle, about 29 seconds), then aiming with the eyes starts.
-5. Double-blink practice (optional).
-6. A default resting profile is used until a personal baseline has built up.
+**Setup flow** (in the side panel after the opening animation, `setup/first-run.ts`; it runs in full until it has been completed once, and later openings show only a step that has gone missing)
+1. Slideshow: Iris introduces itself in four short lines, who it is, look then blink twice, tilt the head to scroll, and voice commands, one slide per line, each captioned with what Iris says.
+2. Camera access: Iris opens Chrome's camera prompt in a tab by itself, since a side panel may not show it; the tab closes once access is allowed, and the panel starts the camera at once.
+3. Website access, from one button on the slide, since Chrome grants it only from a click, so Iris keeps working after a link to another site (Chrome's `activeTab` access ends there). It is used only to read target positions and draw numbers on the page.
+4. Calibration: once the camera has tracked the face steadily for a second, 16 dots over the website in the active tab, or over Wikipedia opened for it when no website is showing (a 4x4 grid: every corner, two more along each edge and four in the middle, about 29 seconds). The dots start again if the face is lost, and later openings calibrate again by themselves on a screen with no saved calibration.
+5. "All set. Enjoy browsing!" Eye aiming with the red gaze ring, and head-tilt scrolling, then run whenever the panel is open; setup only counts as done here, so closing the panel partway runs it again.
+6. Microphone access, from the panel's **Allow microphone** button, for voice.
+7. A default resting profile is used until a personal baseline has built up.
 
 ---
 

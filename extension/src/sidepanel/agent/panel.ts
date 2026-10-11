@@ -10,16 +10,15 @@ import { HandsFree, type HandsFreeStatus } from './hands-free';
 import { micLevels } from './mic-level';
 import { navigationTools } from './navigation';
 import { browserTools } from './tools';
-import { playLine, VOICE_LINES } from './voice-lines';
+import { playLine } from './voice-lines';
 
 const LISTENING_KEY = 'iris.listening';
-const GREETED_KEY = 'iris.greeted';
 /** Spoken when the user seems tired. Fixed, so nothing about their body reaches the voice agent. */
 export const CHECK_IN = 'Want a hand, or a short break?';
 const PROBLEMS: Record<string, string> = {
   MICROPHONE: 'Allow your microphone under Voice setup, and Iris starts listening.',
   AUDIO_BLOCKED: 'Click anywhere in this panel once to turn on listening.',
-  GATEWAY_ACCESS: 'Allow Iris on all websites (above), and Iris starts listening.',
+  GATEWAY_ACCESS: 'Allow Iris on all websites when setup asks, and Iris starts listening.',
 };
 
 function describe(status: HandsFreeStatus): string {
@@ -40,8 +39,12 @@ export interface ConversationPanel {
   readonly talking: boolean;
 }
 
-/** `opening` resolves once the panel's opening animation is over; listening and the greeting wait for it. */
-export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }, opening: Promise<void> = Promise.resolve()): ConversationPanel {
+/**
+ * `opening` settles once the opening animation and setup are over, saying whether Iris already spoke
+ * during them; listening and the greeting wait for it, so Iris never hears its own setup lines.
+ */
+export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel },
+  opening: Promise<{ spoke: boolean }> = Promise.resolve({ spoke: false })): ConversationPanel {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
@@ -72,13 +75,11 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
     onStatus: (s) => { status.textContent = describe(s); },
   });
   // Listening is on unless the person turned it off, and stays off across panel openings if they did.
-  // After the opening animation Iris speaks a fixed line, output only: the full intro (also shown)
-  // until it has played once, then "Iris here!". Listening starts after it, so Iris never hears itself.
-  void Promise.all([chrome.storage.local.get([LISTENING_KEY, GREETED_KEY]).catch(() => ({} as Record<string, unknown>)), opening]).then(async ([stored]) => {
+  // After setup Iris says "Iris here!", output only, unless it has just spoken during setup; listening
+  // starts after that, so Iris never hears itself.
+  void Promise.all([chrome.storage.local.get(LISTENING_KEY).catch(() => ({} as Record<string, unknown>)), opening]).then(async ([stored, { spoke }]) => {
     listening.checked = stored[LISTENING_KEY] !== false;
-    const intro = stored[GREETED_KEY] !== true;
-    if (intro) action.textContent = VOICE_LINES.intro;
-    if (await playLine(intro ? 'intro' : 'ready') && intro) void chrome.storage.local.set({ [GREETED_KEY]: true }).catch(() => {});
+    if (!spoke) await playLine('ready');
     handsFree.setOn(listening.checked);
   });
   listening.addEventListener('change', () => {

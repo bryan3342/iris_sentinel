@@ -14,3 +14,25 @@ export function openCamera(): Promise<MediaStream> {
 export function isExtensionPage(): boolean {
   return typeof chrome !== 'undefined' && Boolean(chrome.runtime?.id);
 }
+
+const CAMERA = { name: 'camera' as PermissionName };
+
+/** Whether the camera is allowed for Iris right now. */
+export async function cameraAllowed(): Promise<boolean> {
+  try { return (await navigator.permissions.query(CAMERA)).state === 'granted'; } catch { return false; }
+}
+
+/** Calls `listener` whenever camera access changes, allowed in Chrome's prompt or removed later; returns a function that stops it. */
+export function watchCamera(listener: () => void): () => void {
+  let stopped = false;
+  let status: PermissionStatus | null = null;
+  void navigator.permissions.query(CAMERA).then((current) => {
+    if (stopped) return;
+    status = current;
+    current.addEventListener('change', listener);
+  }, () => {});
+  return () => {
+    stopped = true;
+    status?.removeEventListener('change', listener);
+  };
+}
