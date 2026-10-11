@@ -1,5 +1,6 @@
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { companionPanel } from './companion-status';
+import { fatiguePanel } from './fatigue-panel';
 import { isExtensionPage, openCamera } from './setup/camera';
 import { gazePanel } from './gaze-panel';
 import { numbersPanel } from './numbers';
@@ -36,7 +37,7 @@ export function mountPanel(root: HTMLElement): void {
     // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
     root.append(microphonePanel(), conversationPanel({ coordinator, marks, gaze }), pageAccessPanel(), numbersPanel(marks), gaze.element,
-      understandingPanel(marks, coordinator), companionPanel());
+      understandingPanel(marks, coordinator), companionPanel(), fatiguePanel());
   }
 
   openCamera()

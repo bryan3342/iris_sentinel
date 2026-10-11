@@ -144,6 +144,8 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 
 **Fatigue score.** Combines slow body signals (blink rate up, heart rate variability down, breathing rate) with behavior (back-after-click rate, aim steadiness, time to click). It is computed against the user's own resting baseline, uses hysteresis so it does not flicker, and is paused while the voice agent hears the user talking.
 
+**Where fatigue runs today.** `FatigueEngine` (`packages/core`) runs in the side panel until a background coordinator exists. Every input is stamped on the side panel clock (`performance.now()`) when it arrives, because the camera, the companion and the simulated providers each keep their own clock. Personal baselines live in memory for the session only. The side panel's fatigue card shows the level, the "why" lines and what Iris would change; for now it runs on simulated body signals (Play, with a "Cover camera" switch), and the responses are shown, not yet applied. Back-after-click is not measured yet, and the talking pause waits for the voice agent.
+
 | Fatigue level | Iris response |
 | :--- | :--- |
 | Fresh | Normal confirm timing and target size |
