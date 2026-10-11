@@ -35,6 +35,8 @@ export { explain, fatigueResponse } from './fatigue-response';
 export type { FatigueResponse } from './fatigue-response';
 export { decideSelection } from './selection';
 export { SettledAim } from './settled-aim';
+export { SpeechGate } from './speech-gate';
+export type { SpeechGateOptions } from './speech-gate';
 export { TiltScroller } from './tilt-scroll';
 export type { TiltScrollOptions } from './tilt-scroll';
 export type { GateTarget, Selection } from './selection';
