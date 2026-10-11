@@ -1,4 +1,4 @@
-import { SpeechGate } from '@iris/core';
+import { addressedToIris, SpeechGate } from '@iris/core';
 import { VoiceController } from './session';
 import type { VoiceAgent, VoiceState, VoiceTools } from './voice';
 
@@ -16,6 +16,8 @@ export interface HandsFreeDeps {
   /** Reports microphone loudness until the returned function is called (see mic-level.ts). */
   listen: (onLevel: (db: number, t: number) => void) => Promise<() => void>;
   onStatus: (status: HandsFreeStatus) => void;
+  /** Told whenever the room turns loud or quiet again; in a loud room Iris acts only on requests that start with "Iris". */
+  onLoudRoom?: (loud: boolean) => void;
   gate?: SpeechGate;
   now?: () => number;
 }
@@ -25,15 +27,21 @@ export const QUIET_MS = 60_000;
 const RETRY_MS = 30_000;
 /** Problems only the person can fix (a permission, a click); listening resumes on retry(). */
 const NEEDS_PERSON = new Set(['MICROPHONE', 'AUDIO_BLOCKED', 'GATEWAY_ACCESS']);
+/** What a tool answers, without running, to a request not addressed to Iris in a loud room. */
+const NOT_FOR_IRIS = 'Not done: the room is loud, so Iris acts only on requests that start with "Iris". Say nothing.';
 
 /**
  * Hands-free voice: while on, Iris hears only loudness on the laptop. When the user starts
  * speaking it connects the voice agent (only then does audio go to ElevenLabs), and after a minute
  * of quiet it hangs up and goes back to listening locally. One microphone user at a time: local
  * listening stops before the agent opens the microphone. Turning it off stops all microphone use.
+ * In a loud room (see SpeechGate.loud) Iris acts only on requests that start with "Iris": any other
+ * runs no tool, and the agent's reply to it is silent, so voices around the user do nothing.
  */
 export class HandsFree {
   private on = false;
+  private loud = false; // the room as last heard; it is not measured during a conversation
+  private ignoring = false; // the latest request was not addressed to Iris in a loud room
   private phase: 'off' | 'idle' | 'waiting' | 'connecting' | 'connected' | 'problem' = 'off';
   private generation = 0;
   private stopListening: (() => void) | null = null;
@@ -49,7 +57,13 @@ export class HandsFree {
   constructor(private readonly deps: HandsFreeDeps) {
     this.gate = deps.gate ?? new SpeechGate();
     this.now = deps.now ?? (() => Date.now());
-    this.controller = new VoiceController(deps.agent, (state) => this.onVoice(state), deps.tools);
+    // Checked here, not left to the agent: a request not addressed to Iris in a loud room runs nothing.
+    const tools: VoiceTools = Object.fromEntries(Object.entries(deps.tools).map(([name, run]) =>
+      [name, async (parameters: Record<string, unknown>) => (this.ignoring ? NOT_FOR_IRIS : run(parameters))]));
+    this.controller = new VoiceController(deps.agent, (state) => this.onVoice(state), tools, (said) => {
+      this.ignoring = this.loud && !addressedToIris(said);
+      return !this.ignoring;
+    });
   }
 
   setOn(on: boolean): void {
@@ -81,7 +95,11 @@ export class HandsFree {
     const mine = ++this.generation;
     this.gate.reset();
     try {
-      const stop = await this.deps.listen((db, t) => { if (this.gate.update(db, t)) void this.connect(); });
+      const stop = await this.deps.listen((db, t) => {
+        const speaking = this.gate.update(db, t);
+        this.room(this.gate.loud);
+        if (speaking) void this.connect();
+      });
       if (mine !== this.generation || this.phase !== 'waiting') return stop();
       this.stopListening = stop;
       this.deps.onStatus({ kind: 'waiting' });
@@ -100,6 +118,7 @@ export class HandsFree {
     const mine = this.generation;
     const greeting = this.greeting ?? undefined;
     this.greeting = null;
+    this.ignoring = false;
     try {
       await this.controller.start(this.deps.getUrl, greeting);
     } catch (error) {
@@ -146,6 +165,13 @@ export class HandsFree {
     this.stopListening?.();
     this.stopListening = null;
     void this.controller.stop().catch(() => {});
+    this.room(false); // not listening: the room is no longer heard
     this.deps.onStatus({ kind: 'off' });
+  }
+
+  private room(loud: boolean): void {
+    if (loud === this.loud) return;
+    this.loud = loud;
+    this.deps.onLoudRoom?.(loud);
   }
 }

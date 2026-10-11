@@ -49,6 +49,7 @@ export type { RestingPointOptions } from './resting-point';
 export { SettledAim } from './settled-aim';
 export { SpeechGate } from './speech-gate';
 export type { SpeechGateOptions } from './speech-gate';
+export { addressedToIris } from './wake-word';
 export { TiltScroller } from './tilt-scroll';
 export type { TiltScrollOptions } from './tilt-scroll';
 export type { GateTarget, Selection } from './selection';

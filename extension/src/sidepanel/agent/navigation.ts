@@ -1,4 +1,5 @@
 import type { TabInput, TabMatch } from '@iris/protocol';
+import { pageSearch } from '../../content/search';
 import { eligibleTab } from '../../page-understanding/capture';
 import { choice, untrusted, voiceTool, words } from './tool';
 import type { VoiceTools } from './voice';
@@ -50,11 +51,21 @@ function flag(value: unknown): boolean {
   return value;
 }
 
+/** Searches with the search box of the page in view (see pageSearch); false when it has none or Iris may not run there. */
+async function searchedOnPage(tab: ActiveTab, text: string): Promise<boolean> {
+  if (!eligibleTab(tab)) return false;
+  try {
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: pageSearch, args: [text] });
+    return result?.result === 'SEARCHED';
+  } catch { return false; } // Chrome would not let Iris in, such as on a page still loading
+}
+
 /**
  * The browser commands the voice agent can ask for beyond the page itself: tabs, websites, search,
  * reload and zoom. Matching a described tab asks the model through the Iris server, with each tab's
  * title and site name only. Closing a tab, which can lose unsaved work, waits for the person's double
- * blink; the rest happen at once, since none of them can submit, pay, delete or send anything.
+ * blink; the rest happen at once, since none of them can submit, pay, delete or send anything. A
+ * search on the page's own search box only loads its results (see pageSearch).
  */
 export function navigationTools({ matchTab, confirm, report }: NavigationDeps): VoiceTools {
   const tool = voiceTool(report);
@@ -106,9 +117,14 @@ export function navigationTools({ matchTab, confirm, report }: NavigationDeps): 
       await browser(inNewTab ? chrome.tabs.create({ windowId: active.windowId, url: url.href, active: true }) : chrome.tabs.update(active.id, { url: url.href }));
       return `Opening ${url.hostname}.`;
     }),
-    search_web: tool(async ({ query, new_tab }) => {
-      const text = words(query), inNewTab = flag(new_tab);
+    search_web: tool(async ({ query, new_tab, web }) => {
+      // An agent set up before `web` existed leaves it out.
+      const text = words(query), inNewTab = flag(new_tab), onWeb = web !== undefined && flag(web);
       const { active } = await windowTabs();
+      // The page's own search box first, as the person would use it, such as on Amazon or YouTube.
+      if (!inNewTab && !onWeb && await searchedOnPage(active, text)) {
+        return `Searching ${siteOf(active.url)?.replace(/^www\./, '') ?? 'this page'} for ${text}.`;
+      }
       // The person's own default search engine, as if they had typed into the address bar.
       await browser(chrome.search.query(inNewTab ? { text, disposition: 'NEW_TAB' } : { text, tabId: active.id }));
       return `Searching for ${text}.`;

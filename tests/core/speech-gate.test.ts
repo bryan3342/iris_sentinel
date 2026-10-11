@@ -51,4 +51,16 @@ describe('SpeechGate', () => {
     t = play(gate, t, 60_000, -70).t;
     expect(play(gate, t, 500, -30).opened).toHaveLength(1);
   });
+
+  it('calls the room loud once its background reaches -45 dBFS, and quiet again 5 dB below', () => {
+    const gate = new SpeechGate();
+    let { t } = play(gate, 0, 2000, -70);
+    expect(gate.loud).toBe(false);
+    t = play(gate, t, 120_000, -40).t;
+    expect(gate.loud).toBe(true);
+    t = play(gate, t, 2000, -47).t; // still above the quiet-again level
+    expect(gate.loud).toBe(true);
+    play(gate, t, 5000, -70);
+    expect(gate.loud).toBe(false);
+  });
 });
