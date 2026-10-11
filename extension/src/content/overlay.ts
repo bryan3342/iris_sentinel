@@ -11,6 +11,8 @@ export type OverlayCommand =
 export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
 /** The connection over which the side panel streams the live gaze point to the page. */
 export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
+/** The connection over which it streams the fingertip, for finger tracing. */
+export const FINGER_CURSOR_PORT = 'iris.finger-cursor';
 
 /**
  * Draws target numbers (unless asked not to) and one highlight over the page. Runs in Chrome's
@@ -32,12 +34,13 @@ export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
  * moved over a connection from the side panel instead of one injection per frame.
  * It lives in the same closed shadow root, so page scripts cannot read where the
  * user looks, and it hides for a screenshot, when the eyes close, and when the
- * side panel disconnects.
+ * side panel disconnects. The finger ring, a blue ring at the fingertip for
+ * finger tracing, works the same way over its own connection.
  */
 export async function pageOverlay(command: OverlayCommand): Promise<OverlayResult> {
   type Scan = { revision: number; entries: { el: Element }[] };
   type Understanding = { documentToken: string; revision: number; onChange?: () => void; scans?: Scan[] };
-  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement; cursor: HTMLDivElement; listening?: boolean; drawing?: object };
+  type Overlay = { host: HTMLDivElement; layer: HTMLDivElement; cursor: HTMLDivElement; finger: HTMLDivElement; listening?: boolean; drawing?: object };
   const host = globalThis as typeof globalThis & { __irisUnderstandingV01?: Understanding; __irisOverlayV01?: Overlay; __irisOverlayHoldV01?: number };
   const STYLE = `
       .badge { position: fixed; padding: 0 4px; font: bold 13px/18px sans-serif; color: #000;
@@ -50,14 +53,17 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
       .dot { position: fixed; width: 24px; height: 24px; margin: -12px 0 0 -12px; border-radius: 50%;
         background: #2dd4bf; border: 3px solid #fff; }
       .cursor { position: fixed; left: -24px; top: -24px; width: 48px; height: 48px; box-sizing: border-box;
-        border: 4px solid #ff2828; box-shadow: 0 0 12px #ff2828; border-radius: 50%; }`;
+        border: 4px solid #ff2828; box-shadow: 0 0 12px #ff2828; border-radius: 50%; }
+      .finger { position: fixed; left: -18px; top: -18px; width: 36px; height: 36px; box-sizing: border-box;
+        border: 4px solid #2563eb; box-shadow: 0 0 10px #2563eb; border-radius: 50%; }`;
   const held = () => (host.__irisOverlayHoldV01 ?? 0) > Date.now();
   const clear = () => {
     const overlay = host.__irisOverlayV01;
-    const drawn = Boolean(overlay && (overlay.layer.firstChild || !overlay.cursor.hidden));
+    const drawn = Boolean(overlay && (overlay.layer.firstChild || !overlay.cursor.hidden || !overlay.finger.hidden));
     overlay?.layer.replaceChildren();
     if (overlay) {
       overlay.cursor.hidden = true;
+      overlay.finger.hidden = true;
       overlay.drawing = undefined; // retires a pending frame check
     }
     return drawn;
@@ -74,8 +80,11 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     const cursor = document.createElement('div');
     cursor.className = 'cursor';
     cursor.hidden = true;
-    root.append(style, layer, cursor);
-    host.__irisOverlayV01 = { host: element, layer, cursor };
+    const finger = document.createElement('div');
+    finger.className = 'finger';
+    finger.hidden = true;
+    root.append(style, layer, cursor, finger);
+    host.__irisOverlayV01 = { host: element, layer, cursor, finger };
     document.documentElement.append(element);
     return host.__irisOverlayV01;
   };
@@ -101,17 +110,19 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     if (!overlay.listening) {
       overlay.listening = true;
       chrome.runtime.onConnect.addListener((port) => {
-        if (port.name !== 'iris.gaze-cursor') return; // GAZE_CURSOR_PORT; self-contained for executeScript
+        // GAZE_CURSOR_PORT and FINGER_CURSOR_PORT, spelled out: self-contained for executeScript.
+        const ring = port.name === 'iris.gaze-cursor' ? overlay.cursor : port.name === 'iris.finger-cursor' ? overlay.finger : null;
+        if (!ring) return;
         port.onMessage.addListener((message: unknown) => {
           const at = (message as { at?: { x?: unknown; y?: unknown } | null } | null)?.at;
           const valid = !!at && typeof at.x === 'number' && typeof at.y === 'number' && Number.isFinite(at.x) && Number.isFinite(at.y);
-          overlay.cursor.hidden = !valid || held();
+          ring.hidden = !valid || held();
           if (valid && !held()) {
             const vv = visualViewport;
-            overlay.cursor.style.transform = `translate(${(at.x as number) + (vv?.offsetLeft ?? 0)}px, ${(at.y as number) + (vv?.offsetTop ?? 0)}px)`;
+            ring.style.transform = `translate(${(at.x as number) + (vv?.offsetLeft ?? 0)}px, ${(at.y as number) + (vv?.offsetTop ?? 0)}px)`;
           }
         });
-        port.onDisconnect.addListener(() => { overlay.cursor.hidden = true; });
+        port.onDisconnect.addListener(() => { ring.hidden = true; });
       });
     }
     return 'SHOWN';

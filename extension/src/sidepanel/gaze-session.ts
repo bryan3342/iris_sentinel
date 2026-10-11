@@ -45,6 +45,7 @@ export interface GazeSessionOptions {
 }
 
 const ARM_MS = 10_000; // how long a target picked by voice waits for the user's confirm
+const HAND_RECENT_MS = 2_000; // a selection this soon after a hand was in view may have been the finger's
 /** Whether only the person's own confirm may open a target: a missing flag never reads as safe. */
 export const isRisky = (target: { risky?: boolean }) => target.risky !== false;
 
@@ -56,8 +57,9 @@ export const isRisky = (target: { risky?: boolean }) => target.risky !== false;
  * so a safe target is selected by any confirm and a risky one only by a
  * double blink. Snapping stays in the side panel; the page learns which
  * target is aimed and which to select, and `onGaze` feeds the live cursor that
- * Iris draws inside its closed overlay. The caller owns the provider's
- * lifecycle (the camera preview shares it).
+ * Iris draws inside its closed overlay. While finger tracing has a hand in view
+ * (`pointWith`), the finger aims instead of the eyes. The caller owns the
+ * provider's lifecycle (the camera preview shares it).
  */
 export class GazeSession {
   readonly confirms = new ConfirmChannel();
@@ -71,6 +73,10 @@ export class GazeSession {
   private armed: { id: number; until: number } | null = null;
   /** An action the voice agent asked for, such as closing a tab, that waits for the user's double blink on that tab. */
   private action: { tabId: number; run: () => void; until: number } | null = null;
+  /** While finger tracing has a hand in view, the target under the finger (null for none); undefined while the eyes aim. */
+  private hand: number | null | undefined = undefined;
+  /** When a hand was last in view, on the gaze clock: a selection soon after may have been the finger's. */
+  private handSeenAt = -Infinity;
   private stops: Unsubscribe[] = [];
 
   constructor(
@@ -96,8 +102,10 @@ export class GazeSession {
         this.lastT = sample.t;
         if (this.armed && sample.t > this.armed.until) this.disarm();
         if (this.action && sample.t > this.action.until) this.action = null;
-        const aimed = this.aim.update(sample);
-        if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list, aimed);
+        const eyes = this.aim.update(sample);
+        if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list, eyes);
+        // A finger in view aims instead of the eyes; the double blink then confirms what the finger aims at.
+        const aimed = this.hand === undefined ? eyes : this.hand;
         this.marks.setAim(aimed);
         // A double blink (or, for the mouse, a dwell) confirms the aimed target; decideSelection says what it opens.
         const dwelt = this.options.dwell ? this.dwell.update(sample, aimed) : null;
@@ -115,8 +123,21 @@ export class GazeSession {
     this.doubleBlink.reset();
     this.disarm();
     this.action = null;
+    this.hand = undefined;
     this.marks.follow(null);
     this.marks.stop();
+  }
+
+  /**
+   * Finger tracing aims instead of the eyes while a hand is in view: `target` is the one under the
+   * finger in the current scan (null for none), and undefined hands aiming back to the eyes. The page
+   * highlight follows at once. A pinch then confirms through `confirms` with the target it held.
+   */
+  pointWith(target: number | null | undefined): void {
+    if (target !== undefined) this.handSeenAt = this.lastT;
+    if (target === this.hand) return;
+    this.hand = target;
+    if (this.running) this.marks.setAim(target === undefined ? this.aim.current : target);
   }
 
   private follow(list: TargetList): number | null {
@@ -126,7 +147,10 @@ export class GazeSession {
     if (this.armed && !this.samePlace(this.armed.id, list)) this.disarm();
     if (this.action && this.action.tabId !== list.tabId) this.action = null; // never acts on a tab the user moved away from
     this.list = list;
-    return this.aim.setTargets(list.targets, this.frameFor(list));
+    const eyes = this.aim.setTargets(list.targets, this.frameFor(list));
+    // Numbers are only valid for their own scan, so a finger's aim waits for its next frame on this one.
+    if (this.hand !== undefined) this.hand = null;
+    return this.hand === undefined ? eyes : this.hand;
   }
 
   /**
@@ -177,14 +201,18 @@ export class GazeSession {
     // A target picked by voice is what a double blink confirms, wherever the user is looking; otherwise a
     // double blink brings the target it locked before the eyes closed, and a dwell the aimed one.
     const byVoice = event.source === 'double-blink' && this.armed !== null;
-    const id = byVoice ? this.armed!.id : event.target === undefined ? this.aim.current : event.target;
+    const aimedNow = this.hand === undefined ? this.aim.current : this.hand;
+    const id = byVoice ? this.armed!.id : event.target === undefined ? aimedNow : event.target;
+    // The finger chose it: a pinch, or any confirm while a hand was just in view.
+    const byFinger = event.source === 'pinch' || this.lastT - this.handSeenAt < HAND_RECENT_MS;
     const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = decideSelection(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'needs-double-blink') this.options.onOutcome?.('NEEDS_DOUBLE_BLINK');
     if (outcome.kind === 'none' && event.source === 'double-blink') this.options.onOutcome?.('NO_TARGET');
-    if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice) {
+    if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice && !byFinger) {
       // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
-      // Never for a voice pick: the eyes were not on that target, so it would teach the aim a wrong offset.
+      // Never for a voice pick or the finger's choice: the eyes may not have been on that target, so it
+      // would teach the aim a wrong offset.
       const center = { x: target.rect.x + target.rect.width / 2, y: target.rect.y + target.rect.height / 2 };
       if (this.aim.learn(center)) this.options.onLearned?.();
     }

@@ -46,6 +46,10 @@ export interface GazePanel {
    * as far, and the red ring snaps onto the aimed target when `snapCursor` is set. Normal help undoes it.
    */
   adapt(help: AimHelp): void;
+  /** Finger tracing aims while a hand is in view (see GazeSession.pointWith); nothing happens until the eyes aim. */
+  pointWith(target: number | null | undefined): void;
+  /** A pinch confirms `target` at `t`: a safe target opens, and a risky one still needs a double blink. */
+  pinch(t: number, target: number | null): void;
 }
 
 /**
@@ -164,5 +168,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       help = { targetScale: next.targetScale, snapCursor: next.snapCursor };
       active?.aim.setScale(help.targetScale); // the ring follows the new help from the next sample
     },
+    pointWith: (target) => active?.session.pointWith(target),
+    pinch: (t, target) => active?.session.confirms.emit({ t, source: 'pinch', target }),
   };
 }

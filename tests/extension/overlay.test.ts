@@ -4,7 +4,10 @@ import type { NumberedTarget } from '@iris/protocol';
 import { pageOverlay } from '../../extension/src/content/overlay';
 import { pageSnapshot } from '../../extension/src/page-understanding/page-helper';
 
-type Globals = typeof globalThis & { __irisUnderstandingV01?: unknown; __irisOverlayV01?: { host: HTMLElement; layer: HTMLElement; cursor: HTMLElement } };
+type Globals = typeof globalThis & {
+  __irisUnderstandingV01?: unknown;
+  __irisOverlayV01?: { host: HTMLElement; layer: HTMLElement; cursor: HTMLElement; finger: HTMLElement };
+};
 const g = globalThis as Globals;
 const TARGETS: NumberedTarget[] = [
   { id: 1, role: 'link', rect: { x: 10, y: 20, width: 120, height: 30 } },
@@ -123,6 +126,22 @@ describe('page overlay', () => {
     expect(cursor.hidden).toBe(true);
     await settle();
     expect(pageSnapshot().revision).toBe(snapshot.revision); // moving the cursor is not a page change
+  });
+
+  it('moves the finger ring over its own connection, apart from the gaze ring', async () => {
+    const connects: ((port: unknown) => void)[] = [];
+    vi.stubGlobal('chrome', { runtime: { onConnect: { addListener: (l: (port: unknown) => void) => connects.push(l) } } });
+    await pageOverlay({ type: 'listen' });
+    let receive: (m: unknown) => void = () => {}, drop: () => void = () => {};
+    connects[0]!({ name: 'iris.finger-cursor', onMessage: { addListener: (l: typeof receive) => (receive = l) }, onDisconnect: { addListener: (l: typeof drop) => (drop = l) } });
+    const { cursor, finger } = g.__irisOverlayV01!;
+    receive({ at: { x: 300, y: 200 } });
+    expect([finger.hidden, finger.style.transform, cursor.hidden]).toEqual([false, 'translate(300px, 200px)', true]);
+    receive({ at: null });
+    expect(finger.hidden).toBe(true);
+    receive({ at: { x: 310, y: 210 } });
+    drop();
+    expect(finger.hidden).toBe(true);
   });
 
   it('ignores other connections', async () => {

@@ -15,13 +15,17 @@ export function ringPoint(at: Point2 | null, aimed: { rect: Rect } | null, snap:
  * The live gaze cursor on the browsing tab. Each smoothed gaze point goes over one
  * open connection to the page's overlay, which moves a red ring there; nothing is
  * injected per frame. The point is drawn inside Iris's closed overlay and never
- * leaves this computer.
+ * leaves this computer. On FINGER_CURSOR_PORT the same moves the blue finger ring.
  */
 export class GazeCursor {
-  private readonly channel = new PageChannel(GAZE_CURSOR_PORT,
-    (tabId) => chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [{ type: 'listen' }] }));
+  private readonly channel: PageChannel;
   private port: chrome.runtime.Port | null = null;
   private last: Point2 | null = null;
+
+  constructor(portName: string = GAZE_CURSOR_PORT) {
+    this.channel = new PageChannel(portName,
+      (tabId) => chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [{ type: 'listen' }] }));
+  }
 
   /** Shows the cursor at `at` (viewport pixels) on tab `tabId`, or hides it for null. */
   move(tabId: number, at: Point2 | null): void {
