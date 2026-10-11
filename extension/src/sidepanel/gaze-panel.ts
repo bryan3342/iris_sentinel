@@ -57,6 +57,7 @@ const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
   NEEDS_DOUBLE_BLINK: 'That one may submit, pay, delete or send, so only a double blink opens it. Nothing was selected.',
   STALE: 'The page changed, so nothing was selected.',
+  NO_TARGET: 'Double blink seen, but no number was held under your gaze just before it. Rest your eyes on a number until it is outlined, then blink twice.',
 };
 
 /**

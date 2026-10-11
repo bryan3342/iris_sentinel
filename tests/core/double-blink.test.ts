@@ -8,16 +8,16 @@ const FRAME = 33;
 const sample = (t: number, left: number, right = left): GazeSample => ({ t, eye: { x: 0, y: 0 }, head: HEAD, blink: { left, right } });
 
 /** Open eyes aimed per `aimAt(t)` until 600 ms, then each blink in `blinks` as [closed ms, open ms after], then open eyes. */
-function play(blinks: [number, number][], { aimAt = (_t: number): number | null => 4, detector = new DoubleBlinkDetector() } = {}) {
+function play(blinks: [number, number][], { aimAt = (_t: number): number | null => 4, detector = new DoubleBlinkDetector(), rest = 0.05 } = {}) {
   const events: ConfirmEvent[] = [];
   const push = (e: ConfirmEvent | null) => { if (e) events.push(e); };
   let t = 0;
-  for (; t < 600; t += FRAME) push(detector.update(sample(t, 0.05), aimAt(t)));
+  for (; t < 600; t += FRAME) push(detector.update(sample(t, rest), aimAt(t)));
   for (const [closed, open] of blinks) {
     const end = t + closed;
     for (; t < end; t += FRAME) push(detector.update(sample(t, 0.9), aimAt(t)));
     const reopen = t + open;
-    for (; t < reopen; t += FRAME) push(detector.update(sample(t, 0.05), aimAt(t)));
+    for (; t < reopen; t += FRAME) push(detector.update(sample(t, rest), aimAt(t)));
   }
   return { events, detector };
 }
@@ -31,12 +31,25 @@ describe('DoubleBlinkDetector', () => {
 
   it('ignores a single blink, and two blinks too far apart', () => {
     expect(play([[150, 500]]).events).toHaveLength(0);
-    expect(play([[150, 900], [150, 100]]).events).toHaveLength(0);
+    expect(play([[150, 1300], [150, 100]]).events).toHaveLength(0);
+  });
+
+  it('clicks on a deliberate double blink, slower than natural blinks', () => {
+    expect(play([[350, 300], [350, 100]]).events.map((e) => e.target)).toEqual([4]);
+  });
+
+  it('judges open and closed against heavy resting lids, as when looking down at a laptop screen', () => {
+    expect(play([[150, 150], [150, 100]], { rest: 0.45 }).events.map((e) => e.target)).toEqual([4]);
+    // A lid dipping from that rest to 0.6 is not closed.
+    const detector = new DoubleBlinkDetector();
+    let events = 0;
+    for (let t = 0; t < 3000; t += FRAME) if (detector.update(sample(t, t % 400 < 100 ? 0.6 : 0.45), 4)) events++;
+    expect(events).toBe(0);
   });
 
   it('ignores a closure longer than a quick blink, even as part of a pair', () => {
-    expect(play([[600, 100], [150, 100]]).events).toHaveLength(0);
-    expect(play([[150, 100], [600, 100]]).events).toHaveLength(0);
+    expect(play([[900, 100], [150, 100]]).events).toHaveLength(0);
+    expect(play([[150, 100], [900, 100]]).events).toHaveLength(0);
   });
 
   it('ignores winks: one eye closed is not a blink', () => {

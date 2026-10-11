@@ -310,6 +310,22 @@ describe('confirming with a double blink', () => {
       provider.stop();
     });
 
+    it('says so when a double blink comes with no number aimed and none picked', async () => {
+      const provider = new ScriptedEyes(doubleBlinkAt(away, 1000));
+      const store = new CalibrationStore();
+      store.setDots(simulatedCalibration(), VIEWPORT);
+      const outcomes: Outcome[] = [];
+      const gaze = new GazeSession(provider, new GazeAim(new GazePointer(store)), new PageMarks(new LiveTargetList()), {
+        select: async () => 'SELECTED', onOutcome: (outcome) => outcomes.push(outcome),
+      });
+      gaze.start();
+      await provider.start();
+      await vi.advanceTimersByTimeAsync(1600);
+      expect(outcomes).toEqual(['NO_TARGET']);
+      gaze.stop();
+      provider.stop();
+    });
+
     it('never teaches the calibration, since the eyes were not on that target', async () => {
       const { provider, gaze, selected, learned } = picking(doubleBlinkAt(away, 1000), true);
       gaze.start();

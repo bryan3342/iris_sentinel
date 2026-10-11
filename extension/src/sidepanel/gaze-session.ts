@@ -7,7 +7,8 @@ import type { TargetList } from './target-list';
 type Target = TargetList['targets'][number];
 /** Clicks a confirmed target; the page checks everything again before it does. `blinked` says the confirm was a double blink, the only one that opens a risky target. */
 export type Select = (list: TargetList, target: Target, blinked: boolean) => Promise<SelectResult>;
-export type Outcome = SelectResult;
+/** What a confirm did: a selection's result, or NO_TARGET for a double blink with no number aimed before it. */
+export type Outcome = SelectResult | 'NO_TARGET';
 
 export const selectInPage: Select = async (list, target, blinked) => {
   const [result] = await chrome.scripting.executeScript({
@@ -155,6 +156,7 @@ export class GazeSession {
     const target = list?.targets.find((t) => t.id === id) ?? null;
     const outcome = decideSelection(event, target && { id: target.id, risky: isRisky(target) });
     if (outcome.kind === 'needs-double-blink') this.options.onOutcome?.('NEEDS_DOUBLE_BLINK');
+    if (outcome.kind === 'none' && event.source === 'double-blink') this.options.onOutcome?.('NO_TARGET');
     if (outcome.kind === 'select' && list && target && this.options.learn && !byVoice) {
       // Learned at the confirm, from the eyes' samples during the dwell, before the page reacts.
       // Never for a voice pick: the eyes were not on that target, so it would teach the aim a wrong offset.

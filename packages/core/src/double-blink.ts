@@ -10,8 +10,16 @@ export interface DoubleBlinkOptions {
   steadyMs?: number;
 }
 
-const CLOSED = 0.5; // both eyes' closure scores above this count as closed
-const OPEN = 0.35; // and both below this as open again; the gap stops a half-closed flicker from counting twice
+// Each eye's closure score must rise this far above its own resting level to count as closed, and
+// fall back to within this of it to count as open again; the gap stops a half-closed flicker from
+// counting twice. Resting levels differ: looking down at a laptop screen lowers the lids, and the
+// camera then scores open eyes as about 0.4 closed, so fixed limits would never see them open.
+const CLOSED_ABOVE_REST = 0.2;
+const OPEN_ABOVE_REST = 0.12;
+const MIN_CLOSED = 0.5; // never easier to close than this, or to open than MIN_OPEN, whatever the rest
+const MIN_OPEN = 0.35;
+const MAX_CLOSED = 0.85; // and a heavy-lidded rest never puts closed out of reach
+const REST_MS = 2_000; // how quickly the resting level follows the lids (time constant)
 const LID_JUMP_MS = 120; // an aim change this close to a blink is the closing lids, not the user moving on
 
 type Segment = { aim: number | null; since: number };
@@ -25,8 +33,10 @@ type Segment = { aim: number | null; since: number };
  * picked another way (by voice). A single blink, a wink (one eye), a closure longer than a quick
  * blink, or blinks too far apart is no double blink at all. Each click needs two fresh blinks.
  *
- * The camera holds back the start of every blink, so each closure is timed from the last open
- * sample, not the first closed one.
+ * The defaults fit deliberate blinks, which are slower than natural ones: each closure up to 0.6 s,
+ * and the pair within 1.3 s of the first closing. Closed and open are judged against each eye's own
+ * resting level (see CLOSED_ABOVE_REST). The camera holds back the start of every blink, so each
+ * closure is timed from the last open sample, not the first closed one.
  */
 export class DoubleBlinkDetector {
   private readonly blinkMaxMs: number;
@@ -39,8 +49,11 @@ export class DoubleBlinkDetector {
   private closed: { since: number; target: number | null } | null = null;
   /** The first of two blinks, once it has ended. */
   private first: { since: number; target: number | null } | null = null;
+  /** Each eye's resting closure, learned while no closure is in progress. */
+  private rest = { left: 0.1, right: 0.1 };
+  private lastT: number | null = null;
 
-  constructor({ blinkMaxMs = 400, windowMs = 800, steadyMs = 200 }: DoubleBlinkOptions = {}) {
+  constructor({ blinkMaxMs = 600, windowMs = 1_300, steadyMs = 200 }: DoubleBlinkOptions = {}) {
     this.blinkMaxMs = blinkMaxMs;
     this.windowMs = windowMs;
     this.steadyMs = steadyMs;
@@ -55,7 +68,12 @@ export class DoubleBlinkDetector {
   update(sample: GazeSample, aim: number | null): ConfirmEvent | null {
     const { left, right } = sample.blink;
     if (this.first && sample.t - this.first.since > this.windowMs) this.first = null; // too slow for a pair
-    if (left > CLOSED && right > CLOSED) {
+    const closedAt = (eye: 'left' | 'right') => Math.min(MAX_CLOSED, Math.max(MIN_CLOSED, this.rest[eye] + CLOSED_ABOVE_REST));
+    const openAt = (eye: 'left' | 'right') => Math.min(closedAt(eye) - 0.1, Math.max(MIN_OPEN, this.rest[eye] + OPEN_ABOVE_REST));
+    const closed = left > closedAt('left') && right > closedAt('right');
+    if (!closed && !this.closed) this.learnRest(sample);
+    else this.lastT = sample.t;
+    if (closed) {
       if (!this.closed) {
         const since = this.lastOpen ?? sample.t;
         // Only the first blink of a pair locks a target; the second confirms it.
@@ -63,7 +81,7 @@ export class DoubleBlinkDetector {
       }
       return null;
     }
-    if (left >= OPEN || right >= OPEN) return null; // half open: neither closed nor open yet
+    if (left >= openAt('left') || right >= openAt('right')) return null; // half open: neither closed nor open yet
     this.lastOpen = sample.t;
     const blink = this.closed;
     if (!blink) {
@@ -82,6 +100,13 @@ export class DoubleBlinkDetector {
     const { target } = this.first;
     this.first = null;
     return { t: sample.t, source: 'double-blink', target };
+  }
+
+  /** Moves each eye's resting level toward its closure now; the slow pace keeps a blink's edges from moving it much. */
+  private learnRest({ t, blink }: GazeSample): void {
+    const k = this.lastT === null ? 1 : 1 - Math.exp(-(t - this.lastT) / REST_MS); // the first sample sets it
+    this.lastT = t;
+    this.rest = { left: this.rest.left + (blink.left - this.rest.left) * k, right: this.rest.right + (blink.right - this.rest.right) * k };
   }
 
   /** Forgets any blinks in progress, for example when the page's targets change under them. */
