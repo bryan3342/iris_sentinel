@@ -11,6 +11,7 @@ import { understandingPanel } from './understanding';
 import { microphonePanel } from './setup/microphone';
 import { conversationPanel } from './agent/panel';
 import { PageCoordinator } from '../page-understanding/coordinator';
+import { brandHeader } from './brand';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -27,7 +28,7 @@ export function mountPanel(root: HTMLElement): void {
   status.className = 'status';
   status.textContent = 'Starting camera...';
 
-  root.replaceChildren(preview, status);
+  root.replaceChildren(brandHeader(), preview, status);
   const targets = new LiveTargetList();
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);

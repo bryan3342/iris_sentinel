@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Iris">
+  <defs>
+    <linearGradient id="iris" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#36e0cc"/>
+      <stop offset="1" stop-color="#0e9488"/>
+    </linearGradient>
+    <linearGradient id="irisv" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#36e0cc"/>
+      <stop offset="1" stop-color="#0e9488"/>
+    </linearGradient>
+  </defs>
+  <style>
+    .blink { transform-box: fill-box; transform-origin: center; animation: iris-blink 5.4s ease-in-out infinite; }
+    .look  { transform-box: fill-box; transform-origin: center; animation: iris-drift 7.5s ease-in-out infinite; }
+    @keyframes iris-blink { 0%,90%,100% { transform: scaleY(1); } 94% { transform: scaleY(0.08); } }
+    @keyframes iris-drift {
+      0%,100% { transform: translate(0,0); }
+      22% { transform: translate(3.5px,-2px); }
+      48% { transform: translate(-3.5px,1.5px); }
+      73% { transform: translate(2px,2.5px); }
+    }
+    @media (prefers-reduced-motion: reduce) { .blink, .look { animation: none; } }
+  </style>
+  <rect x="42" y="42" width="16" height="46" rx="8" fill="url(#irisv)"/>
+  <g class="blink">
+    <circle cx="50" cy="22" r="14" fill="none" stroke="url(#iris)" stroke-width="7"/>
+    <g class="look">
+      <circle cx="50" cy="22" r="6" fill="#1a6b60"/>
+      <circle cx="46" cy="18.5" r="2.4" fill="#eafffb"/>
+    </g>
+  </g>
+</svg>
