@@ -190,6 +190,7 @@ User blinks twice ─> page helper clicks target 12
 | :--- | :--- | :--- |
 | `scroll_page` | `direction`: `down`, `up`, `top`, `bottom` | Scrolls the active tab by most of a screen, or to an end; says when already there |
 | `navigate_history` | `direction`: `back`, `forward` | Goes back or forward in the active tab's history |
+| `summarize_looked_at` | none | Summarizes only the block where the eyes rested in the last five seconds (a paragraph, image or table), or the whole viewport if they never settled |
 | `summarize_page` | none | Page understanding summary of the visible viewport |
 | `describe_looked_at` | none | Describes the target gaze last rested on (`describe_target`) |
 | `find_on_page` | `description` (up to 500 characters) | Finds a target, picks it (as `select_number`), and answers with its number |

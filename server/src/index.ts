@@ -65,7 +65,8 @@ export function createWorker(multimodal?: PageUnderstanding, gate = new DemoAcce
           const adapter = multimodal ?? new GeminiMultimodal(env);
           result = validateUnderstanding(await abortable(adapter[METHODS[input.operation]](input, deadline), deadline), input);
           if (result.operation === 'summarize_page') {
-            result = { ...result, summary: `Visible viewport only: ${result.summary}`.slice(0, 2000) };
+            const only = result.scope === 'visible_region' ? 'Looked-at region only' : 'Visible viewport only';
+            result = { ...result, summary: `${only}: ${result.summary}`.slice(0, 2000) };
           }
         }
         catch (error) {

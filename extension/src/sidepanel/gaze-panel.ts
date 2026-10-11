@@ -1,4 +1,4 @@
-import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, type AccuracyReport } from '@iris/core';
+import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, RestingPoint, type AccuracyReport } from '@iris/core';
 import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
@@ -70,6 +70,8 @@ export interface GazePanel {
   useCamera(provider: GazeProvider): void;
   /** Picks target `id` for the user's next confirm (see GazeSession.arm). */
   pick(id: number): PickResult;
+  /** Where on the page the eyes (or mouse) rested in the last few seconds, or null. */
+  lookedAt(): Point2 | null;
 }
 
 export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel {
@@ -96,7 +98,14 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   eyes.input.disabled = calibrate.disabled = check.disabled = true;
   // The live cursor follows wherever the user looks (or points), on the page itself.
   const cursor = new GazeCursor();
-  const onGaze = (at: Point2 | null, list: { tabId: number }) => cursor.move(list.tabId, at);
+  // Recent gaze on the current tab, for "summarize this". Kept in memory only, for five seconds.
+  const rest = new RestingPoint();
+  let restTab: number | null = null;
+  const onGaze = (at: Point2 | null, list: { tabId: number }) => {
+    cursor.move(list.tabId, at);
+    if (list.tabId !== restTab) { rest.clear(); restTab = list.tabId; }
+    rest.push(at, performance.now());
+  };
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void; mouse?: boolean } | null = null;
   // Head-tilt scrolling runs alongside eye aiming, from the same camera samples.
@@ -110,6 +119,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     active?.stop?.();
     active = null;
     cursor.stop();
+    rest.clear();
     headScroll.stop();
     status.textContent = '';
   };
@@ -229,6 +239,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
         status.textContent = 'Aiming with your saved calibration for this screen. Blink twice quickly to select; looking alone never clicks.';
       });
     },
+    lookedAt: () => (active ? rest.point(performance.now()) : null),
     pick(id) {
       if (!active) return 'NO_AIMING';
       if (!active.session.arm(id)) return 'NO_SUCH_NUMBER';

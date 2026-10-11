@@ -8,7 +8,7 @@ import type { VoiceTools } from './voice';
 export interface ToolDeps {
   coordinator: Pick<PageCoordinator, 'inspect'>;
   marks: Pick<PageMarks, 'aimed'>;
-  gaze: Pick<GazePanel, 'pick'>;
+  gaze: Pick<GazePanel, 'pick' | 'lookedAt'>;
   /** Shows what a tool did in the side panel, as the agent also says it. */
   report: (text: string) => void;
 }
@@ -62,6 +62,12 @@ export function browserTools({ coordinator, marks, gaze, report }: ToolDeps): Vo
     summarize_page: tool(async () => {
       const { result } = await coordinator.inspect({ operation: 'summarize_page' });
       return result.result.operation === 'summarize_page' ? untrusted(result.result.summary) : 'No summary.';
+    }),
+    summarize_looked_at: tool(async () => {
+      const { result } = await coordinator.inspect({ operation: 'summarize_page', lookedAt: gaze.lookedAt() });
+      if (result.result.operation !== 'summarize_page') return 'No summary.';
+      const whole = result.result.scope === 'visible_viewport' ? 'Your eyes had not settled on one part, so this covers the whole screen. ' : '';
+      return whole + untrusted(result.result.summary);
     }),
     describe_looked_at: tool(async () => {
       const aimed = marks.aimed;

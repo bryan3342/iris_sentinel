@@ -133,3 +133,26 @@ export function pageSnapshot(mode: 'understanding' | 'targets' = 'understanding'
   if (masks.length > 1000) blocked = true;
   return { documentToken: state.documentToken, revision: state.revision, viewport, targets, targetsTruncated, images, masks, blocked };
 }
+
+/**
+ * The block of content at a viewport point: the paragraph, list item, figure, image or table under
+ * where the user was looking, for a summary of just that part. Runs in Chrome's isolated world and
+ * must remain self-contained for executeScript. Reads layout only. Null when nothing there can be
+ * summarized on its own, or the block is most of the page (the whole viewport is summarized instead).
+ */
+export function pageRegionAt(at: { x: number; y: number }): Rect | null {
+  const vv = visualViewport;
+  const left = vv?.offsetLeft ?? 0, top = vv?.offsetTop ?? 0, width = vv?.width ?? innerWidth, height = vv?.height ?? innerHeight;
+  const blocks = 'p, li, dd, blockquote, pre, figure, img, video, table, article, section, [role=article], [role=listitem]';
+  // Iris's own overlay passes pointer events through, so it is never the element found here.
+  for (let el = document.elementFromPoint(at.x + left, at.y + top); el && el !== document.body; el = el.parentElement) {
+    if (!el.matches(blocks)) continue;
+    const b = el.getBoundingClientRect();
+    if (b.width * b.height > 0.8 * width * height) return null;
+    if (b.width < 40 || b.height < 16) continue;
+    const x = Math.max(0, b.left - left), y = Math.max(0, b.top - top);
+    const right = Math.min(width, b.right - left), bottom = Math.min(height, b.bottom - top);
+    return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : null;
+  }
+  return null;
+}

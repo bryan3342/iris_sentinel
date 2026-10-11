@@ -51,7 +51,8 @@ On a long public page, such as a Wikipedia article:
 | "Scroll down" | The page moves down a screen; Iris says "Scrolled down." |
 | "Go to the bottom" / "go to the top" | The page jumps to that end |
 | "Go back" | The previous page opens |
-| "Summarize this" | A short spoken summary of the visible part of the page |
+| "Summarize this" while looking at a paragraph | A short spoken summary of that paragraph only |
+| "Summarize the page" | A short spoken summary of the visible part of the page |
 | "What is this?" while resting your eyes on a link | A spoken description of that link |
 | "Find the history section" | Iris names a number and marks it in blue; blink twice to open it |
 | "Click number 12" (with **Show numbers on the page** on) | Number 12 is marked in blue; blink twice to open it, wherever you are looking |

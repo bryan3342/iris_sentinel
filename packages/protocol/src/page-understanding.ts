@@ -24,7 +24,8 @@ export interface PageInput {
 }
 export type Understanding =
   | { operation: 'find_target'; targetId: number | null; explanation: string }
-  | { operation: 'summarize_page'; scope: 'visible_viewport'; summary: string }
+  /** A summary covers the visible viewport, or with a `sourceRect` only that region (where the user was looking). */
+  | { operation: 'summarize_page'; scope: 'visible_viewport' | 'visible_region'; summary: string }
   | { operation: 'describe_image'; imageId: number; description: string }
   | { operation: 'describe_target'; targetId: number; description: string };
 export interface PageResult {
@@ -96,7 +97,8 @@ export function validateInput(value: unknown): PageInput {
   const required = ['protocolVersion', 'requestId', 'operation', 'binding', 'image'];
   const extra = { find_target: ['request', 'targets', 'targetsTruncated'], summarize_page: [], describe_image: ['imageId', 'sourceRect'],
     describe_target: ['targets', 'targetId', 'sourceRect'] }[operation];
-  object(value, [...required, ...extra]);
+  // A summary may be limited to one region of the viewport.
+  object(value, [...required, ...extra], operation === 'summarize_page' ? ['sourceRect'] : []);
   const binding = validateBinding(base.binding);
   const img = object(base.image, ['mimeType', 'data', 'width', 'height']);
   const width = id(img.width), height = id(img.height);
@@ -118,7 +120,7 @@ export function validateInput(value: unknown): PageInput {
     if (input.targets[0]!.id !== input.targetId) throw new ProtocolError();
   }
   if (operation === 'describe_image') input.imageId = id(base.imageId);
-  if (operation === 'describe_image' || operation === 'describe_target') {
+  if (operation === 'describe_image' || operation === 'describe_target' || base.sourceRect !== undefined) {
     input.sourceRect = validateRect(base.sourceRect, binding.viewport);
     if (Math.abs(width / height - input.sourceRect.width / input.sourceRect.height) > 0.05 * width / height) throw new ProtocolError();
   } else if (Math.abs(width / height - binding.viewport.width / binding.viewport.height) > 0.05 * width / height) throw new ProtocolError();
@@ -132,8 +134,9 @@ export function validateUnderstanding(value: unknown, input: PageInput): Underst
   }
   if (input.operation === 'summarize_page') {
     const r = object(value, ['operation', 'scope', 'summary']);
-    if (r.operation !== input.operation || r.scope !== 'visible_viewport') throw new ProtocolError();
-    return { operation: input.operation, scope: 'visible_viewport', summary: text(r.summary, 2_000) };
+    const scope = input.sourceRect ? 'visible_region' : 'visible_viewport';
+    if (r.operation !== input.operation || r.scope !== scope) throw new ProtocolError();
+    return { operation: input.operation, scope, summary: text(r.summary, 2_000) };
   }
   if (input.operation === 'describe_target') {
     const r = object(value, ['operation', 'targetId', 'description']);

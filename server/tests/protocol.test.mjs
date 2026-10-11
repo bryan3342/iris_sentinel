@@ -34,3 +34,12 @@ test('null selection is valid; wrong image ID, unknown result fields and oversiz
   assert.throws(() => m.validateUnderstanding({ ...result('summarize_page'), url: 'https://evil' }, input('summarize_page')));
   assert.throws(() => m.validateUnderstanding({ ...result('summarize_page'), summary: 'x'.repeat(2001) }, input('summarize_page')));
 });
+
+test('a summary may cover one region, and then must say so; other operations without a crop refuse one', () => {
+  const region = m.validateInput({ ...input('summarize_page'), sourceRect: { x: 0, y: 0, width: 2, height: 2 } });
+  assert.equal(m.validateUnderstanding({ ...result('summarize_page'), scope: 'visible_region' }, region).scope, 'visible_region');
+  assert.throws(() => m.validateUnderstanding(result('summarize_page'), region));
+  assert.throws(() => m.validateUnderstanding({ ...result('summarize_page'), scope: 'visible_region' }, m.validateInput(input('summarize_page'))));
+  assert.throws(() => m.validateInput({ ...input('summarize_page'), sourceRect: { x: 0, y: 0, width: 2, height: 1 } })); // image does not match the crop
+  assert.throws(() => m.validateInput({ ...input('find_target'), sourceRect: { x: 0, y: 0, width: 2, height: 2 } }));
+});

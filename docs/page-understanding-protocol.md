@@ -14,7 +14,7 @@ server reached from elsewhere (see Provisioning below). Supported operations:
 | Operation | Required operation fields | Result fields |
 | --- | --- | --- |
 | `find_target` | `request`, `targets`, `targetsTruncated` | `operation`, `targetId` (supplied ID or null), `explanation` |
-| `summarize_page` | none | `operation`, `scope: "visible_viewport"`, `summary` |
+| `summarize_page` | optional `sourceRect` (a region of the viewport) | `operation`, `scope` (`"visible_viewport"`, or `"visible_region"` exactly when `sourceRect` was sent), `summary` |
 | `describe_image` | `imageId`, `sourceRect` | `operation`, same `imageId`, `description` |
 | `describe_target` | `targets` (exactly one), `targetId` (that target's ID), `sourceRect` | `operation`, same `targetId`, `description` |
 
@@ -58,6 +58,12 @@ the same number and within 4 px of where gaze saw it. The crop is that target wi
 room around it (at least 240 by 160 CSS pixels, inside the viewport), masked like
 any capture, with one drawn outline marking the target; no other overlay is drawn.
 The description is at most 1500 characters. Nothing is clicked.
+For a `summarize_page` limited to one region, the extension takes where gaze (or the
+mouse) rested longest in the last five seconds, kept in side panel memory only, and
+finds the content block there: the paragraph, list item, figure, image or table. The
+crop is that block with room around it (as for `describe_target`), masked like any
+capture, with one drawn outline marking the block. With no resting place, no block
+there, or a block covering most of the page, the whole viewport is summarized.
 
 ## Limits and errors
 

@@ -1,11 +1,12 @@
-import { LIMITS, validateInput, validateResult, type NumberedTarget, type Operation, type PageResult, type Rect } from '@iris/protocol';
+import { LIMITS, validateInput, validateRect, validateResult, type NumberedTarget, type Operation, type PageResult, type Point2, type Rect, type Viewport } from '@iris/protocol';
 import { pageOverlay, type OverlayCommand, type OverlayResult } from '../content/overlay';
 import { assertSameSnapshot, eligibleTab, prepareImage, targetCrop, validateSnapshot } from './capture';
-import { pageSnapshot, type PageSnapshot } from './page-helper';
+import { pageRegionAt, pageSnapshot, type PageSnapshot } from './page-helper';
 
 /** The target gaze rested on, as numbered in the gaze scan. */
 export interface AimedTarget { documentToken: string; id: number; rect: Rect }
-export interface DemoRequest { operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null }
+/** `lookedAt`, for a summary, is where the eyes rested (viewport pixels): only the block there is summarized. */
+export interface DemoRequest { operation: Operation; request?: string; imageId?: number; aimed?: AimedTarget | null; lookedAt?: Point2 | null }
 export interface BrokerReply { ok: boolean; value?: unknown; code?: string }
 export async function broker(message: unknown): Promise<unknown> {
   const reply: BrokerReply = await chrome.runtime.sendMessage(message);
@@ -32,6 +33,11 @@ function aimedTarget(aimed: AimedTarget | null | undefined, snapshot: PageSnapsh
   if (aimed.documentToken !== snapshot.documentToken || !target ||
     Math.abs(target.rect.x - aimed.rect.x) > 4 || Math.abs(target.rect.y - aimed.rect.y) > 4) throw new Error('PAGE_CHANGED');
   return target;
+}
+/** The content block at `at`, or null to summarize the whole viewport. */
+async function regionAt(tabId: number, at: Point2, viewport: Viewport): Promise<Rect | null> {
+  const [result] = await chrome.scripting.executeScript({ target: { tabId }, func: pageRegionAt, args: [at] });
+  try { return result?.result ? validateRect(result.result, viewport) : null; } catch { return null; }
 }
 async function overlay(tabId: number, command: OverlayCommand): Promise<OverlayResult | undefined> {
   const results = await chrome.scripting.executeScript({ target: { tabId }, func: pageOverlay, args: [command] });
@@ -80,7 +86,9 @@ export class PageCoordinator {
       const selected = request.operation === 'describe_image' ? before.images.find(i => i.id === request.imageId) : undefined;
       if (request.operation === 'describe_image' && !selected) throw new Error('IMAGE_NOT_FOUND');
       const aimed = request.operation === 'describe_target' ? aimedTarget(request.aimed, before) : undefined;
-      const crop = selected?.rect ?? (aimed && targetCrop(aimed.rect, before.viewport));
+      const region = request.operation === 'summarize_page' && request.lookedAt ? await regionAt(tabId, request.lookedAt, before.viewport) : null;
+      const outlined = aimed?.rect ?? region ?? undefined; // outlined in the image, so Gemini knows which part is meant
+      const crop = selected?.rect ?? (outlined && targetCrop(outlined, before.viewport));
       // Gemini sees the page itself, never Iris's own numbers or highlight. The hold stops gaze
       // from drawing them again until the screenshot is taken.
       await overlay(tabId, { type: 'hold' });
@@ -100,7 +108,7 @@ export class PageCoordinator {
       };
       await check();
       const image = await prepareImage(captured, before, crop,
-        request.operation === 'find_target' ? 'numbers' : aimed && { outline: aimed.rect });
+        request.operation === 'find_target' ? 'numbers' : outlined && { outline: outlined });
       await check();
       const input = validateInput({ protocolVersion: '0.1', requestId, operation: request.operation,
         binding: { tabToken: crypto.randomUUID(), documentToken: before.documentToken, revision: before.revision,
@@ -108,6 +116,7 @@ export class PageCoordinator {
         ...(request.operation === 'find_target' ? { request: request.request, targets: before.targets, targetsTruncated: before.targetsTruncated } : {}),
         ...(selected ? { imageId: selected.id, sourceRect: selected.rect } : {}),
         ...(aimed && crop ? { targets: [aimed], targetId: aimed.id, sourceRect: crop } : {}),
+        ...(region && crop ? { sourceRect: crop } : {}),
       });
       // No overlapping snapshot checks. Changes cancel HTTP, not just result display.
       let checking = false;

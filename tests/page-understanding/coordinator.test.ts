@@ -136,3 +136,26 @@ it('sends nothing without an aimed target, or once the aimed target has moved', 
     .rejects.toThrow('PAGE_CHANGED');
   expect(events).not.toContain('iris.page.capture');
 });
+it('summarizes only the block where the eyes rested, outlined in a crop, or the whole viewport when there is none', async () => {
+  let region: unknown = { x: 0, y: 0, width: 1, height: 1 };
+  const script = vi.mocked(chrome.scripting.executeScript);
+  const original = script.getMockImplementation()!;
+  script.mockImplementation((async (call: { func: { name: string } }) => call.func.name === 'pageRegionAt'
+    ? [{ frameId: 0, result: region }] : (original as (c: unknown) => unknown)(call)) as never);
+  const previous = send.getMockImplementation()!;
+  send.mockImplementation(async message => message.type !== 'iris.page.understand' ? previous(message) : { ok: true, value: {
+    protocolVersion: '0.1', requestId: message.input.requestId, binding: message.input.binding,
+    result: { operation: 'summarize_page', scope: message.input.sourceRect ? 'visible_region' : 'visible_viewport', summary: 'Sample.' } } });
+  const sent = () => send.mock.calls.map(([m]) => m).filter(m => m.type === 'iris.page.understand').at(-1).input;
+
+  const looked = await new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } });
+  expect(looked.result.result).toMatchObject({ scope: 'visible_region' });
+  expect(sent().sourceRect).toEqual({ x: 0, y: 0, width: 2, height: 2 });
+  expect(vi.mocked(prepareImage).mock.lastCall!.slice(2)).toEqual([{ x: 0, y: 0, width: 2, height: 2 }, { outline: { x: 0, y: 0, width: 1, height: 1 } }]);
+
+  region = null; // nothing summarizable there
+  expect((await new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } })).result.result).toMatchObject({ scope: 'visible_viewport' });
+  region = { x: 0, y: 0, width: 50, height: 1 }; // the page reported a block outside its viewport
+  await new PageCoordinator().inspect({ operation: 'summarize_page', lookedAt: { x: 0.5, y: 0.5 } });
+  expect(sent().sourceRect).toBeUndefined();
+});
