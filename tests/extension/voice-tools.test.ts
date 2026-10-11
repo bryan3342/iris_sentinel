@@ -32,6 +32,20 @@ it('matches the agent setup, so the voice agent is offered exactly these tools a
   for (const name of names) expect(agent.prompt).toContain(name);
 });
 
+it('keeps the agent quiet when a command works: it speaks to say what failed, to ask for a double blink, or to answer a question', () => {
+  const agent = JSON.parse(readFileSync(new URL('../../server/scripts/voice-agent.json', import.meta.url), 'utf8')) as {
+    prompt: string; built_in_tools?: Record<string, { type: string; params: { system_tool_type: string } }>;
+  };
+  expect(agent.built_in_tools?.skip_turn).toMatchObject({ type: 'system', params: { system_tool_type: 'skip_turn' } });
+  const quiet = agent.prompt.match(/Stay quiet when a command works\.[^\n]*/)?.[0] ?? '';
+  const commands = ['scroll_page', 'navigate_history', 'go_to_tab', 'switch_tab', 'open_new_tab', 'open_website', 'search_web', 'reload_page', 'zoom_page', 'click_on', 'select_number'];
+  for (const command of commands) expect(quiet).toContain(command);
+  for (const question of ['summarize_looked_at', 'summarize_whole_page', 'describe_looked_at', 'find_on_page']) expect(quiet).not.toContain(question);
+  expect(quiet).toContain('skip_turn');
+  expect(agent.prompt).toContain('"Blink twice to confirm."');
+  expect(agent.prompt).not.toContain('Say what each tool answered');
+});
+
 it('scrolls the active tab and says what happened, including when there is nowhere to go', async () => {
   const t = tools();
   expect(await t.scroll_page!({ direction: 'bottom' })).toBe('At the bottom of the page.');

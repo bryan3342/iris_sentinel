@@ -38,12 +38,19 @@ export async function convai(key, method, path, body) {
   return response.json();
 }
 
-/** Names of Iris's tools that are not attached to the agent as client tools that wait for Iris's answer. */
+/**
+ * Names of Iris's tools the agent lacks: client tools not attached as tools that wait for Iris's
+ * answer, and system tools (such as skip_turn) not switched on.
+ */
 export async function missingTools(key, agent) {
   const { conversation_config: config } = await convai(key, "GET", `/agents/${agent}`);
   const attached = new Set(config.agent.prompt.tool_ids ?? []);
+  const switchedOn = config.agent.prompt.built_in_tools ?? {};
   const { tools } = await convai(key, "GET", "/tools");
   const ready = new Set(tools.filter((t) => attached.has(t.id) && t.tool_config?.type === "client" && t.tool_config.expects_response)
     .map((t) => t.tool_config.name));
-  return voiceAgent.tools.map((t) => t.name).filter((name) => !ready.has(name));
+  return [
+    ...voiceAgent.tools.map((t) => t.name).filter((name) => !ready.has(name)),
+    ...Object.keys(voiceAgent.built_in_tools ?? {}).filter((name) => !switchedOn[name]),
+  ];
 }

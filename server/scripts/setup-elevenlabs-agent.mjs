@@ -1,5 +1,6 @@
 // Local setup only. Makes the ElevenLabs agent match voice-agent.json: creates or updates Iris's
-// client tools (waiting for Iris's answer), attaches exactly those to the agent and sets its system
+// client tools (waiting for Iris's answer), attaches exactly those to the agent, switches on the
+// system tools Iris uses (skip_turn, so a command that worked gets no reply) and sets its system
 // prompt. The agent's own first message is empty, so it waits for the user when Iris connects on
 // speech, and Iris may set a first message only to check in when the user seems tired. Safe to run again; the agent's voice, language model and other settings are left as they are.
 import { convai, elevenLabsEnv, missingTools, voiceAgent } from "./elevenlabs.mjs";
@@ -8,7 +9,7 @@ const { key, agent } = elevenLabsEnv();
 
 const toolConfig = ({ name, description, parameters }) => ({
   type: "client", name, description,
-  expects_response: true, // the agent waits for Iris's answer and says it
+  expects_response: true, // the agent waits for Iris's answer, then speaks or stays quiet as the prompt says
   response_timeout_secs: 20, // summaries and finding make one Gemini request
   parameters: { type: "object", properties: parameters, required: Object.keys(parameters) },
 });
@@ -28,7 +29,10 @@ try {
   const overrides = platform.overrides ?? {};
   const allowed = overrides.conversation_config_override ?? {};
   await convai(key, "PATCH", `/agents/${agent}`, {
-    conversation_config: { agent: { first_message: voiceAgent.first_message, prompt: { ...prompt, prompt: voiceAgent.prompt, tool_ids: ids } } },
+    conversation_config: { agent: { first_message: voiceAgent.first_message, prompt: {
+      ...prompt, prompt: voiceAgent.prompt, tool_ids: ids,
+      built_in_tools: { ...prompt.built_in_tools, ...voiceAgent.built_in_tools }, // other system tools are left as they are
+    } } },
     platform_settings: { overrides: { ...overrides, conversation_config_override: { ...allowed, agent: { ...allowed.agent, first_message: true } } } },
   });
   const missing = await missingTools(key, agent);
@@ -36,7 +40,8 @@ try {
     console.error(`The agent still lacks: ${missing.join(", ")}. Check it in the ElevenLabs dashboard.`);
     process.exitCode = 1;
   } else {
-    console.log(`Agent ready: ${ids.length} client tools attached and the system prompt set.`);
+    const system = Object.keys(voiceAgent.built_in_tools ?? {}).join(", ");
+    console.log(`Agent ready: ${ids.length} client tools attached, ${system} on, and the system prompt set.`);
   }
 } catch (error) {
   console.error(`ElevenLabs setup failed: ${error instanceof Error ? error.message : "network or timeout"}.`);
