@@ -49,6 +49,7 @@ On a long public page, such as a Wikipedia article:
 | :--- | :--- |
 | (Open the side panel) | The first time ever, Iris speaks a short intro, also shown as text; after that, "Iris is ready." |
 | "Scroll down" | The page moves down a screen; Iris says "Scrolled down." |
+| Talk while Iris is answering | Iris finishes its answer; it hears you only once it has finished speaking |
 | "Go to the bottom" / "go to the top" | The page jumps to that end |
 | "Go back" | The previous page opens |
 | "Summarize this" while looking at a paragraph | A short spoken summary of that paragraph only |
