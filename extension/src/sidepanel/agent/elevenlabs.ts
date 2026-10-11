@@ -12,7 +12,7 @@ import type { VoiceAgent } from './voice';
  */
 export const elevenLabsVoice: VoiceAgent = {
   async start(signedUrl, onState, tools, firstMessage) {
-    const agent = { speaking: false };
+    let agentSpeaking = false;
     let session: Awaited<ReturnType<typeof Conversation.startSession>> | undefined;
     session = await Conversation.startSession({
       signedUrl, connectionType: 'websocket',
@@ -22,15 +22,15 @@ export const elevenLabsVoice: VoiceAgent = {
       clientTools: tools,
       onConnect: () => onState('listening'),
       onModeChange: ({ mode }) => {
-        agent.speaking = mode === 'speaking';
-        session?.setMicMuted(agent.speaking);
+        agentSpeaking = mode === 'speaking';
+        session?.setMicMuted(agentSpeaking);
         onState(mode);
       },
       onDisconnect: () => onState('disconnected'),
       // Never display or log upstream errors, which may contain credentials.
       onError: () => onState('disconnected'),
     });
-    session.setMicMuted(agent.speaking); // the agent may have started speaking before the session was returned
+    session.setMicMuted(agentSpeaking); // the agent may have started speaking before the session was returned
     return session;
   },
 };
