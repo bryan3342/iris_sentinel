@@ -36,7 +36,7 @@ export interface ConversationPanel {
   element: HTMLElement;
   /** Takes each live fatigue result; Iris checks in by voice when the user seems tired (see CheckIn). */
   onFatigue(state: FatigueState): void;
-  /** A conversation is connecting or open. The fatigue card sets blinks and breathing aside meanwhile. */
+  /** A conversation is connecting or open. The fatigue card pauses meanwhile. */
   readonly talking: boolean;
 }
 

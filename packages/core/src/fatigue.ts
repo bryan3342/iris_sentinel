@@ -17,10 +17,10 @@ import { VitalsWindow } from './vitals-window';
  * baselines. Body clues count only while the camera view is trustworthy; once
  * the face has been lost or the view poor for a few seconds, the engine pauses
  * and the score and level hold still. A shorter glitch neither pauses nor
- * throws readings away, since Presage's view status flickers. While a voice
- * conversation is open (`setTalking`), blink and breathing readings are set
- * aside, since talking changes both; heart rate variability and the score
- * carry on.
+ * throws readings away, since Presage's view status flickers. It also pauses
+ * while the user talks (`setTalking`), since talking changes breathing and
+ * blinking, and keeps breathing and heart rate variability out for a while
+ * after, until Presage's readings no longer carry the talking.
  */
 
 export const FATIGUE_CLUES = ['blink', 'hrv', 'breathing', 'timeToClick', 'landings'] as const;
@@ -36,11 +36,19 @@ export interface ClueSettings {
   fullAt: number;
   /** How much the clue counts toward the score, relative to the others. */
   weight: number;
+  /** Where in the first readings the personal baseline is taken (see Baseline); 0.25 by default. */
+  restedQuantile?: number;
+  /** Lowest value the personal baseline may take (see Baseline). */
+  floor?: number;
 }
 
 export const CLUE_SETTINGS: Record<FatigueClue, ClueSettings> = {
   // 15 a minute is what Presage measured at rest (#24); chance alone swings a minute's count by about 25%.
-  blink: { fallback: 15, tiredDirection: 'up', ignoreBelow: 0.25, fullAt: 0.75, weight: 0.25 },
+  // Blink rate swings with activity: it all but stops while someone stares at a screen and rises while
+  // they look around, so its normal is the median rather than the low end, never below 12 a minute
+  // (80% of that resting rate; lower usually means the user was staring while it was learned), and
+  // changes under +50% count as noise.
+  blink: { fallback: 15, tiredDirection: 'up', ignoreBelow: 0.5, fullAt: 1.5, weight: 0.2, restedQuantile: 0.5, floor: 12 },
   // The clue most specific to fatigue.
   hrv: { fallback: 40, tiredDirection: 'down', ignoreBelow: 0.1, fullAt: 0.4, weight: 0.3 },
   breathing: { fallback: 14, tiredDirection: 'up', ignoreBelow: 0.1, fullAt: 0.35, weight: 0.15 },
@@ -49,8 +57,8 @@ export const CLUE_SETTINGS: Record<FatigueClue, ClueSettings> = {
   landings: { fallback: null, tiredDirection: 'up', ignoreBelow: 0.25, fullAt: 1, weight: 0.15 },
 };
 
-/** Why the score is not moving: still gathering enough clues, the face is out of view, or the view is too poor to trust. */
-export type FatiguePause = 'warming-up' | 'no-face' | 'poor-view';
+/** Why the score is not moving: still gathering enough clues, the face is out of view, the view is too poor to trust, or the user is talking or just was. */
+export type FatiguePause = 'warming-up' | 'no-face' | 'poor-view' | 'talking';
 
 export interface ClueState {
   /** Blinks or breaths a minute, heart rate variability in ms, time to click in ms, or landings per click. */
@@ -73,8 +81,6 @@ export interface FatigueState {
   score: number | null;
   level: FatigueLevel;
   paused: FatiguePause | null;
-  /** A voice conversation is open, so blink and breathing readings are set aside. */
-  talking: boolean;
   clues: Record<FatigueClue, ClueState>;
 }
 
@@ -88,6 +94,12 @@ export interface FatigueEngineOptions {
   smoothingHz?: number;
   /** How long a lost face or poor view must last before the engine pauses, in milliseconds. */
   viewGraceMs?: number;
+  /**
+   * How long the engine stays paused after the user stops talking, in milliseconds.
+   * Presage's breathing and heart rate variability are worked out over the last
+   * several seconds, so for a while they still carry the talking.
+   */
+  afterTalkMs?: number;
 }
 
 /** Views that pause the engine. `ok` and `chest-not-visible` (breathing alone stops) do not. */
@@ -113,14 +125,18 @@ export class FatigueEngine {
   private readonly smoother: OneEuroFilter;
   private readonly minCoverage: number;
   private quality: Quality | null = null;
-  private talking = false;
   /** When the current view began. */
   private qualitySince = 0;
   private readonly viewGraceMs: number;
+  private readonly afterTalkMs: number;
+  private talking = false;
+  /** When the user last stopped talking. */
+  private talkEndedAt = Number.NEGATIVE_INFINITY;
   private score: number | null = null;
 
-  constructor({ clues = {}, level, minCoverage = 0.3, smoothingHz = 0.016, viewGraceMs = 3_000 }: FatigueEngineOptions = {}) {
+  constructor({ clues = {}, level, minCoverage = 0.3, smoothingHz = 0.016, viewGraceMs = 3_000, afterTalkMs = 30_000 }: FatigueEngineOptions = {}) {
     this.viewGraceMs = viewGraceMs;
+    this.afterTalkMs = afterTalkMs;
     this.settings = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, { ...CLUE_SETTINGS[c], ...clues[c] }])) as Record<FatigueClue, ClueSettings>;
     this.baselines = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, new Baseline(this.settings[c])])) as Record<FatigueClue, Baseline>;
     this.levels = new FatigueLevelTracker(level);
@@ -129,9 +145,9 @@ export class FatigueEngine {
   }
 
   addVitals(sample: VitalsSample): void {
-    if (this.quality === null || PAUSING_VIEWS[this.quality]) return;
+    if (this.quality === null || PAUSING_VIEWS[this.quality] || this.talkPaused(sample.t)) return;
     this.hrv.add(sample.t, sample.hrv);
-    if (this.quality === 'ok' && !this.talking) this.breathing.add(sample.t, sample.breathing);
+    if (this.quality === 'ok') this.breathing.add(sample.t, sample.breathing);
   }
 
   addBlink(blink: BlinkEvent): void {
@@ -150,9 +166,12 @@ export class FatigueEngine {
     this.blinks.setQuality(status);
   }
 
-  /** Whether a voice conversation is open from time `t`. Talking changes blinking and breathing. */
+  /**
+   * Whether the user is talking at `t`, for example while a voice conversation
+   * is open. Safe to call before every update with the current value.
+   */
   setTalking(t: number, talking: boolean): void {
-    if (talking === this.talking) return;
+    if (this.talking && !talking) this.talkEndedAt = t;
     this.talking = talking;
     this.blinks.setTalking(t, talking);
   }
@@ -170,6 +189,7 @@ export class FatigueEngine {
   update(t: number): FatigueState {
     const bad = this.quality === null ? null : (PAUSING_VIEWS[this.quality] ?? null);
     const viewPause = bad && t - this.qualitySince >= this.viewGraceMs ? bad : null; // a short glitch does not pause
+    const pause = viewPause ?? (this.talkPaused(t) ? 'talking' : null);
     const current: Record<FatigueClue, number | null> = {
       blink: this.blinks.rate(t),
       hrv: this.hrv.value(t),
@@ -179,7 +199,7 @@ export class FatigueEngine {
     };
     const clues = {} as Record<FatigueClue, ClueState>;
     for (const clue of FATIGUE_CLUES) {
-      const value = viewPause ? null : current[clue];
+      const value = pause ? null : current[clue];
       const baseline = this.baselines[clue];
       if (value !== null) baseline.add(value);
       clues[clue] = { value, baseline: baseline.value, personal: baseline.personal, strain: strain(value, baseline.value, this.settings[clue]) };
@@ -187,10 +207,10 @@ export class FatigueEngine {
 
     const strains = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, clues[c].strain]));
     const weights = Object.fromEntries(FATIGUE_CLUES.map((c) => [c, this.settings[c].weight])) as Record<FatigueClue, number>;
-    const { score } = viewPause ? { score: null } : combineScore(strains, weights, { minCoverage: this.minCoverage });
+    const { score } = pause ? { score: null } : combineScore(strains, weights, { minCoverage: this.minCoverage });
     if (score !== null) this.score = this.smoother.filter(score, t);
     const level = this.levels.update(t, score === null ? null : this.score);
-    return { t, score: this.score, level, paused: viewPause ?? (score === null ? 'warming-up' : null), talking: this.talking, clues };
+    return { t, score: this.score, level, paused: pause ?? (score === null ? 'warming-up' : null), clues };
   }
 
   /** Forgets everything, including the baselines, for a new session. */
@@ -205,6 +225,12 @@ export class FatigueEngine {
     this.quality = null;
     this.qualitySince = 0;
     this.talking = false;
+    this.talkEndedAt = Number.NEGATIVE_INFINITY;
     this.score = null;
+  }
+
+  /** True while the user talks, and for `afterTalkMs` after. */
+  private talkPaused(t: number): boolean {
+    return this.talking || t - this.talkEndedAt < this.afterTalkMs;
   }
 }

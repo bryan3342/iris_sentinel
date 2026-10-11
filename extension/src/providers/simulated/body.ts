@@ -33,7 +33,8 @@ export interface WarmUp {
 }
 
 export const RESTING: BodyValues = { blinksPerMin: 15, pulse: 68, breathing: 14, hrv: 45 };
-export const TIRED: BodyValues = { blinksPerMin: 27, pulse: 76, breathing: 19.5, hrv: 25 };
+// Blinks rise well past the +50% that blink rate swings by with activity alone, so the demo reads as clearly tired.
+export const TIRED: BodyValues = { blinksPerMin: 36, pulse: 76, breathing: 19.5, hrv: 25 };
 /** What Presage measured on the demo Mac (#24). */
 export const PRESAGE_WARM_UP: WarmUp = { pulse: 12_000, breathing: 31_000, hrv: 67_000 };
 /** Short warm-ups, so a live demo gets going within seconds. */

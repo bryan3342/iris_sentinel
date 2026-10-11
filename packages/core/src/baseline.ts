@@ -27,6 +27,12 @@ export interface BaselineOptions {
    * percentile when up is tired, and the 75th when down is tired.
    */
   restedQuantile?: number;
+  /**
+   * Lowest value the personal baseline may take, for a clue whose low readings
+   * are often an artifact rather than the user's normal (blinking all but stops
+   * while someone stares at a screen).
+   */
+  floor?: number;
 }
 
 export class Baseline {
@@ -34,14 +40,16 @@ export class Baseline {
   private readonly tiredDirection: TiredDirection;
   private readonly samples: number;
   private readonly restedQuantile: number;
+  private readonly floor: number;
   private collected: number[] = [];
   private personalValue: number | null = null;
 
-  constructor({ fallback, tiredDirection, samples = 60, restedQuantile = 0.25 }: BaselineOptions) {
+  constructor({ fallback, tiredDirection, samples = 60, restedQuantile = 0.25, floor = -Infinity }: BaselineOptions) {
     this.fallback = fallback;
     this.tiredDirection = tiredDirection;
     this.samples = samples;
     this.restedQuantile = restedQuantile;
+    this.floor = floor;
   }
 
   /** The personal baseline once set, otherwise the fallback. */
@@ -60,7 +68,7 @@ export class Baseline {
     this.collected.push(value);
     if (this.collected.length < this.samples) return;
     const q = this.tiredDirection === 'up' ? this.restedQuantile : 1 - this.restedQuantile;
-    this.personalValue = quantile(this.collected, q);
+    this.personalValue = Math.max(quantile(this.collected, q)!, this.floor);
     this.collected = [];
   }
 

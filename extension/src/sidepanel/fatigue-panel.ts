@@ -18,7 +18,7 @@ import { fatigueView } from './fatigue-view';
 export type BodySource = FaceProvider & VitalsProvider;
 
 export interface FatiguePanelOptions {
-  /** Whether a voice conversation is open; blink and breathing readings are set aside while it is. */
+  /** Whether a voice conversation is open; fatigue pauses while it is, and for a while after. */
   talking?: () => boolean;
   /** The side panel clock, in milliseconds. */
   now?: () => number;

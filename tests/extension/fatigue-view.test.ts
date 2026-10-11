@@ -11,7 +11,6 @@ function state(overrides: Partial<FatigueState> = {}, clues: Partial<Record<Fati
     score: 3.4,
     level: 'fresh',
     paused: null,
-    talking: false,
     clues: {
       blink: clue(15, 15, 0),
       hrv: clue(45, 45, 0),
@@ -67,11 +66,6 @@ describe('fatigueView while measuring', () => {
     expect(fatigueView(state({ t: 10_000, score: null, paused: 'warming-up' }), { session: warming }).progress).toBe('Measuring for 10 s');
     expect(fatigueView(null, { session: emptySession(0) }).progress).toBe('Measuring for 0 s');
     expect(fatigueView(state(), { running: false, session }).progress).toBeNull();
-  });
-
-  it('says when a conversation has blink rate and breathing on hold', () => {
-    expect(fatigueView(state({ talking: true })).why).toContain('Talking: blink rate and breathing on hold');
-    expect(fatigueView(state()).why).not.toContain('Talking: blink rate and breathing on hold');
   });
 
   it('keeps the held score while the face is out of view', () => {

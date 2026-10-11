@@ -39,13 +39,13 @@ describe('TIRING_DEMO', () => {
 });
 
 describe('SimulatedBodyProvider', () => {
-  it('blinks about 15 times a minute when rested and about 27 when tired', async () => {
+  it('blinks about 15 times a minute when rested and about 36 when tired', async () => {
     const rested = await run(300_000);
     expect(rested.blinks.length).toBeGreaterThan(65); // about 75 in 5 minutes
     expect(rested.blinks.length).toBeLessThan(85);
     const tired = await run(300_000, { tiredness: () => 1 });
-    expect(tired.blinks.length).toBeGreaterThan(120); // about 133 in 5 minutes
-    expect(tired.blinks.length).toBeLessThan(145);
+    expect(tired.blinks.length).toBeGreaterThan(160); // about 178 in 5 minutes
+    expect(tired.blinks.length).toBeLessThan(195);
   });
 
   it('sends vitals once a second, each stable only after its Presage warm-up', async () => {
@@ -69,7 +69,7 @@ describe('SimulatedBodyProvider', () => {
     const hrv = (from: number, to: number) => mean(vitals.filter(between(from, to)).map((v) => v.hrv!.value));
     expect(hrv(0, 60_000)).toBeCloseTo(45, 0);
     expect(hrv(140_000, 200_000)).toBeCloseTo(25, 0);
-    expect(blinks.filter(between(140_000, 200_000)).length).toBeGreaterThan(22); // about 27 a minute
+    expect(blinks.filter(between(140_000, 200_000)).length).toBeGreaterThan(30); // about 36 a minute
   });
 
   it('repeats exactly with the same seed', async () => {

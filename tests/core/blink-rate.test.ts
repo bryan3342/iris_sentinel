@@ -75,22 +75,36 @@ describe('BlinkRateMeter', () => {
     expect(meter.rate(120_000)).toBeCloseTo(15.25, 2); // 15 blinks in 59 s of view
   });
 
+  it('leaves out the time the user talks, as it does a lost face', () => {
+    const meter = new BlinkRateMeter();
+    meter.setQuality(ok(0));
+    blinkEvery(meter, 4_000, 0, 50_000); // 12 blinks
+    meter.setTalking(50_000, true);
+    blinkEvery(meter, 2_000, 50_000, 60_000); // blinking more while talking: ignored
+    meter.setTalking(60_000, false);
+    blinkEvery(meter, 4_000, 60_000, 90_000);
+    expect(meter.rate(90_000)).toBeCloseTo(14.4); // 12 blinks in the 50 s counted between 30 s and 90 s
+  });
+
+  it('counts again only once the user has stopped talking and the face is back in view', () => {
+    const meter = new BlinkRateMeter();
+    meter.setQuality(ok(0));
+    meter.setTalking(10_000, true);
+    blinkEvery(meter, 4_000, 10_000, 20_000);
+    meter.setQuality(lost(20_000));
+    blinkEvery(meter, 4_000, 20_000, 30_000);
+    meter.setTalking(30_000, false); // the face is still out of view
+    blinkEvery(meter, 4_000, 30_000, 40_000);
+    meter.setQuality(ok(40_000));
+    blinkEvery(meter, 4_000, 40_000, 70_000); // 7 blinks
+    expect(meter.rate(70_000)).toBe(14); // only the 30 s since 40 s counted
+  });
+
   it('still counts blinks while only the chest is out of view', () => {
     const meter = new BlinkRateMeter();
     meter.setQuality({ t: 0, quality: 'chest-not-visible', hint: '' });
     blinkEvery(meter, 4_000, 0, 120_000);
     expect(meter.rate(120_000)).toBe(15);
-  });
-
-  it('does not count blinks, or their time, while the user is talking', () => {
-    const meter = new BlinkRateMeter();
-    meter.setQuality(ok(0));
-    blinkEvery(meter, 4_000, 0, 60_000);
-    meter.setTalking(60_000, true);
-    blinkEvery(meter, 2_000, 60_000, 90_000); // talking: twice as many blinks, none counted
-    meter.setTalking(90_000, false);
-    blinkEvery(meter, 4_000, 88_000, 120_000); // 92 s to 120 s: 8 blinks
-    expect(meter.rate(120_000)).toBe(16); // 8 blinks in the 30 s that counted, not the talking rate of 30
   });
 
   it('falls as blinks stop', () => {
