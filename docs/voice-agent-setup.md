@@ -24,6 +24,9 @@ ElevenLabs dashboard. It takes about 15 minutes.
 2. From `server/`, give the agent Iris's tools and system prompt:
    `npm run setup:elevenlabs`. It creates or updates six client tools, attaches
    them to the agent with **Wait for response** on, and sets the system prompt.
+   It also empties the agent's first message, so the agent waits for you, and
+   allows Iris to set the first message, which it does only to greet you when
+   the panel opens.
    It leaves the voice, language model and other settings alone, and is safe to
    run again. The tools and prompt live in `server/scripts/voice-agent.json`; a
    test keeps their names in step with the extension.
@@ -44,6 +47,7 @@ On a long public page, such as a Wikipedia article:
 
 | Say | Expected |
 | :--- | :--- |
+| (Open the side panel) | The first time ever, Iris speaks a short intro, also shown as text; after that, "Iris is ready." |
 | "Scroll down" | The page moves down a screen; Iris says "Scrolled down." |
 | "Go to the bottom" / "go to the top" | The page jumps to that end |
 | "Go back" | The previous page opens |

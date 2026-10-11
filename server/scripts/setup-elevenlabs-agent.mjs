@@ -1,6 +1,7 @@
 // Local setup only. Makes the ElevenLabs agent match voice-agent.json: creates or updates Iris's
 // client tools (waiting for Iris's answer), attaches exactly those to the agent and sets its system
-// prompt. Safe to run again; the agent's voice, language model and other settings are left as they are.
+// prompt. The agent's own first message is empty, so it waits for the user when Iris connects on
+// speech, and Iris may set a first message only to greet (the panel's intro or "Iris is ready"). Safe to run again; the agent's voice, language model and other settings are left as they are.
 import { convai, elevenLabsEnv, missingTools, voiceAgent } from "./elevenlabs.mjs";
 
 const { key, agent } = elevenLabsEnv();
@@ -22,9 +23,14 @@ try {
     if (id) await convai(key, "PATCH", `/tools/${id}`, body);
     ids.push(id ?? (await convai(key, "POST", "/tools", body)).id);
   }
-  const { conversation_config: config } = await convai(key, "GET", `/agents/${agent}`);
+  const { conversation_config: config, platform_settings: platform = {} } = await convai(key, "GET", `/agents/${agent}`);
   const { tools: _inline, ...prompt } = config.agent.prompt; // tools are attached by ID only
-  await convai(key, "PATCH", `/agents/${agent}`, { conversation_config: { agent: { prompt: { ...prompt, prompt: voiceAgent.prompt, tool_ids: ids } } } });
+  const overrides = platform.overrides ?? {};
+  const allowed = overrides.conversation_config_override ?? {};
+  await convai(key, "PATCH", `/agents/${agent}`, {
+    conversation_config: { agent: { first_message: voiceAgent.first_message, prompt: { ...prompt, prompt: voiceAgent.prompt, tool_ids: ids } } },
+    platform_settings: { overrides: { ...overrides, conversation_config_override: { ...allowed, agent: { ...allowed.agent, first_message: true } } } },
+  });
   const missing = await missingTools(key, agent);
   if (missing.length) {
     console.error(`The agent still lacks: ${missing.join(", ")}. Check it in the ElevenLabs dashboard.`);

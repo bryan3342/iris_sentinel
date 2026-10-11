@@ -9,6 +9,11 @@ import { micLevels } from './mic-level';
 import { browserTools } from './tools';
 
 const LISTENING_KEY = 'iris.listening';
+const GREETED_KEY = 'iris.greeted';
+/** Spoken the first time the panel ever opens (and shown, in case Chrome holds back the sound). */
+export const INTRO = "Hi, I'm Iris. I help you browse the web hands-free. Look at a link or button to aim at it, and blink twice to open it. Tilt your head to scroll. Or just talk to me: say scroll down, go back, summarize this, or click number 12. Whenever you need me, just speak.";
+/** Spoken on every later opening. */
+export const READY = 'Iris is ready.';
 const PROBLEMS: Record<string, string> = {
   MICROPHONE: 'Allow your microphone under Voice setup, and Iris starts listening.',
   AUDIO_BLOCKED: 'Click anywhere in this panel once to turn on listening.',
@@ -44,12 +49,24 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
       if (!await chrome.permissions.contains({ origins: [`${GATEWAY}/*`] })) throw new Error('GATEWAY_ACCESS');
       return (await broker({ type: 'iris.voice.session' }) as { signedUrl: string }).signedUrl;
     },
-    onStatus: (s) => { status.textContent = describe(s); },
+    onStatus: (s) => {
+      status.textContent = describe(s);
+      if (s.kind === 'talking' && introPending) {
+        introPending = false;
+        void chrome.storage.local.set({ [GREETED_KEY]: true }).catch(() => {});
+      }
+    },
   });
+  let introPending = false;
   // Listening is on unless the person turned it off, and stays off across panel openings if they did.
-  void chrome.storage.local.get(LISTENING_KEY).then((stored) => stored[LISTENING_KEY] !== false, () => true).then((on) => {
-    listening.checked = on;
-    handsFree.setOn(on);
+  // Iris greets on opening, unless listening is off: the full intro once, until it has been heard.
+  void chrome.storage.local.get([LISTENING_KEY, GREETED_KEY]).catch(() => ({} as Record<string, unknown>)).then((stored) => {
+    listening.checked = stored[LISTENING_KEY] !== false;
+    handsFree.setOn(listening.checked);
+    if (!listening.checked) return;
+    introPending = stored[GREETED_KEY] !== true;
+    if (introPending) action.textContent = INTRO;
+    handsFree.greet(introPending ? INTRO : READY);
   });
   listening.addEventListener('change', () => {
     void chrome.storage.local.set({ [LISTENING_KEY]: listening.checked }).catch(() => {});

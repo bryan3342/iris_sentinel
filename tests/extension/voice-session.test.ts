@@ -89,6 +89,6 @@ describe('voice session lifecycle', () => {
     const tools = { scroll_page: vi.fn(async () => 'Scrolled down.') };
     const start = vi.fn(async () => ({ endSession: vi.fn(async () => {}) }));
     await new VoiceController({ start }, vi.fn(), tools).start(async () => 'signed');
-    expect(start).toHaveBeenCalledWith('signed', expect.any(Function), tools);
+    expect(start).toHaveBeenCalledWith('signed', expect.any(Function), tools, undefined);
   });
 });
