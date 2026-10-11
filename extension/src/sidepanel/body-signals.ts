@@ -2,9 +2,10 @@ import type { CompanionState, Quality, QualityStatus, Reading, VitalsSample } fr
 import type { LinkState } from '../providers/companion/link';
 
 // What the side panel shows about body signals, as pure functions over a small
-// state: the connection, what the companion reports, Presage's camera hint, a
-// warm-up countdown per signal, and readings once Presage trusts them. No DOM
-// here, so it is tested directly; companion-status.ts renders it.
+// state: the connection, what the companion reports, the Start or Stop button,
+// Presage's camera hint, a warm-up countdown per signal, and readings once
+// Presage trusts them. No DOM here, so it is tested directly;
+// companion-status.ts renders it.
 
 export type Signal = 'pulse' | 'breathing' | 'hrv';
 const SIGNALS: Signal[] = ['pulse', 'breathing', 'hrv'];
@@ -62,9 +63,9 @@ const LINK_TEXT: Record<LinkState, string> = {
   unavailable: 'Body signals: only available in the installed extension.',
   connecting: 'Body signals: connecting to the companion...',
   connected: 'Body signals: companion connected.',
-  'not-installed': 'Body signals: companion not installed. Run npm run install:host in companion/, then reopen this panel.',
-  outdated: 'Body signals: companion is out of date. Run npm run install:host in companion/ again.',
-  disconnected: 'Body signals: companion stopped. Close and reopen this panel to try again.',
+  'not-installed': 'Body signals: companion not installed. Run npm run install:host in companion/, then start again.',
+  outdated: 'Body signals: companion is out of date. Run npm run install:host in companion/, then start again.',
+  disconnected: 'Body signals: companion stopped. Start again to retry.',
 };
 
 const COMPANION_TEXT: Record<CompanionState, string> = {
@@ -72,11 +73,11 @@ const COMPANION_TEXT: Record<CompanionState, string> = {
   running: 'Body signals: measuring.',
   stopped: 'Body signals: paused.',
   'key-missing': 'Body signals: the Presage key is not stored. See "Run the companion" in docs/local-development.md.',
-  'key-invalid': 'Body signals: Presage did not accept the key. Store it again, then reopen this panel.',
+  'key-invalid': 'Body signals: Presage did not accept the key. Store it again, then start again.',
   offline: 'Body signals: cannot reach Presage to check the key. Check the internet connection.',
   'credits-exhausted': 'Body signals: no Presage credit left. Check the Presage developer portal.',
   'camera-unavailable': 'Body signals: the camera is not available. Quit other camera apps, or allow Iris Companion in System Settings, Camera.',
-  error: 'Body signals: Presage stopped with an error. Close and reopen this panel to try again.',
+  error: 'Body signals: Presage stopped with an error. Start again to retry.',
 };
 
 /** Advice when Presage reports a problem without its own hint. */
@@ -95,8 +96,13 @@ const QUALITY_TEXT: Record<Quality, string> = {
 
 const LABEL: Record<Signal, string> = { pulse: 'Heart rate', breathing: 'Breathing', hrv: 'Heart rate variability' };
 
+/** What the section's button does. Body signals never start on their own, since every Presage session uses credits. */
+export type BodyAction = 'start' | 'stop';
+
 export interface BodySignalsView {
   status: string;
+  /** The button, or null where there is no companion (the localhost playground). */
+  action: BodyAction | null;
   /** Presage's advice while the camera view is not good enough, or null. */
   camera: string | null;
   /** One line per signal while measuring. */
@@ -107,13 +113,26 @@ export interface BodySignalsView {
 
 export function bodySignalsView(state: BodySignals, now: number): BodySignalsView {
   const status = state.link === 'connected' && state.companion ? COMPANION_TEXT[state.companion] : LINK_TEXT[state.link];
+  const action = actionFor(state);
   const sensing = state.companion === 'starting' || state.companion === 'running';
   const problem = sensing && state.quality && state.quality.quality !== 'ok' ? state.quality : null;
   const camera = problem ? `Camera: ${problem.hint || QUALITY_TEXT[problem.quality]}` : null;
-  if (state.companion !== 'running' || state.runningSince === null) return { status, camera, signals: [], note: null };
+  if (state.companion !== 'running' || state.runningSince === null) return { status, action, camera, signals: [], note: null };
   const elapsed = now - state.runningSince;
   const signals = SIGNALS.map((signal) => `${LABEL[signal]}: ${signalText(signal, state.latest[signal], elapsed, now)}`);
-  return { status, camera, signals, note: 'Estimates from the camera, not medical readings.' };
+  return { status, action, camera, signals, note: 'Estimates from the camera, not medical readings.' };
+}
+
+/**
+ * Stop while connecting or measuring. Start otherwise, including after the
+ * companion reports a problem: the connection may still be open then, but
+ * nothing is measuring, so starting again is the way to retry.
+ */
+function actionFor(state: BodySignals): BodyAction | null {
+  if (state.link === 'unavailable') return null;
+  if (state.link === 'connecting') return 'stop';
+  const sensing = state.companion === null || state.companion === 'starting' || state.companion === 'running';
+  return state.link === 'connected' && sensing ? 'stop' : 'start';
 }
 
 function signalText(signal: Signal, latest: { t: number; reading: Reading } | undefined, elapsed: number, now: number): string {
