@@ -1,4 +1,4 @@
-export { measureAccuracy } from './accuracy';
+export { measureAccuracy, visualAngle } from './accuracy';
 export type { AccuracyReport } from './accuracy';
 export { applyCalibration, fitCalibration } from './calibration';
 export type { CalibrationModel, CalibrationSample, Viewport } from './calibration';
@@ -35,4 +35,6 @@ export { explain, fatigueResponse } from './fatigue-response';
 export type { FatigueResponse } from './fatigue-response';
 export { decideSelection } from './selection';
 export { SettledAim } from './settled-aim';
+export { TiltScroller } from './tilt-scroll';
+export type { TiltScrollOptions } from './tilt-scroll';
 export type { GateTarget, Selection } from './selection';

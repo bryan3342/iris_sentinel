@@ -4,13 +4,19 @@ import type { GazeProvider, GazeSample, Point2 } from '@iris/protocol';
 const grid = (positions: number[]) => positions.flatMap((y) => positions.map((x) => ({ x, y })));
 
 // Calibration dots near the screen edges (5% inset) so the fit covers the whole
-// screen: center plus corners, or a full 3x3 grid.
-export const DOT_LAYOUTS: Record<5 | 9, Point2[]> = {
+// screen: center plus corners, a 3x3 grid, or a 4x4 grid. Webcam gaze is least
+// accurate at the corners and between the dots, so the 4x4 grid (the default)
+// puts a dot in every corner, two more along each edge and four in the middle.
+export const DOT_LAYOUTS: Record<5 | 9 | 16, Point2[]> = {
   5: [{ x: 0.5, y: 0.5 }, { x: 0.05, y: 0.05 }, { x: 0.95, y: 0.05 }, { x: 0.95, y: 0.95 }, { x: 0.05, y: 0.95 }],
   9: grid([0.05, 0.5, 0.95]),
+  16: grid([0.05, 0.35, 0.65, 0.95]),
 };
-/** Accuracy check dots: inside the calibration grid, so the check is not graded on the points the fit was made from. */
-export const CHECK_DOTS: Point2[] = grid([0.2, 0.5, 0.8]);
+/**
+ * Accuracy check dots: a 4x4 grid reaching toward the corners and through the middle, each 7% of the
+ * screen away from the nearest calibration dot, so the check is not graded on the points the fit was made from.
+ */
+export const CHECK_DOTS: Point2[] = grid([0.12, 0.42, 0.58, 0.88]);
 const SETTLE_MS = 800; // skip the eyes' travel and settling onto the dot
 const COLLECT_MS = 1000;
 
@@ -80,6 +86,6 @@ export async function collectAtDots(provider: GazeProvider, presenter: DotPresen
 }
 
 /** Collects the calibration dots. */
-export function runCalibration(provider: GazeProvider, presenter: DotPresenter, dotCount: 5 | 9): Promise<CalibrationSample[]> {
+export function runCalibration(provider: GazeProvider, presenter: DotPresenter, dotCount: 5 | 9 | 16): Promise<CalibrationSample[]> {
   return collectAtDots(provider, presenter, DOT_LAYOUTS[dotCount]);
 }

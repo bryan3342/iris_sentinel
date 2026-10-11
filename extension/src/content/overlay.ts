@@ -167,7 +167,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
     if (armed) {
       const note = document.createElement('div');
       note.className = 'armed-note';
-      note.textContent = 'Picked by voice: blink twice or rest on it to open';
+      note.textContent = 'Picked by voice: blink twice to open';
       Object.assign(note.style, { left: left(target.rect.x), top: top(target.rect.y + target.rect.height + 4) });
       aim.push(note);
     }

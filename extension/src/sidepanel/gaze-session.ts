@@ -32,6 +32,12 @@ export interface GazeSessionOptions {
   learn?: boolean;
   /** Told when a selection was learned, so the calibration can be saved. */
   onLearned?: () => void;
+  /**
+   * Whether resting on a safe target for a second selects it. Off for the eyes, which rest naturally
+   * while reading, so only a double blink clicks; on for pointing with the mouse, where resting is
+   * deliberate and the mouse has no other way to confirm.
+   */
+  dwell?: boolean;
   /** Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face lost. */
   onGaze?: (at: Point2 | null, list: TargetList) => void;
 }
@@ -87,8 +93,9 @@ export class GazeSession {
         const aimed = this.aim.update(sample);
         if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
         this.marks.setAim(aimed);
-        // A dwell or a deliberate double blink confirms the aimed target; decideSelection says what it opens.
-        const event = this.dwell.update(sample, aimed) ?? this.doubleBlink.update(sample, aimed);
+        // A double blink (or, for the mouse, a dwell) confirms the aimed target; decideSelection says what it opens.
+        const dwelt = this.options.dwell ? this.dwell.update(sample, aimed) : null;
+        const event = dwelt ?? this.doubleBlink.update(sample, aimed);
         if (event) this.confirms.emit(event);
       }),
       this.confirms.onConfirm((event) => this.handle(event)),
@@ -116,7 +123,7 @@ export class GazeSession {
 
   /**
    * The voice agent picked target `id` of the current scan: it is marked on the page, and the user's next
-   * double blink opens it wherever they are looking (a dwell on it works too). It stays picked for ten
+   * double blink opens it wherever they are looking (a mouse dwell on it works too). It stays picked for ten
    * seconds, until a page change moves it, or until something is selected. Nothing clicks from this alone.
    * Returns false when the current scan has no such target.
    */

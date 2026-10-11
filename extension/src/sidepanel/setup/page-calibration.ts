@@ -11,16 +11,19 @@ import { CHECK_DOTS, collectAtDots, DOT_LAYOUTS, type DotPresenter } from './cal
 // dots. The browser's toolbar height is the same in both directions and
 // cancels out. A side panel on the left that gets resized, or page zoom other
 // than 100%, shifts the page in ways the window position does not show;
-// confirms absorb small errors and calibrating again fixes large ones.
+// confirms absorb small errors and calibrating again fixes large ones. Page
+// zoom is read from Chrome and divided out, so a calibration made at one zoom
+// level aims correctly on pages at another.
 
-/** The screen, with the page viewport's corner at the window's position on it. */
+/** The screen, in the page's own CSS pixels (divided by its zoom), with the page viewport's corner at the window's position on it. */
 export function screenFrame(list: TargetList): CalibrationFrame {
   const display = screen as Screen & { availLeft?: number; availTop?: number };
+  const zoom = list.zoom > 0 ? list.zoom : 1;
   return {
-    width: screen.width,
-    height: screen.height,
-    left: list.window.left - (display.availLeft ?? 0),
-    top: list.window.top - (display.availTop ?? 0),
+    width: screen.width / zoom,
+    height: screen.height / zoom,
+    left: (list.window.left - (display.availLeft ?? 0)) / zoom,
+    top: (list.window.top - (display.availTop ?? 0)) / zoom,
   };
 }
 
@@ -33,7 +36,7 @@ function pagePresenter(tabId: number): DotPresenter {
 }
 
 /** Runs the calibration dots over the page in `list`'s tab; returns samples whose targets are screen positions. */
-export function calibrateOnPage(provider: GazeProvider, list: TargetList, dotCount: 5 | 9 = 9): Promise<CalibrationSample[]> {
+export function calibrateOnPage(provider: GazeProvider, list: TargetList, dotCount: 5 | 9 | 16 = 16): Promise<CalibrationSample[]> {
   return dotsOnPage(provider, list, DOT_LAYOUTS[dotCount]);
 }
 

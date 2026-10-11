@@ -145,7 +145,7 @@ describe('GazeSession', () => {
 
 describe('selecting with gaze', () => {
   const RISKY_2 = TARGETS.map((t) => (t.id === 2 ? { ...t, risky: true } : t));
-  function selecting(look: () => Point2 | null, learn = false) {
+  function selecting(look: () => Point2 | null, learn = false, dwell = true) {
     const store = new CalibrationStore();
     store.setDots(simulatedCalibration(), VIEWPORT);
     const provider = new SimulatedGazeProvider(look, { noise: 0.02, seed: 6 });
@@ -156,9 +156,21 @@ describe('selecting with gaze', () => {
       select: async (_list, target, confirmedTwice) => { selected.push([target.id, confirmedTwice]); return 'SELECTED'; },
       onOutcome: (outcome) => outcomes.push(outcome),
       learn, onLearned: () => { learned++; },
+      dwell, // on, as for pointing with the mouse; the eyes leave it off
     });
     return { provider, gaze, selected, outcomes, store, learned: () => learned };
   }
+
+  it('never selects anything when the eyes just rest on a target, however long', async () => {
+    const { provider, gaze, selected, outcomes } = selecting(() => centerOf(1), false, false);
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(selected).toEqual([]);
+    expect(outcomes).toEqual([]);
+    gaze.stop();
+    provider.stop();
+  });
 
   it('selects a safe target the user dwells on, once', async () => {
     const { provider, gaze, selected } = selecting(() => centerOf(1));

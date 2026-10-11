@@ -1,4 +1,4 @@
-import type { HeadPose, Point2 } from '@iris/protocol';
+import type { EyeReading, HeadPose, Point2 } from '@iris/protocol';
 
 /**
  * Maps eye-in-head position to a point on the screen, fitted from calibration
@@ -9,7 +9,7 @@ import type { HeadPose, Point2 } from '@iris/protocol';
  */
 
 export interface CalibrationSample {
-  eye: Point2;
+  eye: EyeReading;
   head: HeadPose;
   /** Where the dot was, as a fraction of the viewport (0..1). */
   target: Point2;
@@ -24,6 +24,11 @@ export interface CalibrationModel {
   quadratic: boolean;
   /** Median head state while calibrating; movement away from it shifts the fitted point. */
   head: HeadPose;
+  /**
+   * Median eyelid opening while calibrating, when every sample carried one; the opening is then a fit
+   * input, which mostly helps tell up from down. Null for calibrations made without it.
+   */
+  lid: number | null;
 }
 
 export interface Viewport {
@@ -39,12 +44,13 @@ const OUTLIER_KEEP = 0.8; // keep the 80% of samples per dot closest to its medi
 
 // The outer eye corners are the ruler that turns image units into centimeters.
 const EYE_SPAN_CM = 9; // adult outer eye-corner distance
-const CALIBRATION_DISTANCE_CM = 60; // assumed seat distance while calibrating, scaled by eye span since
-const CSS_PX_PER_CM = 96 / 2.54; // a CSS pixel is defined as 1/96 inch
+export const CALIBRATION_DISTANCE_CM = 60; // assumed seat distance while calibrating, scaled by eye span since
+export const CSS_PX_PER_CM = 96 / 2.54; // a CSS pixel is defined as 1/96 inch
 const MAX_SHIFT = 0.5; // viewport fraction, so a landmark glitch cannot throw the point off-screen
 
-function features(eye: Point2, quadratic: boolean): number[] {
-  const linear = [1, eye.x, eye.y];
+/** Fit inputs for one eye reading. A reading without a lid opening counts as the calibration's own median. */
+function features(eye: EyeReading, quadratic: boolean, lid: number | null): number[] {
+  const linear = [1, eye.x, eye.y, ...(lid === null ? [] : [eye.lid ?? lid])];
   return quadratic ? [...linear, eye.x * eye.x, eye.y * eye.y, eye.x * eye.y] : linear;
 }
 
@@ -137,7 +143,10 @@ export function fitCalibration(samples: CalibrationSample[], viewport: Viewport)
   const { kept, targets } = rejectOutliers(samples);
   const quadratic = targets >= QUADRATIC_MIN_TARGETS && kept.length >= QUADRATIC_MIN_SAMPLES;
   const head = medianHead(kept);
-  const rows = kept.map((s) => features(s.eye, quadratic));
+  // The lid opening joins the fit only when every sample has one; older saved calibrations have none.
+  const lids = kept.map((s) => s.eye.lid);
+  const lid = lids.every((v): v is number => typeof v === 'number') ? median(lids as number[]) : null;
+  const rows = kept.map((s) => features(s.eye, quadratic, lid));
   const weights = kept.map((s) => s.weight ?? 1);
   const seen = kept.map((s) => {
     const shift = headShift(head, s.head, viewport);
@@ -146,6 +155,7 @@ export function fitCalibration(samples: CalibrationSample[], viewport: Viewport)
   return {
     quadratic,
     head,
+    lid,
     x: ridgeFit(rows, seen.map((t) => t.x), weights),
     y: ridgeFit(rows, seen.map((t) => t.y), weights),
   };
@@ -172,8 +182,8 @@ function headShift(base: HeadPose, head: HeadPose, viewport: Viewport): Point2 {
 }
 
 /** Screen point (fraction of the viewport, clamped to 0..1) for one gaze sample. */
-export function applyCalibration(model: CalibrationModel, eye: Point2, head: HeadPose, viewport: Viewport): Point2 {
-  const f = features(eye, model.quadratic);
+export function applyCalibration(model: CalibrationModel, eye: EyeReading, head: HeadPose, viewport: Viewport): Point2 {
+  const f = features(eye, model.quadratic, model.lid);
   const dot = (w: number[]) => w.reduce((sum, wi, i) => sum + wi * f[i]!, 0);
   const shift = headShift(model.head, head, viewport);
   const clamp = (v: number) => Math.max(0, Math.min(1, v));

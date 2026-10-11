@@ -200,17 +200,57 @@ describe('ClosureTimer', () => {
     expect(timer.blinking(leftHeld, 700)).toBe(false); // left is closed, right is tracking
     expect(timer.blinking(shut, 800)).toBe(true); // right blinks: hold
     expect(timer.blinking(shut, 1000)).toBe(true);
-    expect(timer.blinking(leftHeld, 1100)).toBe(false); // right reopened: back to one-eye tracking
+    expect(timer.blinking(leftHeld, 1100)).toBe(true); // right reopened: still settling
+    expect(timer.blinking(leftHeld, 1250)).toBe(false); // settled: back to one-eye tracking
     expect(timer.blinking(shut, 1700)).toBe(true); // right shuts again: a blink until proven longer
     expect(timer.blinking(shut, 2200)).toBe(false); // right held shut too: both closed
   });
 
-  it('starts timing again after the eyes reopen', () => {
+  it('starts timing again after the eyes reopen, once they have settled', () => {
     const timer = new ClosureTimer();
     timer.blinking(shut, 0);
     expect(timer.blinking(shut, 700)).toBe(false);
-    expect(timer.blinking(open, 800)).toBe(false);
-    expect(timer.blinking({ eyeBlinkLeft: 0.9 }, 900)).toBe(true);
+    expect(timer.blinking(open, 800)).toBe(true); // just reopened: the iris points are still settling
+    expect(timer.blinking(open, 950)).toBe(false);
+    expect(timer.blinking({ eyeBlinkLeft: 0.9 }, 1000)).toBe(true);
+  });
+
+  it('holds from the frame a lid starts closing fast, before it counts as closed', () => {
+    const timer = new ClosureTimer();
+    expect(timer.blinking({ eyeBlinkLeft: 0.05, eyeBlinkRight: 0.05 }, 0)).toBe(false);
+    expect(timer.blinking({ eyeBlinkLeft: 0.3, eyeBlinkRight: 0.3 }, 33)).toBe(true); // closing fast, not yet closed
+    expect(timer.blinking({ eyeBlinkLeft: 0.05, eyeBlinkRight: 0.05 }, 66)).toBe(true); // still within the settle time
+    expect(timer.blinking({ eyeBlinkLeft: 0.05, eyeBlinkRight: 0.05 }, 200)).toBe(false);
+  });
+
+  it('never freezes aiming when the lids lower slowly, as when looking down the page', () => {
+    const timer = new ClosureTimer();
+    for (let t = 0, closure = 0.05; closure < 0.45; t += 33, closure += 0.03) {
+      expect(timer.blinking({ eyeBlinkLeft: closure, eyeBlinkRight: closure }, t)).toBe(false);
+    }
+  });
+});
+
+describe('eyelid opening', () => {
+  /** A frame whose upper and lower lids sit `gap` apart at the middle of each eye (eye width 0.1). */
+  const withLids = (gap: number): FaceFrame => {
+    const f = frame();
+    for (const [top, bottom, x] of [[159, 145, 0.35], [386, 374, 0.65]] as const) {
+      f.landmarks[top] = { x, y: 0.4 - gap / 2 };
+      f.landmarks[bottom] = { x, y: 0.4 + gap / 2 };
+    }
+    return f;
+  };
+
+  it('reports the lid gap over the eye width, larger when the eyes open wider', () => {
+    expect(toGazeSample(withLids(0.03), 0).eye?.lid).toBeCloseTo(0.3, 5);
+    expect(toGazeSample(withLids(0.02), 0).eye?.lid).toBeLessThan(toGazeSample(withLids(0.03), 0).eye!.lid!);
+  });
+
+  it('leaves the lid out when the lid points are missing', () => {
+    const f = withLids(0.03);
+    for (const i of [159, 145, 386, 374]) delete (f.landmarks as (Point2 | undefined)[])[i];
+    expect(toGazeSample(f, 0).eye).not.toHaveProperty('lid');
   });
 });
 

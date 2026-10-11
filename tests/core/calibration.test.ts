@@ -158,4 +158,34 @@ describe('fitCalibration with 9 dots', () => {
   it('keeps a straight mapping with only 5 dots', () => {
     expect(fitCalibration(samplesFor(), VIEWPORT).quadratic).toBe(false);
   });
+
+  it('uses the eyelid opening to tell up from down when the eye position alone barely shows it', () => {
+    // A user whose iris barely moves vertically, but whose upper lid follows the gaze.
+    const weakEye = (t: Point2) => ({ x: (t.x - 0.5) * 0.8, y: (t.y - 0.5) * 0.05, lid: 0.35 - t.y * 0.15 });
+    const dots = [0.05, 0.5, 0.95].flatMap((y) => [0.05, 0.5, 0.95].map((x) => ({ x, y })));
+    let seed = 3;
+    const noise = () => ((seed = (seed * 16807) % 2147483647) / 2147483647 - 0.5) * 0.02;
+    const make = (withLid: boolean) => dots.flatMap((target) => Array.from({ length: 10 }, () => {
+      const e = weakEye(target);
+      const eye = { x: e.x + noise(), y: e.y + noise(), ...(withLid ? { lid: e.lid } : {}) };
+      return { eye, head: LEVEL, target };
+    }));
+    const probe = { x: 0.3, y: 0.7 };
+    const errorY = (withLid: boolean) => {
+      const model = fitCalibration(make(withLid), VIEWPORT);
+      const { lid, ...plain } = weakEye(probe);
+      return Math.abs(applyCalibration(model, withLid ? { ...plain, lid } : plain, LEVEL, VIEWPORT).y - probe.y);
+    };
+    expect(errorY(true)).toBeLessThan(0.05);
+    expect(errorY(true)).toBeLessThan(errorY(false) / 3);
+  });
+
+  it('fits without the lid when any sample lacks one, as older saved calibrations do', () => {
+    const model = fitCalibration(samplesFor(), VIEWPORT);
+    expect(model.lid).toBeNull();
+    // A reading that carries a lid is still mapped by the eye position alone.
+    const p = applyCalibration(model, { ...eyeFor({ x: 0.5, y: 0.5 }), lid: 0.9 }, LEVEL, VIEWPORT);
+    expect(p.x).toBeCloseTo(0.5, 2);
+    expect(p.y).toBeCloseTo(0.5, 2);
+  });
 });

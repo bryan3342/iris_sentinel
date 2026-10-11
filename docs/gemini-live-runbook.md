@@ -154,8 +154,8 @@ Gemini can describe whatever gaze is aiming at. This uses one more request.
    the button does not change the target: Iris uses the one you rested on.
 
 Expected: "Target 1:" and a short description of the link. Nothing is clicked.
-Dwelling on the target for one second still opens it, and anything that may
-submit, pay, delete or send opens only with a double blink.
+Blinking twice on the target opens it; looking alone never does. Anything that
+may submit, pay, delete or send opens only with a double blink.
 
 ## Part 7: Check usage and record the result
 

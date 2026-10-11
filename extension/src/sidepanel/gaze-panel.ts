@@ -3,6 +3,7 @@ import type { GazeProvider, Point2 } from '@iris/protocol';
 import { pagePointer } from '../content/pointer';
 import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
 import { GazeCursor } from './gaze-cursor';
+import { HeadScroller } from './head-scroll';
 import { GazeSession, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
 import { loadSamples, saveCheck, saveSamples, type AccuracyRecord } from './setup/calibration-storage';
@@ -29,11 +30,22 @@ function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; 
 
 const round = (v: number) => Math.round(v);
 /** One check in plain words, with up to three earlier ones (other lid angles or seats) to compare against. */
+/** Where a check dot sat, in words: top left, middle, bottom right and so on. */
+function place(at: Point2): string {
+  const row = at.y < 1 / 3 ? 'top' : at.y > 2 / 3 ? 'bottom' : 'middle';
+  const column = at.x < 1 / 3 ? 'left' : at.x > 2 / 3 ? 'right' : 'center';
+  return row === 'middle' && column === 'center' ? 'the middle' : row === 'middle' ? `middle ${column}` : `${row} ${column}`;
+}
 function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): string {
-  const { posture } = report;
-  const now = `Gaze lands ${round(report.meanPx)} px from where you look on average (${round(report.share * 100)}% of the screen width), ` +
-    `worst ${round(report.worstPx)} px; left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
-    `Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
+  const { posture, regions, worst } = report;
+  const px = (v: number | null) => (v === null ? 'n/a' : `${round(v)} px`);
+  const now = `Gaze lands ${round(report.meanPx)} px from where you look on average, about ${report.meanDeg.toFixed(1)}° of visual angle ` +
+    `(webcam eye trackers typically reach 1° to 2°; ${round(report.share * 100)}% of the screen width); ` +
+    `left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
+    `Corners ${px(regions.corners)}, edges ${px(regions.edges)}, between the quadrants ${px(regions.middle)}; ` +
+    `top half ${px(regions.top)}, bottom half ${px(regions.bottom)}.` +
+    (worst ? ` Worst: ${place(worst.target)} (${round(worst.px)} px).` : '') +
+    ` Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
   const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°)`);
   return before.length ? `${now} Earlier checks: ${before.join(', ')}.` : now;
 }
@@ -47,7 +59,7 @@ const OUTCOMES: Record<Outcome, string> = {
 /**
  * Side panel controls for gaze: calibrating on the page, aiming with the
  * camera, or, for development, the mouse standing in for the eyes. One at a
- * time. Looking aims; a dwell (one second on a target) confirms and selects it,
+ * time. Looking aims; a double blink confirms and selects it (with the mouse, resting one second on a target does),
  * and a risky target opens only with a double blink.
  */
 /** What picking a target by voice led to: ready for the eyes' or the mouse's confirm, nothing aiming, or no such number. */
@@ -74,6 +86,8 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   };
   const eyes = toggle('Aim with my eyes');
   const mouse = toggle('Point with the mouse');
+  const tilt = toggle('Tilt your head to scroll');
+  tilt.input.checked = true;
   const calibrate = document.createElement('button');
   calibrate.textContent = 'Calibrate on this page';
   const check = document.createElement('button');
@@ -85,6 +99,8 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   const onGaze = (at: Point2 | null, list: { tabId: number }) => cursor.move(list.tabId, at);
   let camera: GazeProvider | null = null;
   let active: { session: GazeSession; stop?: () => void; mouse?: boolean } | null = null;
+  // Head-tilt scrolling runs alongside eye aiming, from the same camera samples.
+  const headScroll = new HeadScroller();
 
   let generation = 0; // bumps on every stop, so a slow calibration load cannot start a stale session
 
@@ -94,6 +110,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     active?.stop?.();
     active = null;
     cursor.stop();
+    headScroll.stop();
     status.textContent = '';
   };
   /** Aims with the camera through a calibration saved in screen positions. */
@@ -103,9 +120,11 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       frameFor: screenFrame, onOutcome: report, onGaze,
       // Every gaze selection refines the calibration for the posture the user is in now.
       learn: true, onLearned: () => void saveSamples(store.samples),
+    }), stop: provider.onSample((sample) => {
+      if (tilt.input.checked) headScroll.update(sample, targets.list?.tabId ?? null);
     }) };
     active.session.start();
-    status.textContent = 'Looking aims at the nearest number. To select it, dwell on it for a second or blink twice quickly. Anything that may submit, pay, delete or send opens only with a double blink.';
+    status.textContent = 'Looking aims at the nearest number. Blink twice quickly to select it; looking alone never clicks.';
   };
   eyes.input.addEventListener('change', () => {
     stop();
@@ -132,7 +151,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     eyes.input.checked = mouse.input.checked = false;
     const mine = generation;
     calibrate.disabled = true;
-    status.textContent = 'Look at each dot on the page until it moves. This takes about 16 seconds.';
+    status.textContent = 'Look at each dot on the page until it moves. This takes about 29 seconds.';
     void (async () => {
       const list = await targets.read().catch(() => null);
       if (!list) {
@@ -167,7 +186,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
         status.textContent = 'Open a website in this tab, then check.';
         return;
       }
-      status.textContent = 'Look at each dot until it moves. This takes about 16 seconds.';
+      status.textContent = 'Look at each dot until it moves. This takes about 29 seconds.';
       const samples = await checkOnPage(provider, list);
       if (samples.length === 0) throw new Error('no gaze samples'); // an empty check would read as 0 px error
       const result = measureAccuracy(store.model, samples, screenSize());
@@ -181,22 +200,34 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       check.disabled = false;
     });
   });
+  tilt.input.addEventListener('change', () => {
+    if (!tilt.input.checked) headScroll.stop();
+  });
   mouse.input.addEventListener('change', () => {
     stop();
     eyes.input.checked = false;
     if (!mouse.input.checked) return;
     const sim = mouseGaze(targets);
-    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze }), stop: sim.stop, mouse: true };
+    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze, dwell: true }), stop: sim.stop, mouse: true };
     active.session.start();
     void sim.provider.start();
     status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it. Anything that may submit, pay, delete or send needs a double blink, so aim with your eyes for those.';
   });
-  section.append(calibrate, check, eyes.label, mouse.label, status);
+  section.append(calibrate, check, eyes.label, tilt.label, mouse.label, status);
   return {
     element: section,
     useCamera(provider) {
       camera = provider;
       eyes.input.disabled = calibrate.disabled = check.disabled = false;
+      // A calibration saved for this screen carries over: aiming resumes by itself, with no new dots.
+      const mine = generation;
+      void loadSamples().then((samples) => {
+        let store: CalibrationStore | null = null;
+        try { store = new CalibrationStore(samples, screenSize()); } catch { store = null; }
+        if (mine !== generation || active || !store?.model) return;
+        aimWithEyes(provider, store);
+        status.textContent = 'Aiming with your saved calibration for this screen. Blink twice quickly to select; looking alone never clicks.';
+      });
     },
     pick(id) {
       if (!active) return 'NO_AIMING';
