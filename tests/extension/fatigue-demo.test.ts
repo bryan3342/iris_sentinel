@@ -125,3 +125,18 @@ describe('fatigue from the live companion', () => {
     expect(results).toHaveLength(0);
   });
 });
+
+describe('fatigue while talking to Iris', () => {
+  it('sets blink rate and breathing aside while a conversation is open, and says so', () => {
+    const section = fatiguePanel({ now: () => Date.now(), talking: () => true });
+    section.querySelector('button')!.click();
+    vi.advanceTimersByTime(60_000);
+    const list = (name: string) => [...section.querySelectorAll(`ul.${name} li`)].map((li) => li.textContent);
+    expect(list('why')).toContain('Talking: blink rate and breathing on hold');
+    expect(list('signals')).toEqual([
+      'Blink rate: waiting for steady readings',
+      expect.stringMatching(/^Heart rate variability: \d+ ms/),
+      'Breathing: waiting for steady readings',
+    ]);
+  });
+});
