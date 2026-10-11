@@ -55,6 +55,8 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   const listening = document.createElement('input'); listening.type = 'checkbox';
   label.append(listening, ' Listening');
   const status = document.createElement('p'); status.setAttribute('role', 'status');
+  const loudRoom = document.createElement('p'); loudRoom.setAttribute('aria-live', 'polite'); loudRoom.hidden = true;
+  loudRoom.textContent = 'Loud room: start with "Iris", as in "Iris, scroll down".';
   const action = document.createElement('p'); action.setAttribute('aria-live', 'polite');
   const report = (said: string) => { action.textContent = said; };
   const handsFree = new HandsFree({
@@ -75,6 +77,7 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
       return (await broker({ type: 'iris.voice.session' }) as { signedUrl: string }).signedUrl;
     },
     onStatus: (s) => { status.textContent = describe(s); },
+    onLoudRoom: (loud) => { loudRoom.hidden = !loud; },
   });
   // Listening is on unless the person turned it off, and stays off across panel openings if they did.
   // After setup Iris says "Iris here!", output only, unless it has just spoken during setup; listening
@@ -95,7 +98,7 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
     permission.addEventListener('change', () => { if (permission.state === 'granted') handsFree.retry(); });
   }, () => {});
   addEventListener('pagehide', () => handsFree.setOn(false), { once: true });
-  panel.append(title, label, status, action);
+  panel.append(title, label, status, loudRoom, action);
   const checkIn = new CheckIn();
   return {
     element: panel,

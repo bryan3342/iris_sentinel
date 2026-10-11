@@ -59,6 +59,11 @@ WebSocket through a neutral VoiceAgent interface, and after a minute with neithe
 speaking it hangs up and listens locally again. The microphone is muted while the agent
 speaks, so it takes the user's voice only once it has finished: it cannot be interrupted,
 and its own voice from the speakers never reaches it as the user's. Starts are capped at three a minute.
+In a loud room, where the learned background reaches -45 dBFS (normal speech at the laptop is near
+-30, so loudness alone cannot tell the user from the room), the panel shows "Loud room: start with
+"Iris"" and Iris acts only on requests that start with "Iris" (or "Hey Iris"). The side panel checks
+each request the agent hears, before any tool call it leads to: any other runs no tool, and the
+agent's reply to it plays silent with the microphone left open, so voices around the user do nothing.
 Audio worklets ship inside the extension. Turning Listening off or closing the panel
 ends the session, including late connections, and stops all microphone use. Audio is
 sent to ElevenLabs only while a conversation is connected, which begins only when the
@@ -225,7 +230,7 @@ type; the ElevenLabs SDK is used only in `agent/elevenlabs.ts`):
 | `open_new_tab` | none | Opens a new tab in the window |
 | `close_tab` | none | Closes the active tab on the user's next double blink there, within ten seconds; moving to another tab cancels it |
 | `open_website` | `address`, `new_tab` | Opens an http or https address, a bare site name such as `youtube.com` as https, in this tab or a new one; any other address is refused |
-| `search_web` | `query`, `new_tab` | Searches with the user's own default search engine (`chrome.search`) |
+| `search_web` | `query`, `new_tab`, `web` | Searches with the page's own search box when it has one (see Safety rule), as on Amazon or YouTube: types the words and presses Enter, submitting the box's search form when the page does not take the key. Otherwise, or with `web` or `new_tab` true, searches with the user's own default search engine (`chrome.search`) |
 | `reload_page` | none | Reloads the active tab |
 | `zoom_page` | `direction`: `in`, `out`, `reset` | Steps Chrome's page zoom through its own levels, or back to the default; calibration already divides zoom out |
 
@@ -264,7 +269,11 @@ even when the agent proposes it. The one place Iris clicks is the page helper's
 select step: it clicks only the exact element behind the confirmed number in
 that gaze scan, only if it is still on the page, where the user saw it and not
 covered, and a risky element only after a double blink, checked again in the
-page itself.
+page itself. The one place Iris types is a page's own search box, when the user
+asks to search: only a field plainly for search, in a form that searches by
+address (GET) and holds no password field, so it only loads a results page. A
+form that posts data, a login, a comment box or any other field is never filled
+or submitted.
 
 **v0.1 ownership.** The isolated-world helper owns visible links/buttons/images,
 sensitive rectangles and revisions, and numbers targets exactly as the gaze scan

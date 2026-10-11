@@ -1,4 +1,4 @@
-import type { VoiceAgent, VoiceSession, VoiceState, VoiceTools } from './voice';
+import type { Heard, VoiceAgent, VoiceSession, VoiceState, VoiceTools } from './voice';
 
 /** Keeps a late connection from reopening the microphone after Stop or panel closure. */
 export class VoiceController {
@@ -6,7 +6,7 @@ export class VoiceController {
   private session?: VoiceSession;
   private starting = false;
   private stopping = false;
-  constructor(private agent: VoiceAgent, private onState: (state: VoiceState) => void, private tools: VoiceTools = {}) {}
+  constructor(private agent: VoiceAgent, private onState: (state: VoiceState) => void, private tools: VoiceTools = {}, private heard?: Heard) {}
   async start(getUrl: () => Promise<string>, firstMessage?: string): Promise<void> {
     if (this.starting || this.stopping || this.session) return;
     this.starting = true;
@@ -19,7 +19,7 @@ export class VoiceController {
         if (generation !== this.generation) return;
         if (state === 'disconnected') { void this.stop().catch(() => {}); return; }
         this.onState(state);
-      }, this.tools, firstMessage);
+      }, this.tools, firstMessage, this.heard);
       if (generation !== this.generation) await session.endSession();
       else this.session = session;
     } catch (error) {

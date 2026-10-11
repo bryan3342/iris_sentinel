@@ -4,6 +4,7 @@ import { navigationTools } from '../../extension/src/sidepanel/agent/navigation'
 
 type Tab = { id: number; index: number; windowId: number; active: boolean; title?: string; url?: string; incognito?: boolean };
 let tabs: Tab[], reported: string[], zoom: number, matched: TabMatch, asked: TabInput[], armed: { tabId: number; run: () => void | Promise<void> } | null, canConfirm: boolean;
+let onPage: string; // what the page search helper answers: SEARCHED, or NO_SEARCH_BOX on a page without one
 const tools = () => navigationTools({
   matchTab: async (input) => { asked.push(input); return matched; },
   confirm: (tabId, run) => { if (!canConfirm) return false; armed = { tabId, run }; return true; },
@@ -12,7 +13,7 @@ const tools = () => navigationTools({
 const activeId = () => tabs.find((t) => t.active)!.id;
 
 beforeEach(() => {
-  reported = []; asked = []; zoom = 1; armed = null; canConfirm = true;
+  reported = []; asked = []; zoom = 1; armed = null; canConfirm = true; onPage = 'NO_SEARCH_BOX';
   matched = { tabId: 2, explanation: 'The cookie recipe.' };
   tabs = [
     { id: 11, index: 0, windowId: 1, active: false, title: 'Inbox (3) - person@example.com', url: 'https://mail.example.com/u/0/?token=secret' },
@@ -33,6 +34,7 @@ beforeEach(() => {
       setZoom: vi.fn(async (_id: number, factor: number) => { zoom = factor; }),
     },
     search: { query: vi.fn(async () => {}) },
+    scripting: { executeScript: vi.fn(async () => [{ frameId: 0, result: onPage }]) },
   });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -114,11 +116,36 @@ it('opens a website by its address, in this tab or a new one, and nothing that i
   expect(await tools().open_website!({ address: 'youtube.com', new_tab: 'yes' })).toMatch(/INVALID_INPUT/);
 });
 
-it('searches with the person\'s own default search engine, in this tab or a new one', async () => {
+it('searches with the person\'s own default search engine on a page with no search box, in this tab or a new one', async () => {
   expect(await tools().search_web!({ query: 'cheap flights to Miami', new_tab: false })).toBe('Searching for cheap flights to Miami.');
   expect(chrome.search.query).toHaveBeenCalledWith({ text: 'cheap flights to Miami', tabId: 12 });
   await tools().search_web!({ query: 'weather', new_tab: true });
   expect(chrome.search.query).toHaveBeenCalledWith({ text: 'weather', disposition: 'NEW_TAB' });
+});
+
+it('searches with the page\'s own search box when it has one, as on Amazon or YouTube', async () => {
+  onPage = 'SEARCHED';
+  tabs[1]!.url = 'https://www.amazon.com/';
+  expect(await tools().search_web!({ query: 'solar eclipse', new_tab: false })).toBe('Searching amazon.com for solar eclipse.');
+  const call = (chrome.scripting.executeScript as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+  expect([call.target, call.func.name, call.args]).toEqual([{ tabId: 12 }, 'pageSearch', ['solar eclipse']]);
+  expect(chrome.search.query).not.toHaveBeenCalled();
+});
+
+it('searches the web when asked to, for a new tab, or on a page Iris may not search', async () => {
+  onPage = 'SEARCHED';
+  await tools().search_web!({ query: 'weather', new_tab: false, web: true });
+  await tools().search_web!({ query: 'weather', new_tab: true });
+  tabs.forEach((tab) => { tab.active = tab.id === 13; }); // a page Iris may not see: no title or address
+  await tools().search_web!({ query: 'weather', new_tab: false });
+  expect(chrome.scripting.executeScript).not.toHaveBeenCalled();
+  expect((chrome.search.query as ReturnType<typeof vi.fn>).mock.calls).toEqual([
+    [{ text: 'weather', tabId: 12 }], [{ text: 'weather', disposition: 'NEW_TAB' }], [{ text: 'weather', tabId: 13 }],
+  ]);
+  tabs.forEach((tab) => { tab.active = tab.id === 12; });
+  (chrome.scripting.executeScript as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Cannot access contents of the page'));
+  expect(await tools().search_web!({ query: 'weather', new_tab: false })).toBe('Searching for weather.'); // Chrome would not let Iris in
+  expect(await tools().search_web!({ query: 'weather', new_tab: false, web: 'yes' })).toMatch(/INVALID_INPUT/);
 });
 
 it('reloads the page', async () => {
