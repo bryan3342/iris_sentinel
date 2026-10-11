@@ -1,7 +1,7 @@
 // Local setup only. Makes the ElevenLabs agent match voice-agent.json: creates or updates Iris's
 // client tools (waiting for Iris's answer), attaches exactly those to the agent and sets its system
 // prompt. The agent's own first message is empty, so it waits for the user when Iris connects on
-// speech, and Iris may set a first message only to greet (the panel's intro or "Iris is ready"). Safe to run again; the agent's voice, language model and other settings are left as they are.
+// speech, and Iris may set a first message only to check in when the user seems tired. Safe to run again; the agent's voice, language model and other settings are left as they are.
 import { convai, elevenLabsEnv, missingTools, voiceAgent } from "./elevenlabs.mjs";
 
 const { key, agent } = elevenLabsEnv();
