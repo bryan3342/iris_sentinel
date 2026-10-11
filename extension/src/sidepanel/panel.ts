@@ -9,7 +9,6 @@ import { PageMarks } from './page-marks';
 import { pageAccessPanel } from './setup/page-access';
 import { LiveTargetList } from './target-list';
 import { EyeTrace } from './trace';
-import { understandingPanel } from './understanding';
 import { microphonePanel } from './setup/microphone';
 import { conversationPanel } from './agent/panel';
 import { PageCoordinator } from '../page-understanding/coordinator';
@@ -36,14 +35,15 @@ export function mountPanel(root: HTMLElement): void {
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
   if (isExtensionPage()) {
-    // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
+    // One page understanding coordinator for the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
+    addEventListener('pagehide', () => coordinator.cancel(), { once: true }); // closing the panel ends a pending request
     // The first opening ever starts with the Iris animation; the spoken intro follows it.
     const voice = conversationPanel({ coordinator, marks, gaze }, firstOpenSplash(document.body));
     // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
     const link = companionLink();
     root.append(microphonePanel(), voice.element, pageAccessPanel(), numbersPanel(marks), gaze.element,
-      understandingPanel(marks, coordinator), companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state) }));
+      companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state) }));
   }
 
   openCamera()
