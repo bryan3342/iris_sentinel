@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ClueState, FatigueClue, FatigueState } from '@iris/core';
 import { fatigueView } from '../../extension/src/sidepanel/fatigue-view';
 
-const clue = (value: number | null, baseline: number | null, strain: number | null): ClueState => ({ value, baseline, personal: true, strain });
+const clue = (value: number | null, baseline: number | null, strain: number | null, personal = true): ClueState => ({ value, baseline, personal, strain });
 
 function state(overrides: Partial<FatigueState> = {}, clues: Partial<Record<FatigueClue, ClueState>> = {}): FatigueState {
   return {
@@ -23,33 +23,40 @@ function state(overrides: Partial<FatigueState> = {}, clues: Partial<Record<Fati
 }
 
 describe('fatigueView', () => {
-  it('says so before the demo runs', () => {
-    expect(fatigueView(null)).toEqual({ status: 'Fatigue: not running.', why: [], response: null });
+  it('says so before it runs', () => {
+    expect(fatigueView(null)).toEqual({ status: 'Fatigue: not running.', why: [], signals: [], response: null, note: null });
   });
 
-  it('shows warming up without a score or a response', () => {
-    expect(fatigueView(state({ score: null, paused: 'warming-up' }))).toEqual({
-      status: 'Fatigue: paused.',
-      why: ['Waiting for steady signals'],
-      response: null,
-    });
+  it('shows warming up without a score, and which signals are still waiting', () => {
+    const view = fatigueView(state({ score: null, paused: 'warming-up' }, { hrv: clue(null, 40, null, false), breathing: clue(null, 14, null, false) }));
+    expect(view.status).toBe('Fatigue: paused.');
+    expect(view.why).toEqual(['Waiting for steady signals']);
+    expect(view.signals).toEqual([
+      'Blink rate: 15 a minute (your normal 15, 0%)',
+      'Heart rate variability: waiting for steady readings',
+      'Breathing: waiting for steady readings',
+    ]);
+    expect(view.response).toBeNull();
   });
 
-  it('reassures a rested user', () => {
-    expect(fatigueView(state())).toEqual({
-      status: 'Fatigue: fresh (score 3).',
-      why: ['Signals near your normal'],
-      response: 'Iris would: Normal pace',
-    });
+  it('shows each signal against the user\'s normal, or a typical value before it is learned', () => {
+    const view = fatigueView(state({}, { blink: clue(17, 15, 0), hrv: clue(41, 44, 0), breathing: clue(15, 14, 0, false) }));
+    expect(view.signals).toEqual([
+      'Blink rate: 17 a minute (your normal 15, +13%)',
+      'Heart rate variability: 41 ms (your normal 44, -7%)',
+      'Breathing: 15 a minute (typical 14, +7%)',
+    ]);
+    expect(view.why).toEqual(['Signals near your normal', 'Still learning your normal']);
+    expect(view.response).toBe('Iris would: Normal pace');
+    expect(view.note).toBe('Estimates from the camera, not medical readings.');
   });
 
   it('shows the level, the reasons and what Iris would change', () => {
     const view = fatigueView(state({ score: 47.6, level: 'tiring' }, { blink: clue(22.5, 15, 0.5), hrv: clue(31.5, 45, 2 / 3) }));
-    expect(view).toEqual({
-      status: 'Fatigue: tiring (score 48).',
-      why: ['Heart rate variability down 30%', 'Blink rate up 50%'],
-      response: 'Iris would: Slower clicks and larger targets',
-    });
+    expect(view.status).toBe('Fatigue: tiring (score 48).');
+    expect(view.why).toEqual(['Heart rate variability down 30%', 'Blink rate up 50%']);
+    expect(view.signals[0]).toBe('Blink rate: 23 a minute (your normal 15, +50%)');
+    expect(view.response).toBe('Iris would: Slower clicks and larger targets');
   });
 
   it('keeps the held score while the face is out of view', () => {
