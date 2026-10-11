@@ -114,6 +114,22 @@ describe('FatigueEngine', () => {
     expect(last.paused).toBeNull();
   });
 
+  it('sets blink and breathing readings aside while a voice conversation is open', () => {
+    const engine = warmedUp();
+    engine.setTalking(120_000, true);
+    const talking = play(engine, 120_000, 180_000, tired).at(-1)!;
+    expect(talking.talking).toBe(true);
+    expect(talking.clues.breathing.value).toBeNull(); // no new breathing readings; the old ones aged out
+    expect(talking.clues.blink.value).toBeNull(); // talking time does not count toward the blink rate
+    expect(talking.clues.hrv.value).toBe(25); // heart rate variability carries on
+
+    engine.setTalking(180_000, false);
+    const after = play(engine, 180_000, 240_000, rested).at(-1)!;
+    expect(after.talking).toBe(false);
+    expect(after.clues.breathing.value).toBe(14);
+    expect(after.clues.blink.value).not.toBeNull();
+  });
+
   it('keeps a double-blink confirm out of the blink rate', () => {
     const engine = warmedUp();
     const before = play(engine, 120_000, 180_000, rested).at(-1)!.clues.blink.value!;

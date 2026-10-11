@@ -11,6 +11,7 @@ function state(overrides: Partial<FatigueState> = {}, clues: Partial<Record<Fati
     score: 3.4,
     level: 'fresh',
     paused: null,
+    talking: false,
     clues: {
       blink: clue(15, 15, 0),
       hrv: clue(45, 45, 0),

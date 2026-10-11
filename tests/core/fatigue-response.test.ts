@@ -11,6 +11,7 @@ function state(changes: Partial<Record<FatigueClue, ClueState>> = {}, paused: Fa
     score: 50,
     level: 'tiring',
     paused,
+    talking: false,
     clues: {
       blink: clue(15, 15, 0),
       hrv: clue(45, 45, 0),

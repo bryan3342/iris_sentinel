@@ -17,8 +17,10 @@ import { VitalsWindow } from './vitals-window';
  * baselines. Body clues count only while the camera view is trustworthy; once
  * the face has been lost or the view poor for a few seconds, the engine pauses
  * and the score and level hold still. A shorter glitch neither pauses nor
- * throws readings away, since Presage's view status flickers. The talking pause
- * waits for the voice agent.
+ * throws readings away, since Presage's view status flickers. While a voice
+ * conversation is open (`setTalking`), blink and breathing readings are set
+ * aside, since talking changes both; heart rate variability and the score
+ * carry on.
  */
 
 export const FATIGUE_CLUES = ['blink', 'hrv', 'breathing', 'timeToClick', 'landings'] as const;
@@ -71,6 +73,8 @@ export interface FatigueState {
   score: number | null;
   level: FatigueLevel;
   paused: FatiguePause | null;
+  /** A voice conversation is open, so blink and breathing readings are set aside. */
+  talking: boolean;
   clues: Record<FatigueClue, ClueState>;
 }
 
@@ -109,6 +113,7 @@ export class FatigueEngine {
   private readonly smoother: OneEuroFilter;
   private readonly minCoverage: number;
   private quality: Quality | null = null;
+  private talking = false;
   /** When the current view began. */
   private qualitySince = 0;
   private readonly viewGraceMs: number;
@@ -126,7 +131,7 @@ export class FatigueEngine {
   addVitals(sample: VitalsSample): void {
     if (this.quality === null || PAUSING_VIEWS[this.quality]) return;
     this.hrv.add(sample.t, sample.hrv);
-    if (this.quality === 'ok') this.breathing.add(sample.t, sample.breathing);
+    if (this.quality === 'ok' && !this.talking) this.breathing.add(sample.t, sample.breathing);
   }
 
   addBlink(blink: BlinkEvent): void {
@@ -143,6 +148,13 @@ export class FatigueEngine {
     if (status.quality !== this.quality) this.qualitySince = status.t;
     this.quality = status.quality;
     this.blinks.setQuality(status);
+  }
+
+  /** Whether a voice conversation is open from time `t`. Talking changes blinking and breathing. */
+  setTalking(t: number, talking: boolean): void {
+    if (talking === this.talking) return;
+    this.talking = talking;
+    this.blinks.setTalking(t, talking);
   }
 
   /** The aimed target changed. */
@@ -178,7 +190,7 @@ export class FatigueEngine {
     const { score } = viewPause ? { score: null } : combineScore(strains, weights, { minCoverage: this.minCoverage });
     if (score !== null) this.score = this.smoother.filter(score, t);
     const level = this.levels.update(t, score === null ? null : this.score);
-    return { t, score: this.score, level, paused: viewPause ?? (score === null ? 'warming-up' : null), clues };
+    return { t, score: this.score, level, paused: viewPause ?? (score === null ? 'warming-up' : null), talking: this.talking, clues };
   }
 
   /** Forgets everything, including the baselines, for a new session. */
@@ -192,6 +204,7 @@ export class FatigueEngine {
     this.smoother.reset();
     this.quality = null;
     this.qualitySince = 0;
+    this.talking = false;
     this.score = null;
   }
 }

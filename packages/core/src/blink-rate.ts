@@ -6,9 +6,10 @@ import type { ConfirmEvent } from './confirm';
  * blink rate rises as people tire. Presage misses some blinks, but the rate is
  * only ever compared with the same user's own baseline, so a steady undercount
  * cancels out. A blink close to a double-blink confirm is dropped, so confirming
- * never reads as tiredness. Only blinks seen while the face is in view count,
- * and the rate divides them by the time the face was in view within the
- * window, so a brief camera glitch costs a few seconds of coverage instead of
+ * never reads as tiredness. Only blinks seen while the face is in view and the
+ * user is not talking count (people blink more while they speak), and the rate
+ * divides them by that counting time within the window, so a brief camera
+ * glitch or a short conversation costs a few seconds of coverage instead of
  * starting the count over. Blink times stay in memory only.
  */
 
@@ -34,8 +35,10 @@ export class BlinkRateMeter {
   private readonly confirmAfterMs: number;
   private blinks: number[] = [];
   private confirms: number[] = [];
-  /** Stretches with the face in view; the last one is open (`end` null) while it still is. */
+  /** Stretches when blinks count (face in view, not talking); the last one is open (`end` null) while counting. */
   private views: { start: number; end: number | null }[] = [];
+  private faceInView = false;
+  private talking = false;
 
   constructor({ windowMs = 60_000, minCoverageMs = 30_000, confirmBeforeMs = 900, confirmAfterMs = 2_000 }: BlinkRateOptions = {}) {
     this.windowMs = windowMs;
@@ -56,13 +59,14 @@ export class BlinkRateMeter {
   }
 
   setQuality(status: QualityStatus): void {
-    const inView = FACE_IN_VIEW.includes(status.quality);
-    if (inView && !this.inView) {
-      const oldest = status.t - this.windowMs;
-      this.views = [...this.views.filter((v) => v.end !== null && v.end > oldest), { start: status.t, end: null }];
-    } else if (!inView && this.inView) {
-      this.views = this.views.map((v) => (v.end === null ? { ...v, end: status.t } : v));
-    }
+    this.faceInView = FACE_IN_VIEW.includes(status.quality);
+    this.follow(status.t);
+  }
+
+  /** Whether a voice conversation is open from time `t`: blinks and their time stop counting while it is. */
+  setTalking(t: number, talking: boolean): void {
+    this.talking = talking;
+    this.follow(t);
   }
 
   /** Blinks per minute at time `t`, or null until the face has been in view for `minCoverageMs` of the window. */
@@ -78,10 +82,24 @@ export class BlinkRateMeter {
     this.blinks = [];
     this.confirms = [];
     this.views = [];
+    this.faceInView = false;
+    this.talking = false;
   }
 
+  /** True while a counting stretch is open. */
   private get inView(): boolean {
     return this.views.at(-1)?.end === null;
+  }
+
+  /** Opens or closes the counting stretch at `t` to match the face and talking state. */
+  private follow(t: number): void {
+    const counting = this.faceInView && !this.talking;
+    if (counting && !this.inView) {
+      const oldest = t - this.windowMs;
+      this.views = [...this.views.filter((v) => v.end !== null && v.end > oldest), { start: t, end: null }];
+    } else if (!counting && this.inView) {
+      this.views = this.views.map((v) => (v.end === null ? { ...v, end: t } : v));
+    }
   }
 
   private nearConfirm(blink: number): boolean {

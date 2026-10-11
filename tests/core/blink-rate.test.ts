@@ -82,6 +82,17 @@ describe('BlinkRateMeter', () => {
     expect(meter.rate(120_000)).toBe(15);
   });
 
+  it('does not count blinks, or their time, while the user is talking', () => {
+    const meter = new BlinkRateMeter();
+    meter.setQuality(ok(0));
+    blinkEvery(meter, 4_000, 0, 60_000);
+    meter.setTalking(60_000, true);
+    blinkEvery(meter, 2_000, 60_000, 90_000); // talking: twice as many blinks, none counted
+    meter.setTalking(90_000, false);
+    blinkEvery(meter, 4_000, 88_000, 120_000); // 92 s to 120 s: 8 blinks
+    expect(meter.rate(120_000)).toBe(16); // 8 blinks in the 30 s that counted, not the talking rate of 30
+  });
+
   it('falls as blinks stop', () => {
     const meter = new BlinkRateMeter();
     meter.setQuality(ok(0));
