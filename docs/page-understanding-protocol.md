@@ -18,7 +18,17 @@ server reached from elsewhere (see Provisioning below). Supported operations:
 | `describe_image` | `imageId`, `sourceRect` | `operation`, same `imageId`, `description` |
 | `describe_target` | `targets` (exactly one), `targetId` (that target's ID), `sourceRect` | `operation`, same `targetId`, `description` |
 
-All requests require `protocolVersion: "0.1"`, `requestId`, `operation`,
+`POST /v0.1/tab-match` answers which open tab a spoken request means, such as
+"the tab with the recipe". It takes `{protocolVersion: "0.1", requestId, request, tabs}`:
+the person's words (up to 500 characters) and up to 50 tabs as `{id, title, host}`,
+each a positive ID, a title of up to 200 characters and a site name only (letters,
+digits, dots and hyphens, never a path, query or full address). It returns
+`{protocolVersion, requestId, match: {tabId, explanation}}`, where `tabId` is one
+supplied ID or null. It carries no image, shares the admission, rate limits and the
+`ENABLE_PAGE_UNDERSTANDING` and `PAGE_CONTENT_APPROVED` gates below, and the answer
+only names a tab: the extension switches to it.
+
+All page understanding requests require `protocolVersion: "0.1"`, `requestId`, `operation`,
 `binding`, and one `image`. Unknown fields, including URLs/selectors/actions,
 are rejected at every owned object level. Operation fields cannot be mixed.
 Results return `{protocolVersion, requestId, binding, result}`. The server echoes

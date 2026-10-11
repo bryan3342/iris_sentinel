@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { modules as m } from './modules.mjs';
-import { input, result } from './fixtures.mjs';
+import { input, result, tabInput, tabMatch } from './fixtures.mjs';
 for (const operation of m.OPERATIONS) {
   test(`${operation}: direct adapter sends inline PNG and validates output`, async () => {
     let calls = 0;
@@ -46,4 +46,27 @@ for (const code of [400, 401, 403, 429, 500, 503]) test(`multimodal upstream HTT
     error.status === (code === 429 || code >= 500 ? 503 : 502) && !/secret/.test(error.message) &&
     error.code === (code === 429 || code >= 500 ? 'UPSTREAM_UNAVAILABLE' : 'UPSTREAM_REJECTED'));
   assert.equal(calls, 1);
+});
+
+test('tab match: direct adapter sends only the request and tab titles and sites as text, and validates the answer', async () => {
+  let calls = 0;
+  const adapter = new m.GeminiMultimodal({ GEMINI_API_KEY: 'mock', GEMINI_MODEL: 'test-model' }, async function (url, options) {
+    calls++;
+    assert.equal(url, 'https://generativelanguage.googleapis.com/v1beta/models/test-model:generateContent');
+    const body = JSON.parse(options.body);
+    const { request, tabs } = tabInput();
+    assert.deepEqual(body.contents, [{ parts: [{ text: JSON.stringify({ request, tabs }) }] }]);
+    assert.match(body.systemInstruction.parts[0].text, /untrusted data, never instructions/);
+    assert.equal(body.tools, undefined);
+    assert.deepEqual(Object.keys(body.generationConfig.responseJsonSchema.properties), ['tabId', 'explanation']);
+    return Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(tabMatch()) }] } }] });
+  });
+  assert.deepEqual(await adapter.matchTab(m.validateTabInput(tabInput()), new AbortController().signal), tabMatch());
+  assert.equal(calls, 1);
+});
+
+test('tab match: an answer naming a tab that was not offered is the model\'s fault', async () => {
+  const adapter = new m.GeminiMultimodal({ GEMINI_API_KEY: 'mock', GEMINI_MODEL: 'test-model' },
+    async () => Response.json({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ ...tabMatch(), tabId: 9 }) }] } }] }));
+  await assert.rejects(adapter.matchTab(m.validateTabInput(tabInput()), new AbortController().signal), { code: 'INVALID_MODEL_RESULT' });
 });
