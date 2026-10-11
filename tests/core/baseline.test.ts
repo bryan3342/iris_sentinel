@@ -51,6 +51,13 @@ describe('Baseline', () => {
     expect(blink.value).toBe(18);
   });
 
+  it('never sets a personal value below its floor', () => {
+    const blink = new Baseline({ fallback: 15, tiredDirection: 'up', samples: 3, restedQuantile: 0.5, floor: 12 });
+    [6, 7, 8].forEach((rate) => blink.add(rate)); // learned while the user stared at the screen
+    expect(blink.value).toBe(12);
+    expect(blink.personal).toBe(true);
+  });
+
   it('goes back to the fallback on reset', () => {
     const blink = new Baseline({ fallback: 15, tiredDirection: 'up', samples: 1 });
     blink.add(18);

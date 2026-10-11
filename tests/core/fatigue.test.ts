@@ -8,7 +8,7 @@ const steady = (value: number): Reading => ({ value, confidence: 0.9, stable: tr
  * Plays a simulated user to the engine, one second at a time, from `from`
  * (inclusive) to `to` (exclusive). `tiredness(t)` runs from 0 (rested: 15
  * blinks a minute, heart rate variability 45 ms, 14 breaths a minute) to 1
- * (tired: 27 blinks, 25 ms, 19.5 breaths). Returns the state after each second.
+ * (tired: 36 blinks, 25 ms, 19.5 breaths). Returns the state after each second.
  */
 function play(engine: FatigueEngine, from: number, to: number, tiredness: (t: number) => number, reading = steady): FatigueState[] {
   const states: FatigueState[] = [];
@@ -17,7 +17,7 @@ function play(engine: FatigueEngine, from: number, to: number, tiredness: (t: nu
     const x = tiredness(t);
     while (nextBlink <= t) {
       engine.addBlink({ t: nextBlink, durationMs: 150 });
-      nextBlink += 60_000 / (15 + 12 * x);
+      nextBlink += 60_000 / (15 + 21 * x);
     }
     engine.addVitals({ t, pulse: null, hrv: reading(45 - 20 * x), breathing: reading(14 + 5.5 * x) });
     states.push(engine.update(t));
@@ -134,6 +134,24 @@ describe('FatigueEngine', () => {
     const later = play(engine, 136_000, 196_000, rested).at(-1)!.clues;
     expect(later.timeToClick).toMatchObject({ value: 1_000, personal: true, strain: 0 });
     expect(later.landings).toMatchObject({ value: 1, personal: true, strain: 0 });
+  });
+
+  it('does not mistake ordinary blinking for tiredness after learning while the user stared at the screen', () => {
+    const engine = new FatigueEngine();
+    view(engine, 0, 'ok');
+    let next = 0;
+    let last: FatigueState | null = null;
+    for (let t = 0; t < 300_000; t += 1_000) {
+      const perMinute = t < 120_000 ? 7 : 23; // stared at the panel while it learned, then blinked as usual
+      while (next <= t) {
+        engine.addBlink({ t: next, durationMs: 150 });
+        next += 60_000 / perMinute;
+      }
+      engine.addVitals({ t, pulse: null, hrv: steady(45), breathing: steady(14) });
+      last = engine.update(t);
+    }
+    expect(last!.clues.blink.baseline).toBe(12); // the floor, not the 7 learned while staring
+    expect(last!.level).toBe('fresh');
   });
 
   it('forgets everything on reset', () => {
