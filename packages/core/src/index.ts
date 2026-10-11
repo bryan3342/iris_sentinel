@@ -34,6 +34,8 @@ export type { ClueSettings, ClueState, FatigueClue, FatigueEngineOptions, Fatigu
 export { explain, fatigueResponse } from './fatigue-response';
 export type { FatigueResponse } from './fatigue-response';
 export { decideSelection } from './selection';
+export { RestingPoint } from './resting-point';
+export type { RestingPointOptions } from './resting-point';
 export { SettledAim } from './settled-aim';
 export { SpeechGate } from './speech-gate';
 export type { SpeechGateOptions } from './speech-gate';
