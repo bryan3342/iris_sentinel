@@ -8,6 +8,7 @@ import { cameraAllowed, isExtensionPage, openCamera, watchCamera } from './setup
 import { gazePanel, type GazePanel } from './gaze-panel';
 import { numbersPanel } from './numbers';
 import { PageMarks } from './page-marks';
+import { watchStruggle } from './struggle-watch';
 import { hasPageAccess, requestPageAccess, watchPageAccess } from './setup/page-access';
 import { LiveTargetList } from './target-list';
 import { EyeTrace } from './trace';
@@ -72,7 +73,13 @@ export function mountPanel(root: HTMLElement): void {
       voice.onFatigue(state);
       gaze.adapt(fatigueResponse(state.level));
     };
-    root.append(microphonePanel(), voice.element, numbersPanel(marks), gaze.element,
+    const numbers = numbersPanel(marks);
+    // A sudden, held rise in heart rate or breathing: Iris says so and turns the numbers on.
+    watchStruggle(link, () => voice.talking, () => {
+      voice.onStruggle();
+      numbers.turnOn();
+    });
+    root.append(microphonePanel(), voice.element, numbers.element, gaze.element,
       companionPanel(link), fatiguePanel({ live: link, onFatigue, talking: () => voice.talking }));
   }
 }

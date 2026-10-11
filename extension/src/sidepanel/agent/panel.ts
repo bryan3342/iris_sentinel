@@ -15,6 +15,8 @@ import { playLine } from './voice-lines';
 const LISTENING_KEY = 'iris.listening';
 /** Spoken when the user seems tired. Fixed, so nothing about their body reaches the voice agent. */
 export const CHECK_IN = 'Want a hand, or a short break?';
+/** Spoken when heart rate or breathing suddenly rise well above the user's resting level. Fixed, like CHECK_IN. */
+export const STRUGGLE = 'We can see there is a sort of struggle here.';
 const PROBLEMS: Record<string, string> = {
   MICROPHONE: 'Allow your microphone under Voice setup, and Iris starts listening.',
   AUDIO_BLOCKED: 'Click anywhere in this panel once to turn on listening.',
@@ -35,6 +37,8 @@ export interface ConversationPanel {
   element: HTMLElement;
   /** Takes each live fatigue result; Iris checks in by voice when the user seems tired (see CheckIn). */
   onFatigue(state: FatigueState): void;
+  /** Heart rate or breathing suggest a struggle (see StruggleDetector): Iris says so, unless Listening is off. */
+  onStruggle(): void;
   /** A conversation is connecting or open. The fatigue card pauses meanwhile. */
   readonly talking: boolean;
 }
@@ -98,6 +102,10 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
     onFatigue(state) {
       // Only the level and pause are read. With Listening off, Iris stays quiet.
       if (listening.checked && checkIn.update(state, performance.now(), handsFree.talking)) handsFree.greet(CHECK_IN);
+    },
+    onStruggle() {
+      // Nothing about the readings is said or sent: only this fixed line. With Listening off, Iris stays quiet.
+      if (listening.checked && !handsFree.talking) handsFree.greet(STRUGGLE);
     },
     get talking() {
       return handsFree.talking;

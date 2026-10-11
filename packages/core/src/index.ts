@@ -37,6 +37,8 @@ export { explain, fatigueResponse } from './fatigue-response';
 export type { FatigueResponse } from './fatigue-response';
 export { CheckIn } from './check-in';
 export type { CheckInOptions } from './check-in';
+export { StruggleDetector } from './struggle';
+export type { StruggleOptions, StruggleSignal } from './struggle';
 export { decideSelection } from './selection';
 export { RestingPoint } from './resting-point';
 export type { RestingPointOptions } from './resting-point';

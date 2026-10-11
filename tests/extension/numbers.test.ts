@@ -11,12 +11,25 @@ describe('numbers switch', () => {
       stop: () => void calls.push('stop'),
       showNumbers: (on: boolean) => void calls.push(`numbers ${on ? 'on' : 'off'}`),
     } as unknown as PageMarks;
-    const label = numbersPanel(marks);
-    document.body.replaceChildren(label); // a click changes a switch only while it is on the page
-    const toggle = label.querySelector('input')!;
+    const { element } = numbersPanel(marks);
+    document.body.replaceChildren(element); // a click changes a switch only while it is on the page
+    const toggle = element.querySelector('input')!;
     expect(toggle.checked).toBe(false);
     toggle.click();
     toggle.click();
     expect(calls).toEqual(['numbers on', 'start', 'numbers off', 'stop']);
+  });
+
+  it('can be turned on by Iris, as when it notices a struggle, which shows the numbers once', () => {
+    let started = 0;
+    const marks = { start: () => void started++, stop: () => {}, showNumbers: () => {} } as unknown as PageMarks;
+    const numbers = numbersPanel(marks);
+    document.body.replaceChildren(numbers.element);
+    const toggle = numbers.element.querySelector('input')!;
+    expect(toggle.checked).toBe(false);
+    numbers.turnOn();
+    numbers.turnOn(); // already on: nothing more
+    expect(toggle.checked).toBe(true);
+    expect(started).toBe(1);
   });
 });
