@@ -25,7 +25,7 @@ Guardrails are listed in `docs/claude-automation.md`.
 
 ## Review priorities (in order)
 
-1. **Privacy.** Video and face landmarks never leave the laptop. Heart, breathing and
+1. **Privacy.** Video, face landmarks and hand landmarks never leave the laptop. Heart, breathing and
    blink data stay in memory. Page screenshots go to Gemini only on a user request
    and are never stored. Flag any code that sends, logs or persists these.
 2. **Secrets.** All API keys live in Worker secrets (`server/`). The extension holds

@@ -17,7 +17,7 @@ From the repository root:
 npm install
 ```
 
-The first `npm run dev`, `npm run dev:ext` or `npm run build` also prepares eye tracking: it copies the MediaPipe runtime from `node_modules` and downloads the face model (about 4 MB) into `extension/public/mediapipe/`, checking its SHA-256. Later runs reuse the file. This folder is not committed.
+The first `npm run dev`, `npm run dev:ext` or `npm run build` also prepares eye and hand tracking: it copies the MediaPipe runtime from `node_modules` and downloads the face and hand models into `extension/public/mediapipe/`, checking each one's SHA-256. Later runs reuse the files. This folder is not committed.
 
 ## Run the tests
 

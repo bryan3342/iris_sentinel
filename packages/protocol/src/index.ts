@@ -13,6 +13,7 @@ export {
 export type { CompanionState, FromCompanion, ToCompanion } from './companion';
 export type { BlinkEvent, FaceProvider, Quality, QualityStatus } from './face';
 export type { EyeReading, GazeProvider, GazeSample, HeadPose } from './gaze';
+export type { PointerProvider, PointerSample } from './pointer';
 export type { Reading, VitalsProvider, VitalsSample } from './vitals';
 export { FATIGUE_LEVELS } from './session';
 export type { DailyTrend, FatigueLevel, FatigueMinute, SessionStore } from './session';
