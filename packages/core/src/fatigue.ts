@@ -36,11 +36,19 @@ export interface ClueSettings {
   fullAt: number;
   /** How much the clue counts toward the score, relative to the others. */
   weight: number;
+  /** Where in the first readings the personal baseline is taken (see Baseline); 0.25 by default. */
+  restedQuantile?: number;
+  /** Lowest value the personal baseline may take (see Baseline). */
+  floor?: number;
 }
 
 export const CLUE_SETTINGS: Record<FatigueClue, ClueSettings> = {
   // 15 a minute is what Presage measured at rest (#24); chance alone swings a minute's count by about 25%.
-  blink: { fallback: 15, tiredDirection: 'up', ignoreBelow: 0.25, fullAt: 0.75, weight: 0.25 },
+  // Blink rate swings with activity: it all but stops while someone stares at a screen and rises while
+  // they look around, so its normal is the median rather than the low end, never below 12 a minute
+  // (80% of that resting rate; lower usually means the user was staring while it was learned), and
+  // changes under +50% count as noise.
+  blink: { fallback: 15, tiredDirection: 'up', ignoreBelow: 0.5, fullAt: 1.5, weight: 0.2, restedQuantile: 0.5, floor: 12 },
   // The clue most specific to fatigue.
   hrv: { fallback: 40, tiredDirection: 'down', ignoreBelow: 0.1, fullAt: 0.4, weight: 0.3 },
   breathing: { fallback: 14, tiredDirection: 'up', ignoreBelow: 0.1, fullAt: 0.35, weight: 0.15 },
