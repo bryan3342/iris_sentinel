@@ -1,4 +1,5 @@
 import type { TabInput, TabMatch } from '@iris/protocol';
+import { eligibleTab } from '../../page-understanding/capture';
 import { choice, untrusted, voiceTool, words } from './tool';
 import type { VoiceTools } from './voice';
 
@@ -63,7 +64,7 @@ export function navigationTools({ matchTab, confirm, report }: NavigationDeps): 
       const { tabs } = await windowTabs();
       const offered = tabs.flatMap((tab) => {
         const host = siteOf(tab.url), title = tab.title?.trim().slice(0, 200);
-        return tab.id !== undefined && host && title ? [{ id: tab.index + 1, title, host, tabId: tab.id }] : [];
+        return tab.id !== undefined && eligibleTab(tab) && host && title ? [{ id: tab.index + 1, title, host, tabId: tab.id }] : [];
       }).slice(0, 50);
       if (!offered.length) throw new Error('NO_TABS');
       const match = await matchTab({ protocolVersion: '0.1', requestId: crypto.randomUUID(), request,

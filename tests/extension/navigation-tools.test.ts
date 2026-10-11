@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { TabInput, TabMatch } from '@iris/protocol';
 import { navigationTools } from '../../extension/src/sidepanel/agent/navigation';
 
-type Tab = { id: number; index: number; windowId: number; active: boolean; title?: string; url?: string };
+type Tab = { id: number; index: number; windowId: number; active: boolean; title?: string; url?: string; incognito?: boolean };
 let tabs: Tab[], reported: string[], zoom: number, matched: TabMatch, asked: TabInput[], armed: { tabId: number; run: () => void | Promise<void> } | null, canConfirm: boolean;
 const tools = () => navigationTools({
   matchTab: async (input) => { asked.push(input); return matched; },
@@ -49,6 +49,13 @@ it('switches to the tab Gemini matches, offering only titles and site names, nev
   matched = { tabId: 1, explanation: 'Your email.' };
   await tools().go_to_tab!({ description: 'my email' });
   expect(activeId()).toBe(11);
+});
+
+it('never offers incognito or Chrome Web Store tabs, which Iris is not allowed on', async () => {
+  tabs.push({ id: 14, index: 3, windowId: 1, active: false, title: 'Private', url: 'https://private.example.com/', incognito: true });
+  tabs.push({ id: 15, index: 4, windowId: 1, active: false, title: 'Extension', url: 'https://chromewebstore.google.com/detail/x' });
+  await tools().go_to_tab!({ description: 'the tab with the recipe' });
+  expect(asked[0]!.tabs.map((t) => t.host)).toEqual(['mail.example.com', 'recipes.example.com']);
 });
 
 it('says when Iris can see no tab to match, as before it is allowed on websites', async () => {
