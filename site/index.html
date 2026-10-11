@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Iris: hands-free browsing</title>
+  <meta name="description" content="Iris is a Chrome extension that lets people with severe motor impairments browse real websites with their eyes and voice.">
+  <link rel="icon" href="assets/iris-logo-static.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#top" aria-label="Iris home">
+      <img src="assets/iris-logo.svg" alt="" width="28" height="28">
+      <span>Iris</span>
+    </a>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#flow">Architecture</a>
+      <a href="#privacy">Privacy</a>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero__text reveal">
+        <h1>Browse the web with your eyes and voice.</h1>
+        <p class="lead">Iris is a Chrome extension for people who cannot use a mouse or keyboard. Look at a link, blink twice, and it opens. Say what you want, and Iris finds it.</p>
+        <div class="cta">
+          <a class="btn btn--primary" href="#how">See how it works</a>
+          <a class="btn" href="https://github.com/bryan3342/iris_sentinel">View on GitHub</a>
+        </div>
+      </div>
+
+      <!-- Live demo: the gaze ring moves between numbered targets, a double blink opens one. -->
+      <div class="demo reveal" aria-hidden="true">
+        <div class="demo__bar"><span></span><span></span><span></span><em>example.org</em></div>
+        <div class="demo__page" id="demo-page">
+          <div class="demo__line demo__line--title"></div>
+          <div class="demo__line"></div>
+          <div class="demo__line demo__line--short"></div>
+          <div class="demo__targets">
+            <button class="target" data-n="1">News</button>
+            <button class="target" data-n="2">History</button>
+            <button class="target" data-n="3">Weather</button>
+            <button class="target" data-n="4">Contact</button>
+          </div>
+          <div class="demo__line"></div>
+          <div class="demo__line demo__line--short"></div>
+          <div class="gaze" id="gaze"></div>
+        </div>
+        <div class="demo__status">
+          <svg class="eye" id="eye" viewBox="0 0 40 24"><path d="M2 12 Q20 -4 38 12 Q20 28 2 12Z"/><circle cx="20" cy="12" r="5"/></svg>
+          <span id="demo-status">Looking</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="problem reveal">
+      <p>People with ALS, spinal cord injuries or cerebral palsy often cannot use a mouse. Most eye-control tools move a cursor pixel by pixel, which jitters on a webcam, and click whatever the user happens to look at. Iris aims at real targets and only clicks when the user means it.</p>
+    </section>
+
+    <section id="how" class="how">
+      <h2 class="reveal">How it works</h2>
+      <ol class="steps">
+        <li class="step reveal">
+          <span class="step__n">1</span>
+          <h3>Aim</h3>
+          <p>Iris numbers every link and button on the page. Your gaze snaps to the nearest one, so a webcam is accurate enough.</p>
+        </li>
+        <li class="step reveal">
+          <span class="step__n">2</span>
+          <h3>Confirm</h3>
+          <p>A deliberate double blink opens the target. Looking alone never clicks, and anything that submits, pays or deletes needs that blink.</p>
+        </li>
+        <li class="step reveal">
+          <span class="step__n">3</span>
+          <h3>Ask</h3>
+          <p>Say "open the history section" or "summarize this". The voice agent picks the target; you still confirm it.</p>
+        </li>
+        <li class="step reveal">
+          <span class="step__n">4</span>
+          <h3>Rest</h3>
+          <p>Iris watches for fatigue and adapts: slower timing, larger targets, then a short check-in by voice.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section id="flow" class="flow">
+      <h2 class="reveal">Architecture</h2>
+      <p class="section-lead reveal">Two paths meet at one click. Sensing stays on the laptop; only an explicit voice request reaches the cloud.</p>
+
+      <div class="diagram reveal" id="diagram">
+        <div class="lane">
+          <span class="lane__label">Sensing loop, on the laptop</span>
+          <div class="nodes">
+            <div class="node">Webcam</div>
+            <div class="arrow"></div>
+            <div class="node">MediaPipe<small>Face Landmarker</small></div>
+            <div class="arrow"></div>
+            <div class="node">Calibration fit<small>packages/core</small></div>
+            <div class="arrow"></div>
+            <div class="node">Snap to target<small>packages/core</small></div>
+          </div>
+        </div>
+
+        <div class="lane">
+          <span class="lane__label">Voice request</span>
+          <div class="nodes">
+            <div class="node">Mic</div>
+            <div class="arrow"></div>
+            <div class="node">ElevenLabs agent<small>VoiceAgent</small></div>
+            <div class="arrow"></div>
+            <div class="node">Cloudflare Worker<small>holds API keys</small></div>
+            <div class="arrow"></div>
+            <div class="node">Gemini<small>PageUnderstanding</small></div>
+          </div>
+        </div>
+
+        <div class="merge">
+          <div class="node node--accent">Double blink<small>DoubleBlinkDetector</small></div>
+          <div class="arrow"></div>
+          <div class="node node--accent">Page helper clicks target</div>
+        </div>
+      </div>
+
+      <div class="table-wrap reveal">
+        <table>
+          <thead><tr><th>Interface</th><th>Implementations</th></tr></thead>
+          <tbody>
+            <tr><td><code>GazeProvider</code></td><td>MediaPipe, simulated</td></tr>
+            <tr><td><code>FaceProvider</code></td><td>Presage companion, simulated</td></tr>
+            <tr><td><code>VitalsProvider</code></td><td>Presage companion, simulated</td></tr>
+            <tr><td><code>VoiceAgent</code></td><td>ElevenLabs Agents</td></tr>
+            <tr><td><code>PageUnderstanding</code></td><td>Gemini</td></tr>
+            <tr><td><code>SessionStore</code></td><td>In memory, local only, Tiger Data</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="privacy" class="privacy">
+      <h2 class="reveal">Private by default</h2>
+      <ul class="cards">
+        <li class="card reveal"><h3>Video stays home</h3><p>Camera frames and face landmarks are processed on the laptop and never leave it.</p></li>
+        <li class="card reveal"><h3>Body signals in memory</h3><p>Heart rate, breathing and blink data are used for slow trends and are not stored.</p></li>
+        <li class="card reveal"><h3>Screenshots on request</h3><p>A page screenshot goes to Gemini only when you ask, and is never kept.</p></li>
+        <li class="card reveal"><h3>No keys in the extension</h3><p>Every API key lives in the Worker. The extension holds none.</p></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <img src="assets/iris-logo-static.svg" alt="" width="20" height="20">
+    <span>Iris. Desktop Chrome. Built for Hack Knight.</span>
+  </footer>
+
+  <script src="main.js"></script>
+</body>
+</html>
