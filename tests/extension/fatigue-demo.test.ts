@@ -15,8 +15,9 @@ function mount() {
   const button = section.querySelector('button')!;
   const cover = section.querySelector<HTMLInputElement>('input[type=checkbox]')!;
   const status = () => section.querySelector('[role=status]')!.textContent ?? '';
-  const why = () => [...section.querySelectorAll('li')].map((li) => li.textContent);
-  return { section, button, cover, status, why };
+  const list = (name: string) => [...section.querySelectorAll(`ul.${name} li`)].map((li) => li.textContent);
+  const why = () => list('why');
+  return { section, button, cover, status, why, list };
 }
 
 /** Advances the fake clock one second at a time and returns the time (s) each new status first appeared. */
@@ -32,7 +33,7 @@ function watch(status: () => string, seconds: number, from: number): Map<string,
 
 describe('fatigue demo in the side panel', () => {
   it('waits for Play, then goes from fresh to tiring to strained as the scripted user tires', () => {
-    const { button, status, why } = mount();
+    const { button, status, why, list } = mount();
     expect(status()).toBe('Fatigue: not running.');
     button.click();
     expect(button.textContent).toBe('Stop demo');
@@ -45,6 +46,7 @@ describe('fatigue demo in the side panel', () => {
     expect(seen.get('Fatigue: strained.')).toBeLessThan(260);
     expect(why().length).toBeGreaterThan(0);
     expect(why().join(' ')).toMatch(/Blink rate up|Heart rate variability down|Breathing rate up/);
+    expect(list('signals')[0]).toMatch(/^Blink rate: \d+ a minute \(your normal \d+, \+\d+%\)$/);
   });
 
   it('pauses and holds the score while the camera is covered', () => {

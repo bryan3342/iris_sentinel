@@ -51,24 +51,35 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
   const why = document.createElement('ul');
+  why.className = 'why';
+  const signals = document.createElement('ul');
+  signals.className = 'signals';
   const response = document.createElement('p');
-  section.append(heading, play, coverLabel, status, why, response);
+  const note = document.createElement('p');
+  note.className = 'note';
+  section.append(heading, play, coverLabel, status, why, signals, response, note);
 
   let run: Run | null = null;
   let state: FatigueState | null = null;
 
-  const render = () => {
-    const view = fatigueView(state);
-    if (status.textContent !== view.status) status.textContent = view.status;
-    why.replaceChildren(
-      ...view.why.map((line) => {
+  const lines = (list: HTMLUListElement, items: string[]) =>
+    list.replaceChildren(
+      ...items.map((line) => {
         const item = document.createElement('li');
         item.textContent = line;
         return item;
       }),
     );
+
+  const render = () => {
+    const view = fatigueView(state);
+    if (status.textContent !== view.status) status.textContent = view.status;
+    lines(why, view.why);
+    lines(signals, view.signals);
     response.textContent = view.response ?? '';
     response.hidden = view.response === null;
+    note.textContent = view.note ?? '';
+    note.hidden = view.note === null;
     play.textContent = run ? 'Stop demo' : 'Play demo';
     heading.textContent = run?.live ? 'Fatigue (live, from Presage)' : 'Fatigue (demo, simulated signals)';
     play.hidden = coverLabel.hidden = Boolean(run?.live);
