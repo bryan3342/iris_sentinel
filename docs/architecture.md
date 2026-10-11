@@ -96,6 +96,7 @@ Browser client tools are described in section 3.2; user-talking signals remain a
 | :--- | :--- |
 | `GazeProvider` (where the user looks, eye closure for the double-blink confirm) | MediaPipe, simulated |
 | `FaceProvider` (blink events for blink rate, expressions, motion warning, face points) | Presage companion, simulated |
+| `PointerProvider` (index fingertip, thumb to index gap for a pinch) | MediaPipe |
 | `VitalsProvider` (HR, HRV, breathing rate) | Presage companion, simulated |
 | `VoiceAgent` (conversation, user talking on/off) | ElevenLabs Agents |
 | `PageUnderstanding` | Gemini |
