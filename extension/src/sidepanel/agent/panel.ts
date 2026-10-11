@@ -36,6 +36,8 @@ export interface ConversationPanel {
   element: HTMLElement;
   /** Takes each live fatigue result; Iris checks in by voice when the user seems tired (see CheckIn). */
   onFatigue(state: FatigueState): void;
+  /** A conversation is connecting or open. The fatigue card sets blinks and breathing aside meanwhile. */
+  readonly talking: boolean;
 }
 
 /** `opening` resolves once the panel's opening animation is over; listening and the greeting wait for it. */
@@ -97,6 +99,9 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
     onFatigue(state) {
       // Only the level and pause are read. With Listening off, Iris stays quiet.
       if (listening.checked && checkIn.update(state, performance.now(), handsFree.talking)) handsFree.greet(CHECK_IN);
+    },
+    get talking() {
+      return handsFree.talking;
     },
   };
 }

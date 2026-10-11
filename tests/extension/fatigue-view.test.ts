@@ -69,6 +69,11 @@ describe('fatigueView while measuring', () => {
     expect(fatigueView(state(), { running: false, session }).progress).toBeNull();
   });
 
+  it('says when a conversation has blink rate and breathing on hold', () => {
+    expect(fatigueView(state({ talking: true })).why).toContain('Talking: blink rate and breathing on hold');
+    expect(fatigueView(state()).why).not.toContain('Talking: blink rate and breathing on hold');
+  });
+
   it('keeps the held score while the face is out of view', () => {
     const view = fatigueView(state({ score: 47.6, level: 'tiring', paused: 'no-face' }, { hrv: clue(null, 45, null) }));
     expect(view.status).toBe('Fatigue: paused (score 48).');

@@ -18,6 +18,8 @@ import { fatigueView } from './fatigue-view';
 export type BodySource = FaceProvider & VitalsProvider;
 
 export interface FatiguePanelOptions {
+  /** Whether a voice conversation is open; blink and breathing readings are set aside while it is. */
+  talking?: () => boolean;
   /** The side panel clock, in milliseconds. */
   now?: () => number;
   /** Makes the body source for one run. `covered` tells whether the camera is covered. */
@@ -38,7 +40,7 @@ interface Run {
   timer: ReturnType<typeof setInterval>;
 }
 
-export function fatiguePanel({ now = () => performance.now(), body = demoBody, live, onFatigue }: FatiguePanelOptions = {}): HTMLElement {
+export function fatiguePanel({ now = () => performance.now(), body = demoBody, live, onFatigue, talking = () => false }: FatiguePanelOptions = {}): HTMLElement {
   const section = document.createElement('section');
   section.className = 'fatigue';
   const heading = document.createElement('h2');
@@ -105,6 +107,7 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
       source.onVitals((sample) => engine.addVitals(stamp(sample))),
     ];
     const timer = setInterval(() => {
+      engine.setTalking(now(), talking());
       state = engine.update(now());
       session = addToSession(session ?? emptySession(), state);
       if (liveSource) onFatigue?.(state);

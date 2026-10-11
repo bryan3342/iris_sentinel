@@ -44,7 +44,7 @@ export function mountPanel(root: HTMLElement): void {
     // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
     const link = companionLink();
     root.append(microphonePanel(), voice.element, pageAccessPanel(), numbersPanel(marks), gaze.element,
-      companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state) }));
+      companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state), talking: () => voice.talking }));
   }
 
   openCamera()

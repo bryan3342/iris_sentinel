@@ -68,6 +68,7 @@ export function fatigueView(state: FatigueState | null, { running = true, sessio
   if (!state.paused && why.length === 0) why.push('Signals near your normal');
   const learning = BODY_CLUES.some(({ clue }) => state.clues[clue].value !== null && !state.clues[clue].personal);
   if (!state.paused && learning) why.push('Still learning your normal');
+  if (state.talking) why.push('Talking: blink rate and breathing on hold');
   return {
     status,
     why,
