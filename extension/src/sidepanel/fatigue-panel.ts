@@ -10,8 +10,8 @@ import { fatigueView } from './fatigue-view';
 // check-in). Otherwise Play runs the simulated body: a scripted user who is
 // rested for a minute and then tires, so the whole chain can be seen without a
 // camera, and "Cover camera" stands in for the face leaving the view. Simulated
-// results only show on the card; they never reach `onFatigue`. Every input is stamped on the side panel clock when it
-// arrives, so all of them share one clock. Nothing here is logged, stored or
+// results only show on the card; they never reach `onFatigue`. Every input is
+// stamped on the side panel clock when it arrives, so all of them share one clock. Nothing here is logged, stored or
 // sent; what the card shows describes body readings and stays on screen.
 
 export type BodySource = FaceProvider & VitalsProvider;
