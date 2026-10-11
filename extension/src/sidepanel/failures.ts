@@ -19,7 +19,7 @@ const HINTS: Record<string, string> = {
   TIMEOUT: 'The request timed out.', REQUEST_IN_FLIGHT: 'A request is already running.',
   RATE_LIMITED: 'Iris allows ten requests a minute. Wait a moment, then try again.',
   NO_TARGETS: 'No links or buttons are visible on this page.',
-  NO_AIMED_TARGET: 'Rest your eyes, or the mouse, on a numbered target for a moment first.',
+  NO_AIMED_TARGET: 'Rest your eyes, or the mouse, on a link or button until it is outlined first.',
   NOTHING_LOOKED_AT: 'Iris could not tell which paragraph, image or table you were looking at. Rest your eyes on it for a moment and ask again, or say "summarize the whole page".',
   LIST_IMAGES_FIRST: 'List the visible image numbers first.', IMAGE_NOT_FOUND: 'No visible image has that number.',
   DISABLED: SETUP, NOT_CONFIGURED: SETUP, CONTENT_NOT_APPROVED: SETUP, FORBIDDEN: SETUP,

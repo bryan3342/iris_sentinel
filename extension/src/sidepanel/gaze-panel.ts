@@ -15,7 +15,7 @@ const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
   NEEDS_DOUBLE_BLINK: 'That one may submit, pay, delete or send, so only a double blink opens it. Nothing was selected.',
   STALE: 'The page changed, so nothing was selected.',
-  NO_TARGET: 'Double blink seen, but no number was held under your gaze just before it. Rest your eyes on a number until it is outlined, then blink twice.',
+  NO_TARGET: 'Double blink seen, but nothing was outlined under your gaze just before it. Rest your eyes on a link or button until it is outlined, then blink twice.',
 };
 
 /** What picking a target by voice led to: ready for the user's double blink, nothing aiming yet, or no such number. */
@@ -41,7 +41,7 @@ export interface GazePanel {
 
 /**
  * Eye aiming. It runs whenever the camera is on and a calibration fits this screen, which setup makes
- * sure of: looking aims at the nearest number while a red ring follows the gaze on the page, a double
+ * sure of: looking aims at the nearest link or button, outlined, while a red ring follows the gaze on the page, a double
  * blink selects, and a risky target opens only with a double blink. Head-tilt scrolling runs alongside
  * it from the same camera samples, and is the one switch left here.
  */
@@ -91,7 +91,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
       if (tilt.checked) headScroll.update(sample, targets.list?.tabId ?? null);
     }) };
     active.session.start();
-    status.textContent = 'Looking aims at the nearest number. Blink twice quickly to select it; looking alone never clicks.';
+    status.textContent = 'Looking aims at the nearest link or button, outlined on the page. Blink twice quickly to select it; looking alone never clicks.';
   };
   /** The calibration saved for this screen, or null. */
   const saved = async (): Promise<CalibrationStore | null> => {

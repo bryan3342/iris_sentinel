@@ -40,6 +40,15 @@ describe('page overlay', () => {
     expect(drawn().at(-1)!.textContent).toBe('2'); // the aimed number is drawn on top
   });
 
+  it('with numbers off, outlines the aimed and voice-picked targets but draws no numbers', async () => {
+    const snapshot = pageSnapshot();
+    const result = await pageOverlay({
+      type: 'show', documentToken: snapshot.documentToken, revision: snapshot.revision, targets: TARGETS, highlight: 1, armed: 2, numbers: false,
+    });
+    expect(result).toBe('SHOWN');
+    expect(drawn().map((el) => el.className)).toEqual(['aim', 'aim armed', 'armed-note']);
+  });
+
   it('does not count its own mounting or redrawing as a page change', async () => {
     const snapshot = pageSnapshot();
     await show(snapshot, 1);
