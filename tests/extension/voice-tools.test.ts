@@ -67,7 +67,7 @@ it('finds a target and selects it for the user to open with a double blink, with
   expect(await tools().find_on_page!({ description: 'sign in' })).toMatch(/^It is number 12\. It is selected\. Blink twice to open it\./);
   expect(pick).toHaveBeenCalledWith(12);
   pick.mockReturnValue('NO_AIMING');
-  expect(await tools().find_on_page!({ description: 'sign in' })).toMatch(/^It is number 12\. Turn on aiming to open it\./);
+  expect(await tools().find_on_page!({ description: 'sign in' })).toMatch(/^It is number 12\. Eye aiming starts once setup is finished, then you can open it\./);
   expect(inspect).toHaveBeenCalledWith({ operation: 'find_target', request: 'sign in' });
   inspect.mockResolvedValue(result({ operation: 'find_target', targetId: null, explanation: 'Nothing like that.' }));
   expect(await tools().find_on_page!({ description: 'pricing' })).toMatch(/^No clear match\./);
@@ -88,8 +88,6 @@ it('opens a named number at once when it is safe, leaves a risky one for the per
   expect(open).toHaveBeenCalledWith(12);
   open.mockResolvedValue('PICKED_EYES');
   expect(await tools().select_number!({ number: 3 })).toBe('Number 3 may submit, pay, delete or send, so it is selected: blink twice to open it.');
-  open.mockResolvedValue('PICKED_MOUSE'); // a mouse rest never opens a risky target: only a double blink does
-  expect(await tools().select_number!({ number: 3 })).toBe('Could not do that. NEEDS_EYES. This needs a double blink to confirm. Turn on Aim with my eyes first.');
   open.mockResolvedValue('NO_SUCH_NUMBER');
   expect(await tools().select_number!({ number: 40 })).toMatch(/^Could not do that\. NO_SUCH_NUMBER\./);
   open.mockResolvedValue('NO_AIMING');
@@ -97,7 +95,7 @@ it('opens a named number at once when it is safe, leaves a risky one for the per
   open.mockResolvedValue('STALE');
   expect(await tools().select_number!({ number: 5 })).toMatch(/^Could not do that\. PAGE_CHANGED\./);
   expect(await tools().select_number!({ number: 'twelve' })).toMatch(/INVALID_INPUT/);
-  expect(open).toHaveBeenCalledTimes(6); // the invalid request never reached the page
+  expect(open).toHaveBeenCalledTimes(5); // the invalid request never reached the page
 });
 
 it('clicks what the person describes: Gemini finds it, and it opens only where Gemini saw it', async () => {

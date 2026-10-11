@@ -147,10 +147,9 @@ ten a minute.
 
 Gemini can describe whatever gaze is aiming at. This uses one more request.
 
-1. In the side panel, turn on **Point with the mouse**,
-   or calibrate with **Calibrate on this page** and turn on **Aim with my eyes**.
-2. Rest your eyes (or the mouse) on the "More information" link for about a
-   second, until it is outlined.
+1. Finish setup in the side panel, so aiming with your eyes is on.
+2. Rest your eyes on the "More information" link for about a second, until it
+   is outlined.
 3. Say "what is this". Iris uses the target you rested on, even if your eyes
    have moved since.
 

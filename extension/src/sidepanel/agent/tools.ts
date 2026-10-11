@@ -1,6 +1,6 @@
 import { pageScroll, type ScrollDirection } from '../../content/scroll';
 import { activeTab, type PageCoordinator } from '../../page-understanding/coordinator';
-import type { GazePanel, PickResult } from '../gaze-panel';
+import type { GazePanel } from '../gaze-panel';
 import type { PageMarks } from '../page-marks';
 import type { OpenResult } from '../voice-open';
 import { choice, untrusted, voiceTool, words } from './tool';
@@ -16,19 +16,11 @@ export interface ToolDeps {
 
 const SCROLLS: Record<ScrollDirection, string> = { down: 'Scrolled down.', up: 'Scrolled up.', top: 'At the top of the page.', bottom: 'At the bottom of the page.' };
 
-/** What the user does next for a target picked by voice; throws when it could not be picked. */
-function confirmHint(result: PickResult): string {
-  if (result === 'PICKED_EYES') return 'Blink twice to open it.';
-  if (result === 'PICKED_MOUSE') return 'Rest the mouse on it to open it.';
-  throw new Error(result);
-}
-
 /** What the person hears after asking to open number `id`; throws when nothing was opened or picked. */
 function openedSay(id: number, result: OpenResult): string {
   switch (result) {
     case 'OPENED': return `Opened number ${id}.`;
     case 'PICKED_EYES': return `Number ${id} may submit, pay, delete or send, so it is selected: blink twice to open it.`;
-    case 'PICKED_MOUSE': throw new Error('NEEDS_EYES'); // a mouse rest never opens a risky target: only a double blink does
     case 'STALE': throw new Error('PAGE_CHANGED');
     default: throw new Error(result); // NO_AIMING or NO_SUCH_NUMBER
   }
@@ -39,8 +31,8 @@ function openedSay(id: number, result: OpenResult): string {
  * summaries, descriptions and finding a target go through page understanding (Gemini) only because
  * the user asked. Asking to click a number, or a target Gemini finds, opens a safe one at once
  * through the gaze panel (the page checks it again first); anything that may submit, pay, delete or
- * send is only selected, and the user opens it with a double blink (or, pointing with the mouse, by
- * resting on it). Finding a target without asking to click it only selects it.
+ * send is only selected, and the user opens it with a double blink. Finding a target without asking
+ * to click it only selects it.
  */
 export function browserTools({ coordinator, marks, gaze, report }: ToolDeps): VoiceTools {
   const tool = voiceTool(report);
@@ -83,7 +75,7 @@ export function browserTools({ coordinator, marks, gaze, report }: ToolDeps): Vo
       if (result.result.targetId === null) return `No clear match. ${untrusted(result.result.explanation)}`;
       const id = result.result.targetId;
       const picked = gaze.pick(id);
-      const next = picked === 'PICKED_EYES' || picked === 'PICKED_MOUSE' ? `It is selected. ${confirmHint(picked)}` : 'Turn on aiming to open it.';
+      const next = picked === 'PICKED_EYES' ? 'It is selected. Blink twice to open it.' : 'Eye aiming starts once setup is finished, then you can open it.';
       return `It is number ${id}. ${next} ${untrusted(result.result.explanation)}`;
     }),
     click_on: tool(async ({ description }) => {

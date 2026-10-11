@@ -30,9 +30,9 @@ it('plays a line in the offscreen audio page, opening it if needed', async () =>
   expect(createDocument).toHaveBeenCalledWith(expect.objectContaining({ url: 'offscreen.html', reasons: ['AUDIO_PLAYBACK'] }));
   expect(sendMessage).toHaveBeenCalledWith({ target: 'offscreen', line: 'ready' });
   createDocument.mockRejectedValueOnce(new Error('Only a single offscreen document may be created.'));
-  expect(await playLine('intro')).toBe(true); // already open
+  expect(await playLine('welcome')).toBe(true); // already open
   sendMessage.mockRejectedValueOnce(new Error('Could not establish connection.'));
-  expect(await playLine('intro')).toBe(false);
+  expect(await playLine('welcome')).toBe(false);
 });
 
 it('the audio page plays only a named line for the side panel, and answers once it has played', async () => {
@@ -40,11 +40,11 @@ it('the audio page plays only a named line for the side panel, and answers once 
   const answer = (message: unknown, sender = panel) => new Promise<boolean | 'ignored'>((done) => {
     if (!handleVoiceMessage(message, sender, done)) setTimeout(() => done('ignored'), 0);
   });
-  expect(await answer({ target: 'offscreen', line: 'intro' })).toBe(true);
-  expect(played).toEqual(['chrome-extension://iris/voice/intro.mp3']);
+  expect(await answer({ target: 'offscreen', line: 'welcome' })).toBe(true);
+  expect(played).toEqual(['chrome-extension://iris/voice/welcome.mp3']);
   expect(await answer({ target: 'offscreen', line: 'missing' })).toBe(false);
   expect(await answer({ target: 'offscreen', line: '../x' })).toBe(false);
-  expect(await answer({ target: 'offscreen', line: 'intro' }, { id: 'iris', url: 'chrome-extension://iris/permission.html' } as chrome.runtime.MessageSender)).toBe(false);
+  expect(await answer({ target: 'offscreen', line: 'welcome' }, { id: 'iris', url: 'chrome-extension://iris/permission.html' } as chrome.runtime.MessageSender)).toBe(false);
   expect(await answer({ type: 'iris.voice.session' })).toBe('ignored'); // the broker's messages are not for this page
   expect(played).toHaveLength(2);
 });

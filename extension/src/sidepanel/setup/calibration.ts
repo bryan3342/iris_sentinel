@@ -12,15 +12,24 @@ export const DOT_LAYOUTS: Record<5 | 9 | 16, Point2[]> = {
   9: grid([0.05, 0.5, 0.95]),
   16: grid([0.05, 0.35, 0.65, 0.95]),
 };
-/**
- * Accuracy check dots: a 4x4 grid reaching toward the corners and through the middle, each 7% of the
- * screen away from the nearest calibration dot, so the check is not graded on the points the fit was made from.
- */
-export const CHECK_DOTS: Point2[] = grid([0.12, 0.42, 0.58, 0.88]);
 const SETTLE_MS = 800; // skip the eyes' travel and settling onto the dot
+const STEADY_SAMPLES = 30; // about one second of a tracked face
 const COLLECT_MS = 1000;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Resolves once the camera has tracked the face for an unbroken stretch, so the dots start on a steady face. */
+export function faceSteady(provider: GazeProvider, samples = STEADY_SAMPLES): Promise<void> {
+  return new Promise((resolve) => {
+    let steady = 0;
+    const unsubscribe = provider.onSample((sample) => {
+      steady = sample.eye ? steady + 1 : 0;
+      if (steady < samples) return;
+      unsubscribe();
+      resolve();
+    });
+  });
+}
 
 /** Draws one calibration dot at a time, wherever the dots are shown (a playground stage, or the browsing tab). */
 export interface DotPresenter {

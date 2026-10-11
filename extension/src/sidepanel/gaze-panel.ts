@@ -1,58 +1,15 @@
-import { CalibrationStore, GazeAim, GazePointer, measureAccuracy, RestingPoint, type AccuracyReport } from '@iris/core';
+import { CalibrationStore, GazeAim, GazePointer, RestingPoint } from '@iris/core';
 import type { GazeProvider, Point2, Rect } from '@iris/protocol';
-import { pagePointer } from '../content/pointer';
-import { simulatedCalibration, SimulatedGazeProvider } from '../providers/simulated/gaze';
 import { GazeCursor } from './gaze-cursor';
 import { HeadScroller } from './head-scroll';
 import { GazeSession, selectInPage, type Outcome } from './gaze-session';
 import type { PageMarks } from './page-marks';
-import { loadSamples, saveCheck, saveSamples, type AccuracyRecord } from './setup/calibration-storage';
-import { calibrateOnPage, checkOnPage, screenFrame } from './setup/page-calibration';
+import { loadSamples, saveSamples } from './setup/calibration-storage';
+import { calibrateOnPage, screenFrame } from './setup/page-calibration';
 import type { LiveTargetList } from './target-list';
 import { openByVoice, type OpenResult } from './voice-open';
 
-const POINTER_POLL_MS = 50;
 const screenSize = () => ({ width: screen.width, height: screen.height });
-
-/** Pointing with the mouse: the mouse over the browsing tab aims like the eyes, with a perfect calibration. */
-function mouseGaze(targets: LiveTargetList): { provider: SimulatedGazeProvider; store: CalibrationStore; stop: () => void } {
-  let at: Point2 | null = null;
-  const timer = setInterval(() => {
-    const tabId = targets.list?.tabId;
-    if (tabId === undefined) return void (at = null);
-    chrome.scripting.executeScript({ target: { tabId }, func: pagePointer })
-      .then(([result]) => { at = result?.result ?? null; }, () => { at = null; });
-  }, POINTER_POLL_MS);
-  const provider = new SimulatedGazeProvider(() => at);
-  const store = new CalibrationStore();
-  store.setDots(simulatedCalibration(), screenSize());
-  return { provider, store, stop: () => { clearInterval(timer); provider.stop(); } };
-}
-
-const round = (v: number) => Math.round(v);
-/** Where a check dot sat, in words: top left, middle, bottom right and so on. */
-function place(at: Point2): string {
-  const row = at.y < 1 / 3 ? 'top' : at.y > 2 / 3 ? 'bottom' : 'middle';
-  const column = at.x < 1 / 3 ? 'left' : at.x > 2 / 3 ? 'right' : 'center';
-  return row === 'middle' && column === 'center' ? 'the middle' : row === 'middle' ? `middle ${column}` : `${row} ${column}`;
-}
-/** One check in plain words, with up to three earlier ones (other lid angles or seats) to compare against. */
-function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): string {
-  const { posture, regions, worst } = report;
-  const px = (v: number | null) => (v === null ? 'n/a' : `${round(v)} px`);
-  const now = `Gaze lands ${round(report.meanPx)} px from where you look on average, about ${report.meanDeg.toFixed(1)}° of visual angle ` +
-    `(webcam eye trackers typically reach 1° to 2°; ${round(report.share * 100)}% of the screen width); ` +
-    `left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
-    `While your eyes held still the gaze wandered about ${round(report.shakePx)} px. ` +
-    `Corners ${px(regions.corners)}, edges ${px(regions.edges)}, between the quadrants ${px(regions.middle)}; ` +
-    `top half ${px(regions.top)}, bottom half ${px(regions.bottom)}.` +
-    (worst ? ` Worst: ${place(worst.target)} (${round(worst.px)} px).` : '') +
-    ` Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
-  // Checks saved before shake was measured have none.
-  const shake = (r: AccuracyRecord) => (r.report.shakePx === undefined ? '' : `, wandered ${round(r.report.shakePx)} px`);
-  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°${shake(r)})`);
-  return before.length ? `${now} Earlier checks: ${before.join(', ')}.` : now;
-}
 
 const OUTCOMES: Record<Outcome, string> = {
   SELECTED: 'Selected.',
@@ -61,51 +18,45 @@ const OUTCOMES: Record<Outcome, string> = {
   NO_TARGET: 'Double blink seen, but no number was held under your gaze just before it. Rest your eyes on a number until it is outlined, then blink twice.',
 };
 
-/**
- * Side panel controls for gaze: calibrating on the page, aiming with the
- * camera, or, for development, the mouse standing in for the eyes. One at a
- * time. Looking aims; a double blink confirms and selects it (with the mouse, resting one second on a target does),
- * and a risky target opens only with a double blink.
- */
-/** What picking a target by voice led to: ready for the eyes' or the mouse's confirm, nothing aiming, or no such number. */
-export type PickResult = 'PICKED_EYES' | 'PICKED_MOUSE' | 'NO_AIMING' | 'NO_SUCH_NUMBER';
+/** What picking a target by voice led to: ready for the user's double blink, nothing aiming yet, or no such number. */
+export type PickResult = 'PICKED_EYES' | 'NO_AIMING' | 'NO_SUCH_NUMBER';
 
 export interface GazePanel {
   element: HTMLElement;
+  /** The camera is ready: aiming starts with the calibration saved for this screen, if there is one. */
   useCamera(provider: GazeProvider): void;
+  /** Whether a calibration saved for this screen exists. */
+  calibrated(): Promise<boolean>;
+  /** Runs the calibration dots over the website in the active tab, saves them and aims with them; false when they could not run or finish. */
+  calibrate(): Promise<boolean>;
   /** Picks target `id` for the user's next confirm (see GazeSession.arm). */
   pick(id: number): PickResult;
   /** Opens target `id` for a spoken request, a risky one only after the user's confirm (see openByVoice); `seen` is where it was when found. */
   open(id: number, seen?: Rect): Promise<OpenResult>;
   /** Has the user's next double blink on tab `tabId` run `run` (see GazeSession.armAction); false unless the eyes are aiming. */
   confirm(tabId: number, run: () => void): boolean;
-  /** Where on the page the eyes (or mouse) rested in the last few seconds, or null. */
+  /** Where on the page the eyes rested in the last few seconds, or null. */
   lookedAt(): Point2 | null;
 }
 
+/**
+ * Eye aiming. It runs whenever the camera is on and a calibration fits this screen, which setup makes
+ * sure of: looking aims at the nearest number while a red ring follows the gaze on the page, a double
+ * blink selects, and a risky target opens only with a double blink. Head-tilt scrolling runs alongside
+ * it from the same camera samples, and is the one switch left here.
+ */
 export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel {
   const section = document.createElement('section');
   section.className = 'gaze-aim';
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
-  const toggle = (text: string) => {
-    const label = document.createElement('label');
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    label.append(input, ` ${text}`);
-    return { label, input };
-  };
-  const eyes = toggle('Aim with my eyes');
-  const mouse = toggle('Point with the mouse');
-  const tilt = toggle('Tilt your head to scroll');
-  tilt.input.checked = true;
-  const calibrate = document.createElement('button');
-  calibrate.textContent = 'Calibrate on this page';
-  const check = document.createElement('button');
-  check.textContent = 'Check accuracy';
+  const tiltLabel = document.createElement('label');
+  const tilt = document.createElement('input');
+  tilt.type = 'checkbox';
+  tilt.checked = true;
+  tiltLabel.append(tilt, ' Tilt your head to scroll');
   const report = (outcome: Outcome) => { status.textContent = OUTCOMES[outcome]; };
-  eyes.input.disabled = calibrate.disabled = check.disabled = true;
-  // The live cursor follows wherever the user looks (or points), on the page itself.
+  // The live cursor follows wherever the user looks, on the page itself.
   const cursor = new GazeCursor();
   // Recent gaze on the current tab, for "summarize this". Kept in memory only, for five seconds.
   const rest = new RestingPoint();
@@ -116,8 +67,7 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
     rest.push(at, performance.now());
   };
   let camera: GazeProvider | null = null;
-  let active: { session: GazeSession; stop?: () => void; mouse?: boolean } | null = null;
-  // Head-tilt scrolling runs alongside eye aiming, from the same camera samples.
+  let active: { session: GazeSession; stop: () => void } | null = null;
   const headScroll = new HeadScroller();
 
   let generation = 0; // bumps on every stop, so a slow calibration load cannot start a stale session
@@ -125,139 +75,75 @@ export function gazePanel(marks: PageMarks, targets: LiveTargetList): GazePanel 
   const stop = () => {
     generation++;
     active?.session.stop();
-    active?.stop?.();
+    active?.stop();
     active = null;
     cursor.stop();
     rest.clear();
     headScroll.stop();
-    status.textContent = '';
   };
   /** Aims with the camera through a calibration saved in screen positions. */
   const aimWithEyes = (provider: GazeProvider, store: CalibrationStore) => {
-    eyes.input.checked = true;
     active = { session: new GazeSession(provider, new GazeAim(new GazePointer(store)), marks, {
       frameFor: screenFrame, onOutcome: report, onGaze,
       // Every gaze selection refines the calibration for the posture the user is in now.
       learn: true, onLearned: () => void saveSamples(store.samples),
     }), stop: provider.onSample((sample) => {
-      if (tilt.input.checked) headScroll.update(sample, targets.list?.tabId ?? null);
+      if (tilt.checked) headScroll.update(sample, targets.list?.tabId ?? null);
     }) };
     active.session.start();
     status.textContent = 'Looking aims at the nearest number. Blink twice quickly to select it; looking alone never clicks.';
   };
-  eyes.input.addEventListener('change', () => {
-    stop();
-    mouse.input.checked = false;
-    if (!eyes.input.checked || !camera) return;
-    const provider = camera;
-    const mine = generation;
-    void loadSamples().then((samples) => {
-      let store: CalibrationStore | null = null;
-      try { store = new CalibrationStore(samples, screenSize()); } catch { store = null; }
-      if (mine !== generation) return;
-      if (!store?.model) {
-        eyes.input.checked = false;
-        status.textContent = 'Calibrate on this page first.';
-        return;
-      }
-      aimWithEyes(provider, store);
-    });
-  });
-  calibrate.addEventListener('click', () => {
-    if (!camera) return;
-    const provider = camera;
-    stop();
-    eyes.input.checked = mouse.input.checked = false;
-    const mine = generation;
-    calibrate.disabled = true;
-    status.textContent = 'Look at each dot on the page until it moves. This takes about 29 seconds.';
-    void (async () => {
-      const list = await targets.read().catch(() => null);
-      if (!list) {
-        status.textContent = 'Open a website in this tab, then calibrate.';
-        return;
-      }
-      const store = new CalibrationStore();
-      store.setDots(await calibrateOnPage(provider, list), screenSize());
-      await saveSamples(store.samples);
-      if (mine === generation) aimWithEyes(provider, store);
-    })().catch(() => {
-      status.textContent = 'Calibration needs your face in view. Try again.';
-    }).finally(() => {
-      calibrate.disabled = false;
-    });
-  });
-  check.addEventListener('click', () => {
-    if (!camera) return;
-    const provider = camera;
-    stop();
-    eyes.input.checked = mouse.input.checked = false;
-    const mine = generation;
-    check.disabled = true;
-    void (async () => {
+  /** The calibration saved for this screen, or null. */
+  const saved = async (): Promise<CalibrationStore | null> => {
+    try {
       const store = new CalibrationStore(await loadSamples(), screenSize());
-      if (!store.model) {
-        status.textContent = 'Calibrate on this page first.';
-        return;
-      }
-      const list = await targets.read().catch(() => null);
-      if (!list) {
-        status.textContent = 'Open a website in this tab, then check.';
-        return;
-      }
-      status.textContent = 'Look at each dot until it moves. This takes about 29 seconds.';
-      const samples = await checkOnPage(provider, list);
-      if (samples.length === 0) throw new Error('no gaze samples'); // an empty check would read as 0 px error
-      const result = measureAccuracy(store.model, samples, screenSize());
-      const checks = await saveCheck({ at: Date.now(), report: result, frame: screenSize(), samples });
-      if (mine !== generation) return;
-      aimWithEyes(provider, store);
-      status.textContent = describeCheck(result, checks.slice(0, -1));
-    })().catch(() => {
-      status.textContent = 'The check needs your face in view. Try again.';
-    }).finally(() => {
-      check.disabled = false;
-    });
-  });
-  tilt.input.addEventListener('change', () => {
-    if (!tilt.input.checked) headScroll.stop();
-  });
-  mouse.input.addEventListener('change', () => {
-    stop();
-    eyes.input.checked = false;
-    if (!mouse.input.checked) return;
-    const sim = mouseGaze(targets);
-    active = { session: new GazeSession(sim.provider, new GazeAim(new GazePointer(sim.store)), marks, { onOutcome: report, onGaze, dwell: true }), stop: sim.stop, mouse: true };
-    active.session.start();
-    void sim.provider.start();
-    status.textContent = 'Move the mouse over the page: the nearest number is highlighted. Rest on it for a second to select it. Anything that may submit, pay, delete or send needs a double blink, so aim with your eyes for those.';
+      return store.model ? store : null;
+    } catch { return null; }
+  };
+  tilt.addEventListener('change', () => {
+    if (!tilt.checked) headScroll.stop();
   });
   const pick = (id: number): PickResult => {
     if (!active) return 'NO_AIMING';
-    if (!active.session.arm(id)) return 'NO_SUCH_NUMBER';
-    return active.mouse ? 'PICKED_MOUSE' : 'PICKED_EYES';
+    return active.session.arm(id) ? 'PICKED_EYES' : 'NO_SUCH_NUMBER';
   };
-  section.append(calibrate, check, eyes.label, tilt.label, mouse.label, status);
+  section.append(tiltLabel, status);
   return {
     element: section,
     useCamera(provider) {
       camera = provider;
-      eyes.input.disabled = calibrate.disabled = check.disabled = false;
       // A calibration saved for this screen carries over: aiming resumes by itself, with no new dots.
       const mine = generation;
-      void loadSamples().then((samples) => {
-        let store: CalibrationStore | null = null;
-        try { store = new CalibrationStore(samples, screenSize()); } catch { store = null; }
-        if (mine !== generation || active || !store?.model) return;
+      void saved().then((store) => {
+        if (mine !== generation || active || !store) return;
         aimWithEyes(provider, store);
         status.textContent = 'Aiming with your saved calibration for this screen. Blink twice quickly to select; looking alone never clicks.';
       });
+    },
+    calibrated: async () => (await saved()) !== null,
+    async calibrate() {
+      const provider = camera;
+      const list = provider && await targets.read().catch(() => null);
+      if (!provider || !list) return false;
+      stop();
+      const mine = generation;
+      status.textContent = 'Look at each dot on the page until it moves.';
+      try {
+        const store = new CalibrationStore();
+        store.setDots(await calibrateOnPage(provider, list), screenSize());
+        await saveSamples(store.samples);
+        if (mine === generation) aimWithEyes(provider, store);
+        return true;
+      } catch {
+        status.textContent = 'Calibration needs your face in view. The dots start again.';
+        return false;
+      }
     },
     lookedAt: () => (active ? rest.point(performance.now()) : null),
     pick,
     open: (id, seen) => openByVoice(id, seen, { read: () => targets.read(), select: selectInPage, pick }),
     confirm(tabId, run) {
-      if (!active || active.mouse) return false; // only a double blink confirms an action
+      if (!active) return false; // only a double blink confirms an action, and it needs the eyes aiming
       active.session.armAction(tabId, run);
       return true;
     },
