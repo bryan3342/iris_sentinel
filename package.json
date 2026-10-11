@@ -14,7 +14,8 @@
     "dev:ext": "npm run dev:ext -w @iris/extension",
     "build": "npm run build -w @iris/extension",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "voice:lines": "node --env-file=server/.dev.vars scripts/generate-voice-lines.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

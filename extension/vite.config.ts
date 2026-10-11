@@ -14,6 +14,7 @@ export default defineConfig({
       input: {
         sidepanel: resolve(import.meta.dirname, 'sidepanel.html'),
         permission: resolve(import.meta.dirname, 'permission.html'),
+        offscreen: resolve(import.meta.dirname, 'offscreen.html'),
         background: resolve(import.meta.dirname, 'src/background/index.ts'),
       },
       output: {

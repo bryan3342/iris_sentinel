@@ -60,14 +60,16 @@ speaking it hangs up and listens locally again. Starts are capped at three a min
 Audio worklets ship inside the extension. Turning Listening off or closing the panel
 ends the session, including late connections, and stops all microphone use. Audio is
 sent to ElevenLabs only while a conversation is connected, which begins only when the
-user speaks or Iris greets. The first opening ever starts with a short animation (the
+user speaks or Iris checks in. The first opening ever starts with a short animation (the
 eye appears in the middle and blinks, then the rest of the wordmark pulls out of it to
 the right and settles centered; a still wordmark with reduced motion). On opening, after
-any animation, the panel connects at once to greet: the full
-spoken intro (also shown as text) the first time ever, until it has been heard, then
-"Iris is ready." The agent's own first message is empty, so a connection made on speech
-waits for the user. With Listening off there is no greeting. No transcripts are stored
-or logged.
+any animation, Iris speaks one fixed line, output only: the full intro (also shown as
+text) until it has played once, then "Iris here!". These lines are audio files in the
+agent's voice that ship inside the extension (generated once by `npm run voice:lines`)
+and play from an offscreen document, which Chrome lets play sound without a click; no
+microphone, server, network or conversation is involved. Listening starts only after
+the line ends, so Iris never hears itself. The agent's own first message is empty, so
+a connection made on speech waits for the user. No transcripts are stored or logged.
 Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
 | Layer | Choice | Role |

@@ -10,6 +10,7 @@ chrome.sidePanel
 let pending: { requestId: string; controller: AbortController } | undefined;
 // Only the extension side panel can use this privileged broker. Content scripts cannot.
 chrome.runtime.onMessage.addListener((message: unknown, sender, respond) => {
+  if ((message as { target?: unknown } | null)?.target === 'offscreen') return false; // for the voice page (offscreen.html), not the broker
   if (sender.id !== chrome.runtime.id || sender.url !== chrome.runtime.getURL('sidepanel.html') || sender.tab) return false;
   const handle = async (): Promise<unknown> => {
     const base = object(message, ['type'], ['tabId', 'windowId', 'input', 'requestId']);
