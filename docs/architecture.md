@@ -173,7 +173,7 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 
 **Focus score.** Combines how steady the gaze is on the page, blink pattern, movement level and Presage facial expressions. Like fatigue, it is computed against the user's own baseline and is never shown as a medical reading.
 
-**Presage signal limits** (from the SmartSpectra docs, confirmed on the demo laptop in #24). Readings carry a confidence value and only become trustworthy after a warm-up: 12 seconds for pulse, 30 seconds for breathing, 60 seconds for heart rate variability. Breathing needs the upper chest in view and a still camera, and talking distorts it. Iris ignores readings below their stable threshold, pauses breathing-based signals while the voice agent hears the user talking, and uses these signals only for slow trends (fatigue, focus), never for confirms.
+**Presage signal limits** (from the SmartSpectra docs, confirmed on the demo laptop in #24). Readings carry a confidence value and only become trustworthy after a warm-up: 12 seconds for pulse, 30 seconds for breathing, 60 seconds for heart rate variability. Breathing needs the upper chest in view and a still camera, and talking distorts it. Iris ignores readings below their stable threshold, sets blink and breathing readings aside while a voice conversation is open, and uses these signals only for slow trends (fatigue, focus), never for confirms.
 
 ### 3.2 Voice request flow
 
