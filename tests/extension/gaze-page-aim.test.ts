@@ -132,6 +132,17 @@ describe('GazeSession', () => {
     provider.stop();
   });
 
+  it('tells the live cursor which target is aimed, so the ring can snap onto it', async () => {
+    const aimed: (number | null)[] = [];
+    const { provider, gaze } = session([{ at: centerOf(3), ms: 1500 }], { onGaze: (_at, _list, id) => void aimed.push(id) });
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1400);
+    expect(aimed.at(-1)).toBe(3);
+    gaze.stop();
+    provider.stop();
+  });
+
   it('highlights the target the user looks at, messaging the page only when the aim moves', async () => {
     const { provider, gaze } = session([{ at: centerOf(1), ms: 1500 }, { at: centerOf(3), ms: 1500 }]);
     gaze.start();

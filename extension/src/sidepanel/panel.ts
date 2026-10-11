@@ -1,4 +1,4 @@
-import type { LightAdvice } from '@iris/core';
+import { fatigueResponse, type FatigueState, type LightAdvice } from '@iris/core';
 import type { GazeProvider } from '@iris/protocol';
 import { MediaPipeGazeProvider } from '../providers/mediapipe/provider';
 import { companionLink } from '../providers/companion/link';
@@ -64,10 +64,16 @@ export function mountPanel(root: HTMLElement): void {
       .then(() => runSetup(slides, setupDeps(gaze, camera, targets)))
       .catch(() => { slides.close(); return { spoke: false }; });
     const voice = conversationPanel({ coordinator, marks, gaze }, setup);
-    // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
+    // One companion link: its card shows the readings, and the fatigue card turns them into a level for
+    // voice check-ins and easier aiming. Without live readings, aiming goes back to normal.
     const link = companionLink();
+    link.onState((state) => { if (state !== 'connected') gaze.adapt(fatigueResponse('fresh')); });
+    const onFatigue = (state: FatigueState) => {
+      voice.onFatigue(state);
+      gaze.adapt(fatigueResponse(state.level));
+    };
     root.append(microphonePanel(), voice.element, numbersPanel(marks), gaze.element,
-      companionPanel(link), fatiguePanel({ live: link, onFatigue: (state) => voice.onFatigue(state), talking: () => voice.talking }));
+      companionPanel(link), fatiguePanel({ live: link, onFatigue, talking: () => voice.talking }));
   }
 }
 

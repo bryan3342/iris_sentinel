@@ -17,11 +17,25 @@ export class GazeAim {
   private targets: readonly SnapTarget[] = [];
   private frame: CalibrationFrame | null = null;
   private aimed: number | null = null;
+  /** The options in use: the given ones, scaled by setScale. */
+  private snap: SnapOptions;
 
   constructor(
     private readonly pointer: GazePointer,
     private readonly options: SnapOptions = DEFAULT_SNAP,
-  ) {}
+  ) {
+    this.snap = options;
+  }
+
+  /**
+   * Scales how far from a target gaze still aims at it, and how much closer a neighbor must be to
+   * take over, by `scale` (a fatigue response's target scale; 1 is the usual reach, and it never
+   * shrinks below that). Applies from the next sample.
+   */
+  setScale(scale: number): void {
+    const s = Math.max(1, scale);
+    this.snap = { maxDistance: this.options.maxDistance * s, hysteresis: this.options.hysteresis * s };
+  }
 
   /** The latest smoothed gaze point in page pixels, or null before calibration has one. */
   get point(): Point2 | null {
@@ -38,7 +52,7 @@ export class GazeAim {
     this.targets = targets;
     this.frame = frame;
     const point = this.pointer.point;
-    this.aimed = point ? snapToTarget(point, targets, null, this.options) : null;
+    this.aimed = point ? snapToTarget(point, targets, null, this.snap) : null;
     return this.aimed;
   }
 
@@ -56,7 +70,7 @@ export class GazeAim {
     if (!this.frame) return null;
     const point = this.pointer.update(sample, this.frame);
     if (!sample.eye || !point) return this.aimed;
-    this.aimed = snapToTarget(point, this.targets, this.aimed, this.options);
+    this.aimed = snapToTarget(point, this.targets, this.aimed, this.snap);
     return this.aimed;
   }
 }

@@ -37,8 +37,11 @@ export interface GazeSessionOptions {
    * while reading, so only a double blink clicks; on only for a pointer whose resting is deliberate.
    */
   dwell?: boolean;
-  /** Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face lost. */
-  onGaze?: (at: Point2 | null, list: TargetList) => void;
+  /**
+   * Told where the user is looking on each sample, in page pixels, or null with eyes closed or the face
+   * lost, and which target of `list` is aimed (or null), so the live cursor can snap onto it.
+   */
+  onGaze?: (at: Point2 | null, list: TargetList, aimed: number | null) => void;
 }
 
 const ARM_MS = 10_000; // how long a target picked by voice waits for the user's confirm
@@ -94,7 +97,7 @@ export class GazeSession {
         if (this.armed && sample.t > this.armed.until) this.disarm();
         if (this.action && sample.t > this.action.until) this.action = null;
         const aimed = this.aim.update(sample);
-        if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list);
+        if (this.list) this.options.onGaze?.(sample.eye ? this.aim.point : null, this.list, aimed);
         this.marks.setAim(aimed);
         // A double blink (or, for the mouse, a dwell) confirms the aimed target; decideSelection says what it opens.
         const dwelt = this.options.dwell ? this.dwell.update(sample, aimed) : null;
