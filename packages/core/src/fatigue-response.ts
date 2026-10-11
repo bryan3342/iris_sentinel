@@ -14,6 +14,7 @@ const PAUSE_LINES: Record<FatiguePause, string> = {
   'warming-up': 'Waiting for steady signals',
   'no-face': 'Face out of view, paused',
   'poor-view': 'Camera view unclear, paused',
+  talking: 'Talking with Iris, paused',
 };
 
 /** One line per clue, given the change from the user's normal as a whole percent. */

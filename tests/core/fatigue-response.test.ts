@@ -43,6 +43,7 @@ describe('explain', () => {
     expect(explain(state({}, 'warming-up'))).toEqual(['Waiting for steady signals']);
     expect(explain(state({}, 'no-face'))).toEqual(['Face out of view, paused']);
     expect(explain({ ...TIRED, paused: 'poor-view' })).toEqual(['Camera view unclear, paused']); // the pause, not the clues
+    expect(explain({ ...TIRED, paused: 'talking' })).toEqual(['Talking with Iris, paused']);
   });
 });
 
