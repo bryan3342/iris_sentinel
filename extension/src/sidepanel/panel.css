@@ -109,6 +109,8 @@ button {
 .brand.splash .stem { transform-box: fill-box; transform-origin: top; animation: splash-stem 0.5s ease-out 1.25s both; }
 .brand.splash .word__rest {
   display: inline-block; overflow: hidden; white-space: nowrap;
+  /* The tight letter spacing lets the "s" reach past its box; room inside the clip keeps it whole. */
+  padding-right: 0.1em; margin-right: -0.1em;
   animation: splash-pull 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 1.25s both;
 }
 
