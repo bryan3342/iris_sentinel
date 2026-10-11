@@ -14,6 +14,7 @@ import { microphonePanel } from './setup/microphone';
 import { conversationPanel } from './agent/panel';
 import { PageCoordinator } from '../page-understanding/coordinator';
 import { brandHeader } from './brand';
+import { firstOpenSplash } from './splash';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -37,7 +38,8 @@ export function mountPanel(root: HTMLElement): void {
   if (isExtensionPage()) {
     // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
-    const voice = conversationPanel({ coordinator, marks, gaze });
+    // The first opening ever starts with the Iris animation; the spoken intro follows it.
+    const voice = conversationPanel({ coordinator, marks, gaze }, firstOpenSplash(document.body));
     // One companion link: its card shows the readings, and the fatigue card turns them into a level for voice check-ins.
     const link = companionLink();
     root.append(microphonePanel(), voice.element, pageAccessPanel(), numbersPanel(marks), gaze.element,

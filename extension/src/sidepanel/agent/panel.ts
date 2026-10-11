@@ -39,7 +39,8 @@ export interface ConversationPanel {
   onFatigue(state: FatigueState): void;
 }
 
-export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }): ConversationPanel {
+/** `opening` resolves once the panel's opening animation is over; listening and the greeting wait for it. */
+export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }, opening: Promise<void> = Promise.resolve()): ConversationPanel {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
@@ -69,7 +70,7 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   let introPending = false;
   // Listening is on unless the person turned it off, and stays off across panel openings if they did.
   // Iris greets on opening, unless listening is off: the full intro once, until it has been heard.
-  void chrome.storage.local.get([LISTENING_KEY, GREETED_KEY]).catch(() => ({} as Record<string, unknown>)).then((stored) => {
+  void Promise.all([chrome.storage.local.get([LISTENING_KEY, GREETED_KEY]).catch(() => ({} as Record<string, unknown>)), opening]).then(([stored]) => {
     listening.checked = stored[LISTENING_KEY] !== false;
     handsFree.setOn(listening.checked);
     if (!listening.checked) return;
