@@ -4,7 +4,7 @@ import type { Unsubscribe } from './common';
  * Face sensing contract for slow trends: natural blinks for the fatigue score,
  * and whether the camera view is good enough to trust body signals. Implemented
  * by the Presage companion (and a simulated provider); callers never see vendor
- * types. Deliberate long blinks for confirms come from GazeProvider instead.
+ * types. Deliberate double blinks for confirms come from GazeProvider instead.
  */
 
 /** One natural blink. */

@@ -6,7 +6,7 @@ export interface PageSnapshot {
 }
 /**
  * Gaze's view of the page: target positions, plus whether selecting each one
- * needs a second confirm (missing counts as risky). Nothing here is sent off the device.
+ * is risky, so only a double blink opens it (missing counts as risky). Nothing here is sent off the device.
  */
 export type PageTargets = Pick<PageSnapshot, 'documentToken' | 'revision' | 'viewport' | 'targetsTruncated'> & {
   targets: (NumberedTarget & { risky?: boolean })[];

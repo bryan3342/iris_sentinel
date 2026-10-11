@@ -7,7 +7,7 @@ import type { GazeProvider, GazeSample, HeadPose, Point2, Unsubscribe } from '@i
 // or null while the eyes are closed or the face is out of view); the provider turns that into
 // eye samples through a fixed eye model, with optional webcam-like jitter from a
 // seeded generator so a run repeats exactly. The head stays still and level, and
-// the eyes always read open, so a null look never counts as a long blink.
+// the eyes always read open, so a null look never counts as a double blink.
 
 /** Where the simulated user is looking at `t` ms after start, as a fraction of the screen. */
 export type LookSource = (t: number) => Point2 | null;

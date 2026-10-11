@@ -53,9 +53,9 @@ it('calibrates with dots on the page, then aims in screen positions that follow 
   await provider.start();
   const targets = new LiveTargetList();
   const calibrating = calibrateOnPage(provider, (await targets.read())!);
-  await vi.advanceTimersByTimeAsync(9 * 1800);
+  await vi.advanceTimersByTimeAsync(16 * 1800);
   const samples = await calibrating;
-  expect(sent.filter((c) => c.type === 'dot')).toHaveLength(10); // nine dots, then hidden
+  expect(sent.filter((c) => c.type === 'dot')).toHaveLength(17); // sixteen dots, then hidden
   expect(dot).toBeNull();
 
   const store = new CalibrationStore();
@@ -77,4 +77,14 @@ it('calibrates with dots on the page, then aims in screen positions that follow 
   expect(highlights().at(-1)).toBe(2);
   gaze.stop();
   provider.stop();
+});
+
+it('divides the page zoom out, so a zoomed page lines up with a calibration made at another zoom', () => {
+  const list = { tabId: 1, window: { left: 100, top: 40 }, zoom: 2 } as Parameters<typeof screenFrame>[0];
+  const frame = screenFrame(list);
+  expect(frame).toEqual({ width: 1920 / 2, height: 1080 / 2, left: 50, top: 20 });
+  // A link 200 CSS pixels in on a 200% page sits 400 screen pixels right of the window's corner.
+  const screenX = (100 + 200 * 2) / 1920;
+  expect(screenX * frame.width - frame.left).toBeCloseTo(200, 6); // mapped back to the page: 200 CSS pixels
+  expect(screenFrame({ ...list, zoom: 1 })).toEqual({ width: 1920, height: 1080, left: 100, top: 40 });
 });

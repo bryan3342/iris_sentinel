@@ -12,6 +12,7 @@ import { understandingPanel } from './understanding';
 import { microphonePanel } from './setup/microphone';
 import { conversationPanel } from './agent/panel';
 import { PageCoordinator } from '../page-understanding/coordinator';
+import { brandHeader } from './brand';
 
 /** Builds the side panel UI. Shared by the extension and the playground. */
 export function mountPanel(root: HTMLElement): void {
@@ -28,14 +29,14 @@ export function mountPanel(root: HTMLElement): void {
   status.className = 'status';
   status.textContent = 'Starting camera...';
 
-  root.replaceChildren(preview, status);
+  root.replaceChildren(brandHeader(), preview, status);
   const targets = new LiveTargetList();
   const marks = new PageMarks(targets);
   const gaze = gazePanel(marks, targets);
   if (isExtensionPage()) {
     // One page understanding coordinator for the panel's buttons and the voice tools: one request at a time.
     const coordinator = new PageCoordinator({ afterCapture: () => marks.redraw() });
-    root.append(microphonePanel(), conversationPanel({ coordinator, marks }), pageAccessPanel(), numbersPanel(marks), gaze.element,
+    root.append(microphonePanel(), conversationPanel({ coordinator, marks, gaze }), pageAccessPanel(), numbersPanel(marks), gaze.element,
       understandingPanel(marks, coordinator), companionPanel(), fatiguePanel());
   }
 
