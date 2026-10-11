@@ -37,6 +37,7 @@ export class HandsFree {
   private phase: 'off' | 'idle' | 'waiting' | 'connecting' | 'connected' | 'problem' = 'off';
   private generation = 0;
   private stopListening: (() => void) | null = null;
+  private greeting: string | null = null; // said on the next connection, which then needs no speech
   private mode: VoiceState = 'disconnected';
   private lastActive = 0;
   private quietTimer?: ReturnType<typeof setInterval>;
@@ -57,6 +58,12 @@ export class HandsFree {
     else this.halt();
   }
 
+  /** Connects as soon as listening is up, without waiting for speech, and has the agent say `message`. */
+  greet(message: string): void {
+    this.greeting = message;
+    if (this.phase === 'waiting' && this.stopListening) void this.connect();
+  }
+
   /** Tries again after the person fixed what stopped listening. */
   retry(): void {
     if (this.on && this.phase === 'problem') void this.resume();
@@ -73,6 +80,7 @@ export class HandsFree {
       if (mine !== this.generation || this.phase !== 'waiting') return stop();
       this.stopListening = stop;
       this.deps.onStatus({ kind: 'waiting' });
+      if (this.greeting !== null) void this.connect();
     } catch (error) {
       if (mine === this.generation) this.problem(error);
     }
@@ -85,10 +93,14 @@ export class HandsFree {
     this.stopListening = null;
     this.deps.onStatus({ kind: 'connecting' });
     const mine = this.generation;
+    const greeting = this.greeting ?? undefined;
+    this.greeting = null;
     try {
-      await this.controller.start(this.deps.getUrl);
+      await this.controller.start(this.deps.getUrl, greeting);
     } catch (error) {
-      if (mine === this.generation) this.problem(error);
+      if (mine !== this.generation) return;
+      if (greeting !== undefined) this.greeting ??= greeting; // greet once it works
+      this.problem(error);
       return;
     }
     // Started without ever connecting (it closed at once): listen again.
@@ -122,6 +134,7 @@ export class HandsFree {
 
   private halt(): void {
     this.generation++;
+    this.greeting = null;
     this.phase = 'off';
     clearTimeout(this.retryTimer);
     clearInterval(this.quietTimer);

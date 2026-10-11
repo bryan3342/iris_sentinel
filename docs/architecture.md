@@ -60,7 +60,11 @@ speaking it hangs up and listens locally again. Starts are capped at three a min
 Audio worklets ship inside the extension. Turning Listening off or closing the panel
 ends the session, including late connections, and stops all microphone use. Audio is
 sent to ElevenLabs only while a conversation is connected, which begins only when the
-user speaks; no transcripts are stored or logged.
+user speaks or Iris greets. On opening, the panel connects at once to greet: the full
+spoken intro (also shown as text) the first time ever, until it has been heard, then
+"Iris is ready." The agent's own first message is empty, so a connection made on speech
+waits for the user. With Listening off there is no greeting. No transcripts are stored
+or logged.
 Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
 | Layer | Choice | Role |

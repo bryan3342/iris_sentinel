@@ -32,7 +32,7 @@ it('listens locally, and connects the agent only once the user starts speaking',
   expect(start).not.toHaveBeenCalled();
   speak(); await flush();
   expect(stopListening).toHaveBeenCalledTimes(1); // local listening stops before the agent opens the microphone
-  expect(start).toHaveBeenCalledWith('signed', expect.any(Function), {});
+  expect(start).toHaveBeenCalledWith('signed', expect.any(Function), {}, undefined); // no greeting: the agent waits for the user
   expect(statuses.at(-1)).toEqual({ kind: 'talking', state: 'listening' });
 });
 
@@ -74,4 +74,27 @@ it('waits for the person on a permission problem, and retries other failures aft
   expect(statuses.at(-1)).toEqual({ kind: 'problem', code: 'RATE_LIMITED' });
   await vi.advanceTimersByTimeAsync(30_000);
   expect(statuses.at(-1)).toEqual({ kind: 'waiting' });
+});
+
+it('greets as soon as listening is up, with no speech needed, and later connections wait for the user', async () => {
+  const handsFree = make();
+  handsFree.setOn(true); handsFree.greet('Iris is ready.'); await flush();
+  expect(start).toHaveBeenCalledWith('signed', expect.any(Function), {}, 'Iris is ready.');
+  t += QUIET_MS; await vi.advanceTimersByTimeAsync(1_000); // hangs up, listens locally
+  speak(); await flush();
+  expect(start).toHaveBeenLastCalledWith('signed', expect.any(Function), {}, undefined);
+});
+
+it('keeps the greeting for when the problem is fixed, and drops it when turned off', async () => {
+  let allowed = false;
+  const handsFree = make(async () => { if (!allowed) throw new Error('GATEWAY_ACCESS'); return 'signed'; });
+  handsFree.setOn(true); handsFree.greet('Hi'); await flush();
+  expect(statuses.at(-1)).toEqual({ kind: 'problem', code: 'GATEWAY_ACCESS' });
+  allowed = true; handsFree.retry(); await flush();
+  expect(start).toHaveBeenLastCalledWith('signed', expect.any(Function), {}, 'Hi');
+
+  const blocked = make(async () => { throw new Error('GATEWAY_ACCESS'); });
+  blocked.setOn(true); blocked.greet('Hi'); await flush();
+  blocked.setOn(false); blocked.setOn(true); await flush();
+  expect(statuses.at(-1)).toEqual({ kind: 'waiting' }); // no greeting left to connect for
 });

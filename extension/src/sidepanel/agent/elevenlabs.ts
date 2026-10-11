@@ -9,9 +9,11 @@ import type { VoiceAgent } from './voice';
  * asks, Iris runs them in the browser and returns only their spoken answer, never a screenshot.
  */
 export const elevenLabsVoice: VoiceAgent = {
-  async start(signedUrl, onState, tools) {
+  async start(signedUrl, onState, tools, firstMessage) {
     return Conversation.startSession({
       signedUrl, connectionType: 'websocket',
+      // The agent's own first message is empty, so it waits for the user unless Iris greets.
+      ...(firstMessage ? { overrides: { agent: { firstMessage } } } : {}),
       workletPaths: { rawAudioProcessor, audioConcatProcessor },
       clientTools: tools,
       onConnect: () => onState('listening'),
