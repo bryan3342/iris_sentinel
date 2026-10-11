@@ -5,7 +5,7 @@ Iris is a Chrome extension that lets people with severe motor impairments browse
 Track and technology choices behind this design are in [tracks.md](tracks.md).
 
 **Implementation status: v0.1 private-demo MVP.** The extension has a camera
-preview, gaze aiming with on-page calibration, dwell-confirmed selection of
+preview, gaze aiming with on-page calibration, double-blink selection of
 page targets, and an explicit-request page-understanding harness. The Worker implements
 authenticated screenshot/target matching, visible-viewport summaries and local
 image-crop descriptions. It remains disabled by default and has not been deployed
@@ -63,7 +63,7 @@ Browser client tools are described in section 3.2; user-talking signals remain a
 | Client | Chrome extension, Manifest V3, TypeScript | Side panel (UI, voice agent, gaze tracking), background coordinator, page helper injected into each tab |
 | Vitals and face sensing | **Presage SmartSpectra** (Node.js SDK) in a local companion | Heart rate, heart rate variability, breathing rate and waveform, natural blinks, facial expressions and a motion warning, used for slow trends (fatigue, focus), never for confirms. Runs on-device. Presage has no gaze output and no fatigue, focus or movement score; Iris computes those. |
 | Companion link | Chrome native messaging | Chrome starts the companion and only Iris's extension can reach it. No open network port. Iris's extension ID is fixed by a public key in its manifest, so the companion can name exactly one allowed caller. |
-| Gaze (where the user looks) | MediaPipe Face Landmarker (in the side panel) | Primary aiming source. Eye and head landmarks are mapped to a screen point through the 5-dot calibration. Its per-eye closure drives the double-blink confirm. The WebAssembly runtime and model are bundled with the extension. |
+| Gaze (where the user looks) | MediaPipe Face Landmarker (in the side panel) | Primary aiming source. Eye and head landmarks are mapped to a screen point through the 16-dot calibration. Its per-eye closure drives the double-blink confirm. The WebAssembly runtime and model are bundled with the extension. |
 | Voice | **ElevenLabs Agents** with client tools | Hands-free conversation with turn-taking; calls Iris actions as tools; tells Iris when the user is talking |
 | Fixed voice lines | ElevenLabs text-to-speech | Backup for short system lines if the agent connection fails |
 | Page understanding | **Gemini API** (Flash models, image input) | Matches spoken requests to numbered targets using a screenshot plus the target list, summarizes pages, describes images |
@@ -168,7 +168,7 @@ User speaks ─> ElevenLabs Agent (side panel, signed session from the local ser
                       └─ local server /v0.1/page-understanding/find_target
                            ─> Gemini ─> validated supplied target ID or null
                  └─ answers "It is number 12 ..."
-                 └─ picks target 12 (marked "blink twice or rest on it to open")
+                 └─ picks target 12 (marked "blink twice to open")
 User blinks twice ─> page helper clicks target 12
 ```
 
