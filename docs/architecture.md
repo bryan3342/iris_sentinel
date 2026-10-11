@@ -171,6 +171,8 @@ The first two stages are built. A neural gaze model is out of scope unless measu
 | Fatigued | Iris checks in by voice with a fixed phrase and takes requests by voice (built); offers to read the page aloud |
 | Sustained strain | Iris checks in by voice with the same fixed phrase (built); pauses gaze confirms until the user looks back |
 
+**Struggle check-in.** While body signals run, the side panel also watches heart rate and breathing for a sudden struggle (`StruggleDetector` in `packages/core`). It learns the user's resting level from the first minute of trusted readings of each session; when heart rate stays 20% above it, or breathing 30% above it, for 20 seconds, Iris says one fixed phrase, "We can see there is a sort of struggle here." (with Listening on), and turns on **Show numbers on the page**, so any target can be named by its number. It counts only readings Presage trusts, starts over when readings pause, sets everything aside while a conversation is open and for 30 seconds after, and offers help at most once every ten minutes. No reading reaches the voice agent, and the readings stay in memory.
+
 **Movement level.** Derived from frame-to-frame change in Presage face points plus its "excessive motion" warning. High movement lowers trust in the other body signals and can mean the user is restless or uncomfortable.
 
 **Focus score.** Combines how steady the gaze is on the page, blink pattern, movement level and Presage facial expressions. Like fatigue, it is computed against the user's own baseline and is never shown as a medical reading.
