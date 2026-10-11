@@ -19,17 +19,26 @@ async function createLandmarker(): Promise<HandLandmarker> {
  */
 export class MediaPipePointerProvider implements PointerProvider {
   private landmarker: HandLandmarker | null = null;
+  private loading: Promise<HandLandmarker> | null = null;
+  private running = false;
   private frameRequest: number | null = null;
   private readonly listeners = new Set<(sample: PointerSample) => void>();
 
   constructor(private readonly video: HTMLVideoElement) {}
 
   async start(): Promise<void> {
-    this.landmarker ??= await createLandmarker();
-    if (this.frameRequest === null) this.scheduleFrame();
+    this.running = true;
+    this.loading ??= createLandmarker().catch((error) => {
+      this.loading = null; // let a later start try again
+      throw error;
+    });
+    this.landmarker = await this.loading;
+    // stop() may have been called while the model loaded.
+    if (this.running && this.frameRequest === null) this.scheduleFrame();
   }
 
   stop(): void {
+    this.running = false;
     if (this.frameRequest !== null) this.video.cancelVideoFrameCallback(this.frameRequest);
     this.frameRequest = null;
   }
