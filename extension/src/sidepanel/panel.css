@@ -93,3 +93,34 @@ button {
 @media (prefers-reduced-motion: reduce) {
   .brand .blink, .brand .look { animation: none; }
 }
+
+/* First-open animation: the eye appears and blinks, then "ris" pulls out of it to the right and
+   the wordmark settles in the middle (the flex box keeps it centered as it widens), then fades. */
+.brand.splash {
+  position: fixed; inset: 0; z-index: 10; margin: 0;
+  justify-content: center; align-items: center;
+  background: Canvas; color: CanvasText;
+  animation: splash-out 0.4s ease-in 2.8s forwards;
+}
+.brand.splash .word { font-size: 80px; }
+.brand.splash .word__i { animation: splash-eye-in 0.5s ease-out both; }
+.brand.splash .blink { animation: splash-blink 0.35s ease-in-out 0.8s both; }
+.brand.splash .look { animation: none; }
+.brand.splash .stem { transform-box: fill-box; transform-origin: top; animation: splash-stem 0.5s ease-out 1.25s both; }
+.brand.splash .word__rest {
+  display: inline-block; overflow: hidden; white-space: nowrap;
+  animation: splash-pull 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 1.25s both;
+}
+
+@keyframes splash-eye-in { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+@keyframes splash-blink { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.08); } }
+@keyframes splash-stem { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes splash-pull {
+  from { max-width: 0; opacity: 0; clip-path: inset(0 100% 0 0); }
+  to { max-width: 2.5em; opacity: 1; clip-path: inset(0 0 0 0); }
+}
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .brand.splash, .brand.splash .word__i, .brand.splash .blink, .brand.splash .stem, .brand.splash .word__rest { animation: none; }
+}
