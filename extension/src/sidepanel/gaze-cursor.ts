@@ -1,6 +1,15 @@
-import type { Point2 } from '@iris/protocol';
+import type { Point2, Rect } from '@iris/protocol';
 import { GAZE_CURSOR_PORT, pageOverlay } from '../content/overlay';
 import { PageChannel } from './page-channel';
+
+/**
+ * Where the ring goes: the gaze point, or, when it snaps, the center of the aimed target, so a
+ * tired user sees exactly what a double blink opens. No ring while the eyes are away.
+ */
+export function ringPoint(at: Point2 | null, aimed: { rect: Rect } | null, snap: boolean): Point2 | null {
+  if (!at || !snap || !aimed) return at;
+  return { x: aimed.rect.x + aimed.rect.width / 2, y: aimed.rect.y + aimed.rect.height / 2 };
+}
 
 /**
  * The live gaze cursor on the browsing tab. Each smoothed gaze point goes over one

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { GazeCursor } from '../../extension/src/sidepanel/gaze-cursor';
+import { GazeCursor, ringPoint } from '../../extension/src/sidepanel/gaze-cursor';
 
 type Port = { name: string; tabId: number; posted: unknown[]; postMessage: (m: unknown) => void; disconnect: ReturnType<typeof vi.fn>; drop: () => void;
   onDisconnect: { addListener: (l: () => void) => void } };
@@ -62,4 +62,13 @@ it('retries a tab it cannot draw on at most once a second', async () => {
   await vi.advanceTimersByTimeAsync(1000);
   cursor.move(1, { x: 1, y: 1 }); await flush();
   expect(injections).toEqual([1, 1]);
+});
+
+it('sits on the aimed target when it snaps, and follows the gaze otherwise', () => {
+  const aimed = { rect: { x: 100, y: 200, width: 80, height: 20 } };
+  const at = { x: 150, y: 190 };
+  expect(ringPoint(at, aimed, true)).toEqual({ x: 140, y: 210 }); // the target's center
+  expect(ringPoint(at, aimed, false)).toEqual(at);
+  expect(ringPoint(at, null, true)).toEqual(at); // nothing aimed: the ring follows the gaze
+  expect(ringPoint(null, aimed, true)).toBeNull(); // eyes closed or face lost: no ring
 });

@@ -1,7 +1,8 @@
 import type { NumberedTarget, Point2 } from '@iris/protocol';
 
 export type OverlayCommand =
-  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; armed?: number | null }
+  // `numbers: false` draws only the aimed and voice-picked outlines, without the targets' numbers.
+  | { type: 'show'; documentToken: string; revision: number; targets: NumberedTarget[]; highlight: number | null; armed?: number | null; numbers?: boolean }
   | { type: 'clear' }
   | { type: 'hold' }
   | { type: 'release' }
@@ -12,7 +13,7 @@ export type OverlayResult = 'SHOWN' | 'STALE' | 'CLEARED' | 'HELD';
 export const GAZE_CURSOR_PORT = 'iris.gaze-cursor';
 
 /**
- * Draws target numbers and one highlight over the page. Runs in Chrome's
+ * Draws target numbers (unless asked not to) and one highlight over the page. Runs in Chrome's
  * isolated world and must remain self-contained for executeScript. It only
  * draws: no clicks, focus or scrolling, and pointer events pass straight
  * through. The host is a plain div with a closed shadow root, mounted once and
@@ -171,6 +172,7 @@ export async function pageOverlay(command: OverlayCommand): Promise<OverlayResul
       Object.assign(note.style, { left: left(target.rect.x), top: top(target.rect.y + target.rect.height + 4) });
       aim.push(note);
     }
+    if (command.numbers === false) continue;
     const badge = document.createElement('div');
     badge.className = aimed ? 'badge aimed' : 'badge';
     badge.textContent = String(target.id);

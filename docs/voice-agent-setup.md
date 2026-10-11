@@ -24,7 +24,8 @@ ElevenLabs dashboard. It takes about 15 minutes.
 2. From `server/`, give the agent Iris's tools and system prompt:
    `npm run setup:elevenlabs`. It creates or updates every client tool in
    `voice-agent.json`, attaches them to the agent with **Wait for response** on,
-   and sets the system prompt.
+   switches on ElevenLabs' **Skip turn** system tool, which lets the agent stay
+   silent after a command that worked, and sets the system prompt.
    It also empties the agent's first message, so the agent waits for you, and
    allows Iris to set the first message, which it does only for a check-in when
    you seem tired.
@@ -34,7 +35,8 @@ ElevenLabs dashboard. It takes about 15 minutes.
    file changes, such as when Iris gains a new command.
 3. Check it: `npm run check:elevenlabs`. It should end with
    `Iris's browser tools attached: true`. If a tool is missing or does not wait
-   for a response, the agent can talk but cannot act on the page.
+   for a response, the agent can talk but cannot act on the page; if
+   `skip_turn` is missing, it talks after every command that worked.
 4. Restart the server with `npm run dev`.
 5. In the Iris side panel, click **Allow microphone** once, allow page access,
    and just speak: **Listening** under **Talk to Iris** is on by default. Iris
@@ -50,7 +52,8 @@ On a long public page, such as a Wikipedia article:
 | Say | Expected |
 | :--- | :--- |
 | (Open the side panel) | After the opening animation, the first time ever, Iris speaks a short intro, also shown as text; after that, "Iris here!". Nothing is expected back, and no microphone or server is needed |
-| "Scroll down" | The page moves down a screen; Iris says "Scrolled down." |
+| "Scroll down" | The page moves down a screen, and Iris says nothing: a command that works gets no reply |
+| "Go forward" on a tab with no next page | Iris says there is no page that way: it speaks when a command fails |
 | Talk while Iris is answering | Iris finishes its answer; it hears you only once it has finished speaking |
 | "Go to the bottom" / "go to the top" | The page jumps to that end |
 | "Go back" | The previous page opens |
@@ -59,7 +62,7 @@ On a long public page, such as a Wikipedia article:
 | "Summarize the whole page" | A short spoken summary of the visible part of the page |
 | "What is this?" while resting your eyes on a link | A spoken description of that link |
 | "Find the history section" | Iris names a number and marks it in blue; blink twice to open it |
-| "Click number 12" (with **Show numbers on the page** on) | Number 12 is marked in blue; blink twice to open it, wherever you are looking |
+| "Click number 12" (with **Show numbers on the page** on) | A safe link opens at once, silently; anything that may submit, pay, delete or send is marked in blue and Iris says "Blink twice to confirm." Blink twice to open it, wherever you are looking |
 
 The side panel shows each answer under **Talk to Iris**. Summaries, descriptions
 and finding each make one Gemini request, within Iris's limit of ten a minute.

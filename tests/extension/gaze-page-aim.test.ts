@@ -58,6 +58,19 @@ describe('PageMarks', () => {
     marks.stop();
   });
 
+  it('draws no numbers while only gaze aims, and every number while the switch has them on', async () => {
+    const marks = new PageMarks(new LiveTargetList());
+    marks.start(); // gaze aiming
+    await vi.advanceTimersByTimeAsync(600);
+    marks.setAim(2);
+    marks.showNumbers(true);
+    marks.showNumbers(true); // nothing changed: no redraw
+    marks.showNumbers(false);
+    const numbers = sent.filter((s) => s.command.type === 'show').map((s) => (s.command as { numbers?: boolean }).numbers);
+    expect(numbers).toEqual([false, false, true, false]);
+    marks.stop();
+  });
+
   it('erases the previous tab on a tab switch, and stops only when its last user stops', async () => {
     const marks = new PageMarks(new LiveTargetList());
     marks.start();
@@ -115,6 +128,17 @@ describe('GazeSession', () => {
     await vi.advanceTimersByTimeAsync(400);
     expect(seen.at(-1)).toBeNull();
     expect([...tabs]).toEqual([1]);
+    gaze.stop();
+    provider.stop();
+  });
+
+  it('tells the live cursor which target is aimed, so the ring can snap onto it', async () => {
+    const aimed: (number | null)[] = [];
+    const { provider, gaze } = session([{ at: centerOf(3), ms: 1500 }], { onGaze: (_at, _list, id) => void aimed.push(id) });
+    gaze.start();
+    await provider.start();
+    await vi.advanceTimersByTimeAsync(1400);
+    expect(aimed.at(-1)).toBe(3);
     gaze.stop();
     provider.stop();
   });

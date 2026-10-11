@@ -58,6 +58,16 @@ describe('GazeAim', () => {
     expect(far.update(look(800, 700))).toBeNull();
   });
 
+  it('reaches farther while targets are scaled up, so a tired user still lands on them', () => {
+    const aim = new GazeAim(new GazePointer(calibrated()));
+    aim.setTargets([target(1, 100, 100)], FRAME); // spans x 100 to 220
+    expect(aim.update(look(335, 115))).toBeNull(); // 115 px past its edge: beyond the usual 100 px reach
+    aim.setScale(1.25);
+    expect(aim.update(look(335, 115))).toBe(1); // within 125 px
+    aim.setScale(1);
+    expect(aim.update(look(335, 115))).toBeNull();
+  });
+
   it('holds the aim while the eyes are closed or the face is lost', () => {
     const aim = new GazeAim(new GazePointer(calibrated()));
     aim.setTargets([target(1, 100, 100), target(2, 600, 100)], FRAME);
