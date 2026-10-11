@@ -1,3 +1,4 @@
+import { CheckIn, type FatigueState } from '@iris/core';
 import { broker, type PageCoordinator } from '../../page-understanding/coordinator';
 import { GATEWAY } from '../../page-understanding/gateway';
 import { watchPageAccess } from '../setup/page-access';
@@ -14,6 +15,8 @@ const GREETED_KEY = 'iris.greeted';
 export const INTRO = "Hi, I'm Iris. I help you browse the web hands-free. Look at a link or button to aim at it, and blink twice to open it. Tilt your head to scroll. Or just talk to me: say scroll down, go back, summarize this, or click number 12. Whenever you need me, just speak.";
 /** Spoken on every later opening. */
 export const READY = 'Iris is ready.';
+/** Spoken when the user seems tired. Fixed, so nothing about their body reaches the voice agent. */
+export const CHECK_IN = 'Want a hand, or a short break?';
 const PROBLEMS: Record<string, string> = {
   MICROPHONE: 'Allow your microphone under Voice setup, and Iris starts listening.',
   AUDIO_BLOCKED: 'Click anywhere in this panel once to turn on listening.',
@@ -30,7 +33,13 @@ function describe(status: HandsFreeStatus): string {
   }
 }
 
-export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }): HTMLElement {
+export interface ConversationPanel {
+  element: HTMLElement;
+  /** Takes each live fatigue result; Iris checks in by voice when the user seems tired (see CheckIn). */
+  onFatigue(state: FatigueState): void;
+}
+
+export function conversationPanel(page: { coordinator: PageCoordinator; marks: PageMarks; gaze: GazePanel }): ConversationPanel {
   const panel = document.createElement('section');
   const title = document.createElement('h2'); title.textContent = 'Talk to Iris';
   const notice = document.createElement('p');
@@ -80,5 +89,12 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   }, () => {});
   addEventListener('pagehide', () => handsFree.setOn(false), { once: true });
   panel.append(title, notice, label, status, action);
-  return panel;
+  const checkIn = new CheckIn();
+  return {
+    element: panel,
+    onFatigue(state) {
+      // Only the level and pause are read. With Listening off, Iris stays quiet.
+      if (listening.checked && checkIn.update(state, performance.now(), handsFree.talking)) handsFree.greet(CHECK_IN);
+    },
+  };
 }

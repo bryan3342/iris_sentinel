@@ -67,6 +67,8 @@ export class CompanionLink implements FaceProvider, VitalsProvider {
   private readonly qualityListeners = new Set<(status: QualityStatus) => void>();
   private readonly vitalsListeners = new Set<(sample: VitalsSample) => void>();
   private readonly blinkListeners = new Set<(blink: BlinkEvent) => void>();
+  /** The latest quality while connected. The companion reports quality only when it changes. */
+  private quality: QualityStatus | null = null;
 
   constructor(private readonly options: CompanionLinkOptions) {
     this.now = options.now ?? (() => performance.now());
@@ -113,7 +115,9 @@ export class CompanionLink implements FaceProvider, VitalsProvider {
     return subscribe(this.statusListeners, listener);
   }
 
+  /** Also tells a listener that joins late the current quality, which otherwise would come only on its next change. */
   onQuality(listener: (status: QualityStatus) => void): Unsubscribe {
+    if (this.quality) listener(this.quality);
     return subscribe(this.qualityListeners, listener);
   }
 
@@ -150,9 +154,12 @@ export class CompanionLink implements FaceProvider, VitalsProvider {
       case 'status':
         this.statusListeners.forEach((listener) => listener(message.state));
         break;
-      case 'quality':
-        this.qualityListeners.forEach((listener) => listener({ t, quality: message.quality, hint: message.hint }));
+      case 'quality': {
+        const status = { t, quality: message.quality, hint: message.hint };
+        this.quality = status;
+        this.qualityListeners.forEach((listener) => listener(status));
         break;
+      }
       case 'vitals': {
         const sample = { t, pulse: message.pulse, breathing: message.breathing, hrv: message.hrv };
         this.vitalsListeners.forEach((listener) => listener(sample));
@@ -166,6 +173,7 @@ export class CompanionLink implements FaceProvider, VitalsProvider {
 
   private setState(state: LinkState): void {
     this.current = state;
+    if (state !== 'connected') this.quality = null;
     this.stateListeners.forEach((listener) => listener(state));
   }
 }
