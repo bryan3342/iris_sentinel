@@ -2,6 +2,7 @@ import { FatigueEngine, type FatigueState } from '@iris/core';
 import type { FaceProvider, Unsubscribe, VitalsProvider } from '@iris/protocol';
 import type { LinkState } from '../providers/companion/link';
 import { DEMO_WARM_UP, SimulatedBodyProvider, TIRING_DEMO } from '../providers/simulated/body';
+import { addToSession, emptySession, type FatigueSession } from './fatigue-session';
 import { fatigueView } from './fatigue-view';
 
 // Side panel section that runs the fatigue engine on a body source and shows
@@ -50,17 +51,23 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
   // Only the level line is announced: the reasons change often and would be read out constantly.
   const status = document.createElement('p');
   status.setAttribute('role', 'status');
+  const progress = document.createElement('p');
+  progress.className = 'note progress';
   const why = document.createElement('ul');
   why.className = 'why';
   const signals = document.createElement('ul');
   signals.className = 'signals';
   const response = document.createElement('p');
+  const summary = document.createElement('ul');
+  summary.className = 'summary';
   const note = document.createElement('p');
   note.className = 'note';
-  section.append(heading, play, coverLabel, status, why, signals, response, note);
+  section.append(heading, play, coverLabel, status, progress, why, signals, response, summary, note);
 
   let run: Run | null = null;
   let state: FatigueState | null = null;
+  /** Scores and levels of the current run, or of the last one once stopped: shown as its summary. */
+  let session: FatigueSession | null = null;
 
   const lines = (list: HTMLUListElement, items: string[]) =>
     list.replaceChildren(
@@ -72,10 +79,13 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
     );
 
   const render = () => {
-    const view = fatigueView(state);
+    const view = fatigueView(state, { running: run !== null, session, mode: run?.live === false ? 'demo' : 'live' });
     if (status.textContent !== view.status) status.textContent = view.status;
+    progress.textContent = view.progress ?? '';
+    progress.hidden = view.progress === null;
     lines(why, view.why);
     lines(signals, view.signals);
+    lines(summary, view.summary);
     response.textContent = view.response ?? '';
     response.hidden = view.response === null;
     note.textContent = view.note ?? '';
@@ -96,10 +106,12 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
     ];
     const timer = setInterval(() => {
       state = engine.update(now());
+      session = addToSession(session ?? emptySession(), state);
       if (liveSource) onFatigue?.(state);
       render();
     }, 1_000);
     run = { source, live: Boolean(liveSource), stops, timer };
+    session = emptySession(now());
     if (!liveSource) void source.start();
     render();
   };
@@ -110,7 +122,7 @@ export function fatiguePanel({ now = () => performance.now(), body = demoBody, l
     run.stops.forEach((unsubscribe) => unsubscribe());
     clearInterval(run.timer);
     run = null;
-    state = null;
+    state = null; // the session summary stays on screen as the result
     render();
   };
 
