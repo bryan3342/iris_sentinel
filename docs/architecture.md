@@ -51,11 +51,16 @@ lease apply to minting; they do not cap conversation duration or global spend.
 The response is not cached. API keys stay in Worker secrets; signed URLs must
 remain in memory and must never be logged. The side panel has a microphone
 permission button that opens an extension tab, checks audio-only access and
-immediately stops all tracks without sending audio. Start/Stop conversation connects
-the side panel to the local Worker's signed-session endpoint and ElevenLabs over
-WebSocket through a neutral VoiceAgent interface. Audio worklets ship inside the
-extension. Stop and panel closure end the session, including late connections.
-Audio is sent to ElevenLabs only after Start; no transcripts are stored or logged.
+immediately stops all tracks without sending audio. Voice is hands-free: while
+**Listening** is on, the side panel reads only microphone loudness on the laptop
+(`SpeechGate` in `packages/core`; nothing recorded or sent). When the user starts
+speaking it connects to the local Worker's signed-session endpoint and ElevenLabs over
+WebSocket through a neutral VoiceAgent interface, and after a minute with neither side
+speaking it hangs up and listens locally again. Starts are capped at three a minute.
+Audio worklets ship inside the extension. Turning Listening off or closing the panel
+ends the session, including late connections, and stops all microphone use. Audio is
+sent to ElevenLabs only while a conversation is connected, which begins only when the
+user speaks; no transcripts are stored or logged.
 Browser client tools are described in section 3.2; user-talking signals remain a subsequent milestone.
 
 | Layer | Choice | Role |

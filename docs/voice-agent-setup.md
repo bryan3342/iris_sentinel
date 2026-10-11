@@ -32,7 +32,8 @@ ElevenLabs dashboard. It takes about 15 minutes.
    for a response, the agent can talk but cannot act on the page.
 4. Restart the server with `npm run dev`.
 5. In the Iris side panel, click **Allow microphone** once, allow page access,
-   then **Start conversation** under **Talk to Iris**.
+   and just speak: **Listening** under **Talk to Iris** is on by default. Iris
+   connects when you start talking and hangs up after a minute of quiet.
 
 Editing the tools or prompt by hand in the dashboard works too, but the next
 `npm run setup:elevenlabs` puts them back to `voice-agent.json`.
