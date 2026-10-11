@@ -125,3 +125,14 @@ describe('fatigue from the live companion', () => {
     expect(results).toHaveLength(0);
   });
 });
+
+describe('fatigue while talking to Iris', () => {
+  it('pauses while a conversation is open, and says so', () => {
+    const section = fatiguePanel({ now: () => Date.now(), talking: () => true });
+    section.querySelector('button')!.click();
+    vi.advanceTimersByTime(60_000);
+    const list = (name: string) => [...section.querySelectorAll(`ul.${name} li`)].map((li) => li.textContent);
+    expect(section.querySelector('[role=status]')!.textContent).toMatch(/^Fatigue: paused/);
+    expect(list('why')).toContain('Talking with Iris, paused');
+  });
+});
