@@ -13,17 +13,20 @@ function send(tabId: number, command: OverlayCommand): void {
 }
 
 /**
- * The one thing that draws on the browsing tab: every target's number plus the
- * aimed target, from the live target list. The numbers switch and gaze aiming
- * both use it, so they never overwrite each other. The page is messaged only
- * when the list or the aim changes, and moving to another tab erases the
- * previous one. Runs while at least one user has started it.
+ * The one thing that draws on the browsing tab: the aimed target, plus every
+ * target's number while the numbers switch has them on, from the live target
+ * list. The numbers switch and gaze aiming both use it, so they never overwrite
+ * each other. The page is messaged only when the list, the aim or the numbers
+ * setting changes, and moving to another tab erases the previous one. Runs
+ * while at least one user has started it.
  */
 export class PageMarks {
   private users = 0;
   private list: TargetList | null = null;
   private aim: number | null = null;
   private armed: number | null = null;
+  /** Off at first: aiming alone draws only the outlined target and the red ring. */
+  private numbers = false;
   private drawnTab: number | null = null;
   private stopListening: (() => void) | null = null;
   private aimFor: ((list: TargetList) => number | null) | null = null;
@@ -54,6 +57,13 @@ export class PageMarks {
   /** The target the user last rested on, not one the aim merely passed over, or null. */
   get aimed(): Aimed | null {
     return this.settled.get(this.now());
+  }
+
+  /** Draws every target's number, or none; the numbers switch sets this. */
+  showNumbers(on: boolean): void {
+    if (on === this.numbers) return;
+    this.numbers = on;
+    this.draw();
   }
 
   /** Marks the target the voice agent picked, which the user's next confirm opens, or nothing. */
@@ -96,6 +106,9 @@ export class PageMarks {
     const target = list?.targets.find((t) => t.id === this.aim);
     this.settled.update(list && target ? { list, target } : null, this.now());
     if (!list) return;
-    send(list.tabId, { type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets, highlight: this.aim, armed: this.armed });
+    send(list.tabId, {
+      type: 'show', documentToken: list.documentToken, revision: list.revision, targets: list.targets,
+      highlight: this.aim, armed: this.armed, numbers: this.numbers,
+    });
   }
 }
