@@ -40,6 +40,16 @@ button:focus-visible, input[type='checkbox']:focus-visible { outline: 3px solid 
 label:has(> input[type='checkbox']) { display: flex; align-items: center; gap: 10px; margin: 10px 0; font-size: 1.05rem; cursor: pointer; }
 input[type='checkbox'] { width: 20px; height: 20px; margin: 0; accent-color: var(--iris-teal); cursor: pointer; }
 
+/* Heart rate and breathing graph: heart rate in red above breathing in teal, each line at least 3:1 against the background. */
+.vitals-graph { margin: 12px 0 4px; }
+.vitals-graph figcaption { margin-bottom: 4px; font-size: 0.95rem; }
+.vitals-graph svg { display: block; width: 100%; height: auto; }
+.vitals-graph path { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.vitals-graph path.pulse { stroke: light-dark(#dc2626, #f87171); }
+.vitals-graph path.breathing { stroke: light-dark(var(--iris-teal), var(--iris-teal-light)); }
+.vitals-graph .axis { stroke: color-mix(in srgb, CanvasText 30%, transparent); }
+.vitals-graph text { font-size: 10px; fill: color-mix(in srgb, CanvasText 70%, transparent); }
+
 .preview {
   position: relative;
 }
