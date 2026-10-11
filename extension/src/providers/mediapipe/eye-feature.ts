@@ -199,3 +199,26 @@ export function toGazeSample(frame: FaceFrame, t: number): GazeSample {
   const lid = lidWeight > 0 ? withLid.reduce((sum, r) => sum + r.weight * r.lid!, 0) / lidWeight : undefined;
   return { t, eye: lid === undefined ? eye : { ...eye, lid }, head, blink };
 }
+
+/**
+ * Which detected face is the user's, when someone else is in the picture too: the one nearest the
+ * face followed until now, or at first the largest (the one closest to the camera). Faces are
+ * compared by their outer eye corners, in 0..1 image coordinates. Returns -1 for no faces.
+ */
+export function pickFace(faces: Point2[][], last: Point2 | null): number {
+  let best = -1, bestScore = Infinity;
+  faces.forEach((landmarks, i) => {
+    const at = faceCenter(landmarks);
+    const a = landmarks[RIGHT_EYE.cornerA], b = landmarks[LEFT_EYE.cornerB];
+    if (!at || !a || !b) return;
+    const score = last ? Math.hypot(at.x - last.x, at.y - last.y) : -Math.hypot(b.x - a.x, b.y - a.y);
+    if (score < bestScore) { best = i; bestScore = score; }
+  });
+  return best;
+}
+
+/** Midpoint of a face's outer eye corners, for following that face with pickFace. */
+export function faceCenter(landmarks: Point2[]): Point2 | null {
+  const a = landmarks[RIGHT_EYE.cornerA], b = landmarks[LEFT_EYE.cornerB];
+  return a && b ? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 } : null;
+}

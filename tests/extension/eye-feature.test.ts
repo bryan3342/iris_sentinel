@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Point2 } from '@iris/protocol';
-import { ClosureTimer, type FaceFrame, holdThroughBlink, irisPoints, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
+import { ClosureTimer, type FaceFrame, holdThroughBlink, irisPoints, pickFace, toGazeSample } from '../../extension/src/providers/mediapipe/eye-feature';
 
 const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -259,5 +259,27 @@ describe('holdThroughBlink', () => {
     const last = { t: 100, eye: { x: 0.1, y: -0.2 }, head: { yaw: 0.1, pitch: 0, eyes: { x: 0.5, y: 0.5 }, eyeSpan: 0.2 }, blink: { left: 0.02, right: 0.03 } };
     const held = holdThroughBlink(last, { eyeBlinkLeft: 0.92, eyeBlinkRight: 0.88 }, 133);
     expect(held).toEqual({ ...last, t: 133, blink: { left: 0.92, right: 0.88 } });
+  });
+});
+
+describe('pickFace', () => {
+  /** A face whose outer eye corners sit `span` apart around `x`. */
+  const face = (x: number, span: number): Point2[] => {
+    const points: Point2[] = Array.from({ length: 478 }, () => ({ x, y: 0.4 }));
+    points[33] = { x: x - span / 2, y: 0.4 };
+    points[263] = { x: x + span / 2, y: 0.4 };
+    return points;
+  };
+
+  it('starts with the largest face, the one closest to the camera', () => {
+    expect(pickFace([face(0.2, 0.05), face(0.5, 0.2)], null)).toBe(1);
+  });
+
+  it('keeps following the same face when someone else comes into the picture', () => {
+    expect(pickFace([face(0.3, 0.3), face(0.7, 0.15)], { x: 0.68, y: 0.4 })).toBe(1);
+  });
+
+  it('finds no face in an empty picture', () => {
+    expect(pickFace([], null)).toBe(-1);
   });
 });

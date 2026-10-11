@@ -42,11 +42,14 @@ function describeCheck(report: AccuracyReport, earlier: AccuracyRecord[]): strin
   const now = `Gaze lands ${round(report.meanPx)} px from where you look on average, about ${report.meanDeg.toFixed(1)}° of visual angle ` +
     `(webcam eye trackers typically reach 1° to 2°; ${round(report.share * 100)}% of the screen width); ` +
     `left-right ${round(report.meanXPx)} px, up-down ${round(report.meanYPx)} px. ` +
+    `While your eyes held still the gaze wandered about ${round(report.shakePx)} px. ` +
     `Corners ${px(regions.corners)}, edges ${px(regions.edges)}, between the quadrants ${px(regions.middle)}; ` +
     `top half ${px(regions.top)}, bottom half ${px(regions.bottom)}.` +
     (worst ? ` Worst: ${place(worst.target)} (${round(worst.px)} px).` : '') +
     ` Head turned ${round(posture.yawDeg)}°, tilted ${round(posture.pitchDeg)}°.`;
-  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°)`);
+  // Checks saved before shake was measured have none.
+  const shake = (r: AccuracyRecord) => (r.report.shakePx === undefined ? '' : `, wandered ${round(r.report.shakePx)} px`);
+  const before = earlier.slice(-3).map((r) => `${round(r.report.meanPx)} px (tilted ${round(r.report.posture.pitchDeg)}°${shake(r)})`);
   return before.length ? `${now} Earlier checks: ${before.join(', ')}.` : now;
 }
 

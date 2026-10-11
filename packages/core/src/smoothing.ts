@@ -32,8 +32,8 @@ export class OneEuroFilter {
     this.derivativeCutoff = derivativeCutoff;
   }
 
-  /** Filters one value; `tMs` must increase between calls. */
-  filter(value: number, tMs: number): number {
+  /** Filters one value; `tMs` must increase between calls. `cutoffScale` below 1 smooths a less trusted reading harder. */
+  filter(value: number, tMs: number, cutoffScale = 1): number {
     if (this.last === null) {
       this.last = { value, t: tMs };
       return value;
@@ -45,7 +45,7 @@ export class OneEuroFilter {
     const aSpeed = smoothingFactor(dt, this.derivativeCutoff);
     this.speed = aSpeed * rawSpeed + (1 - aSpeed) * this.speed;
 
-    const cutoff = this.minCutoff + this.beta * Math.abs(this.speed);
+    const cutoff = this.minCutoff * cutoffScale + this.beta * Math.abs(this.speed);
     const a = smoothingFactor(dt, cutoff);
     const smoothed = a * value + (1 - a) * this.last.value;
     this.last = { value: smoothed, t: tMs };
