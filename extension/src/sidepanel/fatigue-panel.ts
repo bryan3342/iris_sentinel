@@ -6,11 +6,11 @@ import { fatigueView } from './fatigue-view';
 
 // Side panel section that runs the fatigue engine on the Presage companion's
 // live readings while it is connected, shows what it concludes, and passes each
-// result to `onFatigue` (the voice check-in). The companion starts as the panel
-// opens, so fatigue is always on while Iris is. Every input is stamped on the
-// side panel clock when it arrives, so all of them share one clock. Nothing here
-// is logged, stored or sent; what the card shows describes body readings and
-// stays on screen.
+// result to `onFatigue` (the voice check-in). It waits until the user starts
+// body signals, which stay off until then to save Presage credits. Every input
+// is stamped on the side panel clock when it arrives, so all of them share one
+// clock. Nothing here is logged, stored or sent; what the card shows describes
+// body readings and stays on screen.
 
 export type BodySource = FaceProvider & VitalsProvider;
 

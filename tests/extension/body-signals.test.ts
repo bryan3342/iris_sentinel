@@ -49,7 +49,7 @@ describe('status line', () => {
 describe('start and stop button', () => {
   const connected = () => withLink(initialBodySignals('connecting'), 'connected');
 
-  it('offers Start while off, to measure again after Stop', () => {
+  it('offers Start while off, so opening the panel uses no Presage credit', () => {
     expect(bodySignalsView(initialBodySignals('idle'), 0)).toMatchObject({ status: 'Body signals: off.', action: 'start' });
   });
 
