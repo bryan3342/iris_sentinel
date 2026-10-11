@@ -1,4 +1,4 @@
-// Iris landing page: scroll reveals, the gaze demo and the architecture walkthrough.
+// Iris landing page: scroll reveals and the gaze demo.
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -12,14 +12,13 @@ const revealObserver = new IntersectionObserver((entries) => {
   }
 }, { threshold: 0.15 });
 document.querySelectorAll(".reveal").forEach((el, i) => {
-  el.style.transitionDelay = `${(i % 4) * 80}ms`;
+  el.style.transitionDelay = `${(i % 3) * 100}ms`;
   revealObserver.observe(el);
 });
 
 // Gaze demo: the ring snaps to a numbered target, then a double blink opens it.
 const page = document.getElementById("demo-page");
 const gaze = document.getElementById("gaze");
-const eye = document.getElementById("eye");
 const status = document.getElementById("demo-status");
 const targets = [...page.querySelectorAll(".target")];
 
@@ -32,10 +31,8 @@ function aimAt(target) {
 }
 
 async function blink() {
-  eye.classList.add("is-closed");
   gaze.classList.add("is-hidden"); // the cursor hides while the eyes are closed
   await wait(160);
-  eye.classList.remove("is-closed");
   gaze.classList.remove("is-hidden");
   await wait(220);
 }
@@ -63,29 +60,4 @@ if (reducedMotion) {
   status.textContent = "Aimed at 2, blink twice to open";
 } else {
   runDemo();
-}
-
-// Architecture walkthrough: light each node in order, the way a request travels.
-const diagram = document.getElementById("diagram");
-const nodes = [...diagram.querySelectorAll(".node")];
-
-async function walkDiagram() {
-  for (;;) {
-    for (const node of nodes) {
-      node.classList.add("is-active");
-      await wait(550);
-      node.classList.remove("is-active");
-    }
-    await wait(900);
-  }
-}
-
-if (!reducedMotion) {
-  const diagramObserver = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) {
-      diagramObserver.disconnect();
-      walkDiagram();
-    }
-  }, { threshold: 0.4 });
-  diagramObserver.observe(diagram);
 }
