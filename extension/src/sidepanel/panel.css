@@ -71,3 +71,25 @@ button {
 
 .understanding input { display: block; width: 100%; box-sizing: border-box; margin: 12px 0; padding: 10px; }
 .understanding button { display: block; margin: 8px 0; }
+
+/* The Iris wordmark header. The dot of the "i" is an eye that blinks and glances. */
+.brand { display: flex; align-items: flex-end; margin: 0 0 14px; }
+.brand .word { display: inline-flex; align-items: flex-end; font-size: 26px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; }
+.brand .word__i { display: inline-block; width: 0.46em; height: 1em; position: relative; }
+.brand .word__svg { position: absolute; bottom: -0.02em; left: 0; width: 100%; height: auto; overflow: visible; color: currentColor; }
+.brand .word__rest { margin-left: 0.03em; }
+.brand .blink, .brand .look { transform-box: fill-box; transform-origin: center; }
+.brand .blink { animation: iris-blink 5.4s ease-in-out infinite; }
+.brand .look { animation: iris-drift 7.5s ease-in-out infinite; }
+
+@keyframes iris-blink { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.08); } }
+@keyframes iris-drift {
+  0%, 100% { transform: translate(0, 0); }
+  22% { transform: translate(3.5px, -2px); }
+  48% { transform: translate(-3.5px, 1.5px); }
+  73% { transform: translate(2px, 2.5px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand .blink, .brand .look { animation: none; }
+}
