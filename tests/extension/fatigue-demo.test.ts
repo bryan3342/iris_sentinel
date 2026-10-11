@@ -17,7 +17,8 @@ function mount() {
   const status = () => section.querySelector('[role=status]')!.textContent ?? '';
   const list = (name: string) => [...section.querySelectorAll(`ul.${name} li`)].map((li) => li.textContent);
   const why = () => list('why');
-  return { section, button, cover, status, why, list };
+  const progress = () => section.querySelector('.progress')!.textContent ?? '';
+  return { section, button, cover, status, why, list, progress };
 }
 
 /** Advances the fake clock one second at a time and returns the time (s) each new status first appeared. */
@@ -33,7 +34,7 @@ function watch(status: () => string, seconds: number, from: number): Map<string,
 
 describe('fatigue demo in the side panel', () => {
   it('waits for Play, then goes from fresh to tiring to strained as the scripted user tires', () => {
-    const { button, status, why, list } = mount();
+    const { button, status, why, list, progress } = mount();
     expect(status()).toBe('Fatigue: not running.');
     button.click();
     expect(button.textContent).toBe('Stop demo');
@@ -47,6 +48,13 @@ describe('fatigue demo in the side panel', () => {
     expect(why().length).toBeGreaterThan(0);
     expect(why().join(' ')).toMatch(/Blink rate up|Heart rate variability down|Breathing rate up/);
     expect(list('signals')[0]).toMatch(/^Blink rate: \d+ a minute \(your normal \d+, \+\d+%\)$/);
+    expect(progress()).toMatch(/^Demo running for 5 min 0 s, average \d+, highest \d+$/);
+
+    button.click();
+    const summary = list('summary');
+    expect(summary[0]).toBe('Session: 5 min 0 s');
+    expect(summary[1]).toMatch(/^Average score \d+, highest (9\d|100)$/);
+    expect(summary[2]).toMatch(/^Time fresh .*, tiring .*, fatigued .*, strained /);
   });
 
   it('pauses and holds the score while the camera is covered', () => {
@@ -60,15 +68,17 @@ describe('fatigue demo in the side panel', () => {
     expect(why()).toEqual(['Face out of view, paused']);
   });
 
-  it('stops cleanly', () => {
-    const { button, status } = mount();
+  it('stops cleanly and leaves the session summary on screen', () => {
+    const { button, status, list } = mount();
     button.click();
     vi.advanceTimersByTime(30_000);
     button.click();
     expect(button.textContent).toBe('Play demo');
-    expect(status()).toBe('Fatigue: not running.');
+    expect(status()).toBe('Fatigue: stopped.');
+    const summary = list('summary');
+    expect(summary[0]).toBe('Session: 30 s');
     vi.advanceTimersByTime(30_000);
-    expect(status()).toBe('Fatigue: not running.');
+    expect(list('summary')).toEqual(summary);
     expect(vi.getTimerCount()).toBe(0);
   });
 });
@@ -92,8 +102,11 @@ describe('fatigue from the live companion', () => {
     expect(section.querySelector('h2')!.textContent).toBe('Fatigue (live, from Presage)');
     expect(button.hidden).toBe(true);
     expect(results.at(-1)!.level).toBe('strained');
+    expect(section.querySelector('.progress')!.textContent).toMatch(/^Measuring for 4 min 20 s, average \d+, highest \d+$/);
 
     state = 'disconnected'; changed(state);
+    expect(section.querySelector('[role=status]')!.textContent).toBe('Fatigue: stopped.');
+    expect([...section.querySelectorAll('ul.summary li')].at(-1)!.textContent).toMatch(/^Last: strained \(score \d+\)$/);
     const count = results.length;
     vi.advanceTimersByTime(5_000);
     expect(results).toHaveLength(count);
