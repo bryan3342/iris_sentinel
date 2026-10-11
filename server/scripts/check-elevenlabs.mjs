@@ -1,21 +1,7 @@
 // Local setup check only. This is not a public Worker endpoint.
-const key = process.env.ELEVENLABS_API_KEY?.trim();
-const agent = process.env.ELEVENLABS_AGENT_ID?.trim();
+import { elevenLabsEnv, missingTools } from "./elevenlabs.mjs";
 
-if (!key || key.endsWith("replace_with_your_key")) {
-  console.error("Set ELEVENLABS_API_KEY in server/.dev.vars before running this check.");
-  process.exit(1);
-}
-if (!/^sk_[A-Za-z0-9]{20,}$/.test(key)) {
-  console.error("ELEVENLABS_API_KEY must be an API key starting with sk_, not an API key ID.");
-  console.error("Keys are shown only when created or rotated in the ElevenLabs dashboard.");
-  process.exit(1);
-}
-if (!agent || !/^agent_[A-Za-z0-9_-]{1,100}$/.test(agent)) {
-  console.error("ELEVENLABS_AGENT_ID must be a bare agent ID, such as agent_0123abc.");
-  console.error("Remove any query suffix copied from a dashboard URL, such as ?branchId=...");
-  process.exit(1);
-}
+const { key, agent } = elevenLabsEnv();
 
 // Minting a signed URL does not start a conversation, so this spends no conversation
 // minutes, but it is a real authenticated call to a live vendor API.
@@ -64,6 +50,13 @@ try {
     } else {
       console.log(`ElevenLabs connection succeeded (${short}).`);
       console.log("Signed URL minted and validated: true");
+      const missing = await missingTools(key, agent);
+      if (missing.length) {
+        console.error(`The agent cannot act on the page yet; missing client tools: ${missing.join(", ")}. Run npm run setup:elevenlabs.`);
+        process.exitCode = 1;
+      } else {
+        console.log("Iris's browser tools attached: true");
+      }
     }
   }
 } catch {

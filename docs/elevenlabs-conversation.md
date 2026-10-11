@@ -2,7 +2,9 @@
 
 Basic conversation is implemented: signed-session minting, microphone access,
 Start/Stop, listening/speaking status, and cleanup on panel closure.
-Browser tools and user-talking signals are not connected yet.
+Browser tools are connected: run `npm run setup:elevenlabs` in `server/` to give
+the agent its tools and prompt (see [voice-agent-setup.md](voice-agent-setup.md)).
+User-talking signals are not connected yet.
 
 ## Verify locally
 
