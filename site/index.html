@@ -5,47 +5,135 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Iris</title>
   <meta name="description" content="Iris is a Chrome extension that lets people with severe motor impairments browse real websites with their eyes and voice.">
+  <meta name="theme-color" content="#09090a">
   <link rel="icon" href="assets/iris-logo-static.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Manrope:wght@400;600;800&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;700&display=swap">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Background: people walking, sped up, under a black gradient. Stock clip from Mixkit (Mixkit License). -->
-  <video class="bg-video" src="assets/walking.mp4" autoplay muted loop playsinline aria-hidden="true"></video>
-  <div class="bg-shade" aria-hidden="true"></div>
+  <!-- Film grain and the gaze ring that follows the pointer. Both are decorative. -->
+  <div class="grain" aria-hidden="true"></div>
+  <div class="gaze" aria-hidden="true"><span class="gaze__dot"></span></div>
 
-  <!-- The extension's opening animation: the eye appears and blinks, then "ris" pulls out of it. -->
-  <main class="hero">
-    <h1 class="word" aria-label="Iris">
-      <span class="word__i">
-        <svg viewBox="0 0 44 96" class="word__svg" aria-hidden="true">
-          <defs>
-            <linearGradient id="iris-grad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#36e0cc"/>
-              <stop offset="1" stop-color="#0e9488"/>
-            </linearGradient>
-          </defs>
-          <rect class="stem" x="15" y="40" width="15" height="44" rx="7.5" fill="currentColor"/>
-          <g class="blink">
-            <circle cx="22.5" cy="16" r="13" fill="none" stroke="url(#iris-grad)" stroke-width="6.5"/>
-            <g class="look">
-              <circle cx="22.5" cy="16" r="5.6" fill="#1a6b60"/>
-              <circle cx="18.8" cy="12.8" r="2.2" fill="#eafffb"/>
+  <header class="top">
+    <a class="top__brand" href="#">Iris</a>
+    <nav class="top__nav" aria-label="Site">
+      <a href="#how">How it works</a>
+      <a href="https://devpost.com/software/iris-58cvyt">Devpost</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <!-- Background: people walking, sped up, revealed like an eye opening. Stock clip from Mixkit (Mixkit License). -->
+      <div class="hero__media" aria-hidden="true">
+        <video class="hero__video" src="assets/walking.mp4" autoplay muted loop playsinline></video>
+        <div class="hero__shade"></div>
+      </div>
+
+      <!-- The extension's opening animation: the eye appears and blinks, then "ris" pulls out of it. -->
+      <h1 class="word" aria-label="Iris">
+        <span class="word__i">
+          <svg viewBox="0 0 44 96" class="word__svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="iris-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#36e0cc"/>
+                <stop offset="1" stop-color="#0e9488"/>
+              </linearGradient>
+            </defs>
+            <rect class="stem" x="15" y="40" width="15" height="44" rx="7.5" fill="currentColor"/>
+            <g class="blink">
+              <circle cx="22.5" cy="16" r="13" fill="none" stroke="url(#iris-grad)" stroke-width="6.5"/>
+              <g class="look">
+                <circle cx="22.5" cy="16" r="5.6" fill="#1a6b60"/>
+                <circle cx="18.8" cy="12.8" r="2.2" fill="#eafffb"/>
+              </g>
             </g>
-          </g>
-        </svg>
-      </span><span class="word__rest" aria-hidden="true">ris</span>
-    </h1>
-    <p class="tagline">Browse the web with your eyes and voice.</p>
-    <p class="lead">People with ALS, spinal cord injuries or cerebral palsy often cannot use a mouse or keyboard. Iris is a Chrome extension that lets them browse real websites hands-free.</p>
-    <ul class="features">
-      <li><strong>Eye Tracking</strong><span>Look at a link and blink twice to open it.</span></li>
-      <li><strong>Spoken Commands</strong><span>Say "scroll down", "go back" or "open the history section".</span></li>
-      <li><strong>Voice Assistance</strong><span>Ask Iris to summarize a page or describe an image.</span></li>
-    </ul>
-    <a class="demo-link" href="https://devpost.com/software/iris-58cvyt">Learn More</a>
+          </svg>
+        </span><span class="word__rest" aria-hidden="true">ris</span>
+      </h1>
+
+      <p class="tagline">
+        <span class="tagline__w">Browse</span>
+        <span class="tagline__w">the</span>
+        <span class="tagline__w">web</span>
+        <span class="tagline__w">with</span>
+        <span class="tagline__w">your</span>
+        <span class="tagline__w tagline__w--accent">eyes</span>
+        <span class="tagline__w">and</span>
+        <span class="tagline__w tagline__w--accent">voice.</span>
+      </p>
+      <p class="lead">People with ALS, spinal cord injuries or cerebral palsy often cannot use a mouse or keyboard. Iris is a Chrome extension that lets them browse real websites hands-free.</p>
+
+      <a class="cue" href="#how" aria-label="Scroll to how it works">
+        <span class="cue__line"></span>
+      </a>
+    </section>
+
+    <section class="how" id="how">
+      <div class="how__aside">
+        <p class="eyebrow" data-reveal>Three ways in</p>
+        <p class="how__note" data-reveal>Your face and eyes stay on your laptop. Only what you ask for leaves it.</p>
+      </div>
+
+      <ol class="features">
+        <li class="feature" data-reveal>
+          <span class="feature__n">01</span>
+          <div class="feature__body">
+            <h2>Look, then blink twice.</h2>
+            <p>The webcam follows your gaze and snaps it to the nearest link. Two blinks open it. Nothing clicks from gaze alone.</p>
+          </div>
+          <svg class="glyph glyph--eye" viewBox="0 0 64 40" aria-hidden="true">
+            <path class="glyph__lid" d="M2 20 C 14 2, 50 2, 62 20 C 50 38, 14 38, 2 20 Z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle class="glyph__iris" cx="32" cy="20" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle class="glyph__pupil" cx="32" cy="20" r="3.5" fill="currentColor"/>
+          </svg>
+        </li>
+        <li class="feature" data-reveal>
+          <span class="feature__n">02</span>
+          <div class="feature__body">
+            <h2>Say where to go.</h2>
+            <p>"Scroll down." "Go back." "Open the history section." Iris finds the target on the page and moves there.</p>
+          </div>
+          <svg class="glyph glyph--voice" viewBox="0 0 64 40" aria-hidden="true">
+            <rect x="8"  y="14" width="3" height="12" rx="1.5" fill="currentColor"/>
+            <rect x="17" y="8"  width="3" height="24" rx="1.5" fill="currentColor"/>
+            <rect x="26" y="16" width="3" height="8"  rx="1.5" fill="currentColor"/>
+            <rect x="35" y="4"  width="3" height="32" rx="1.5" fill="currentColor"/>
+            <rect x="44" y="12" width="3" height="16" rx="1.5" fill="currentColor"/>
+            <rect x="53" y="17" width="3" height="6"  rx="1.5" fill="currentColor"/>
+          </svg>
+        </li>
+        <li class="feature" data-reveal>
+          <span class="feature__n">03</span>
+          <div class="feature__body">
+            <h2>Ask, and hear it back.</h2>
+            <p>Ask Iris to summarize a page or describe an image. It reads the answer aloud, in a voice, not a wall of text.</p>
+          </div>
+          <svg class="glyph glyph--ask" viewBox="0 0 64 40" aria-hidden="true">
+            <circle class="glyph__ring glyph__ring--1" cx="32" cy="20" r="6"  fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle class="glyph__ring glyph__ring--2" cx="32" cy="20" r="12" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle class="glyph__ring glyph__ring--3" cx="32" cy="20" r="18" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </li>
+      </ol>
+
+      <div class="how__cta" data-reveal>
+        <a class="cta" href="https://devpost.com/software/iris-58cvyt" data-magnetic>
+          <span class="cta__label">Learn more</span>
+          <svg class="cta__arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </section>
   </main>
+
+  <footer class="foot">
+    <span>Iris</span>
+    <span>A Chrome extension for hands-free browsing</span>
+  </footer>
+
+  <script src="main.js" defer></script>
 </body>
 </html>
