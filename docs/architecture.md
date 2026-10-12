@@ -60,10 +60,16 @@ speaking it hangs up and listens locally again. The microphone is muted while th
 speaks, so it takes the user's voice only once it has finished: it cannot be interrupted,
 and its own voice from the speakers never reaches it as the user's. Starts are capped at three a minute.
 In a loud room, where the learned background reaches -45 dBFS (normal speech at the laptop is near
--30, so loudness alone cannot tell the user from the room), the panel shows "Loud room: start with
-"Iris"" and Iris acts only on requests that start with "Iris" (or "Hey Iris"). The side panel checks
-each request the agent hears, before any tool call it leads to: any other runs no tool, and the
-agent's reply to it plays silent with the microphone left open, so voices around the user do nothing.
+-30, so loudness alone cannot tell the user from the room), the panel shows "Loud room: say "Hey
+Iris" first" and Iris acts only on requests addressed to it: starting with "Iris", or with "Hey
+Iris" (or "Hi" or "OK Iris") anywhere, since other people's talk can reach the agent in the same
+turn ahead of the user's request. "Iris" alone counts only at the start, since people also talk
+about Iris. The side panel checks each request the agent hears, before any tool call it leads to:
+any other runs no tool, and the agent's reply to it plays silent with the microphone left open, so
+voices around the user do nothing. The user's own requests keep a conversation open even when Iris
+answers them silently; other voices do not. The agent is set up to act only on the words after the
+last "Iris", with "Iris" boosted for recognition. ElevenLabs' background voice detection stays off:
+in a noisy test it kept a nearby speaker's words and dropped the user's request.
 Audio worklets ship inside the extension. Turning Listening off or closing the panel
 ends the session, including late connections, and stops all microphone use. Audio is
 sent to ElevenLabs only while a conversation is connected, which begins only when the

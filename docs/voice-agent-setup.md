@@ -25,7 +25,10 @@ ElevenLabs dashboard. It takes about 15 minutes.
    `npm run setup:elevenlabs`. It creates or updates every client tool in
    `voice-agent.json`, attaches them to the agent with **Wait for response** on,
    switches on ElevenLabs' **Skip turn** system tool, which lets the agent stay
-   silent after a command that worked, and sets the system prompt.
+   silent after a command that worked, and sets the system prompt. For loud
+   rooms it adds "Iris" to the speech recognition keywords, so "Hey Iris" is
+   recognized over other voices, and keeps **background voice detection** off:
+   in a noisy test it kept a nearby speaker's words and dropped the request.
    It also empties the agent's first message, so the agent waits for you, and
    allows Iris to set the first message, which it does only for a check-in when
    you seem tired.

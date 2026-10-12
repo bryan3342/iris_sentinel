@@ -16,7 +16,7 @@ export interface HandsFreeDeps {
   /** Reports microphone loudness until the returned function is called (see mic-level.ts). */
   listen: (onLevel: (db: number, t: number) => void) => Promise<() => void>;
   onStatus: (status: HandsFreeStatus) => void;
-  /** Told whenever the room turns loud or quiet again; in a loud room Iris acts only on requests that start with "Iris". */
+  /** Told whenever the room turns loud or quiet again; in a loud room Iris acts only on requests addressed to it. */
   onLoudRoom?: (loud: boolean) => void;
   gate?: SpeechGate;
   now?: () => number;
@@ -28,15 +28,16 @@ const RETRY_MS = 30_000;
 /** Problems only the person can fix (a permission, a click); listening resumes on retry(). */
 const NEEDS_PERSON = new Set(['MICROPHONE', 'AUDIO_BLOCKED', 'GATEWAY_ACCESS']);
 /** What a tool answers, without running, to a request not addressed to Iris in a loud room. */
-const NOT_FOR_IRIS = 'Not done: the room is loud, so Iris acts only on requests that start with "Iris". Say nothing.';
+const NOT_FOR_IRIS = 'Not done: the room is loud, so Iris acts only on requests addressed to it, such as "Hey Iris, scroll down". Say nothing.';
 
 /**
  * Hands-free voice: while on, Iris hears only loudness on the laptop. When the user starts
  * speaking it connects the voice agent (only then does audio go to ElevenLabs), and after a minute
  * of quiet it hangs up and goes back to listening locally. One microphone user at a time: local
  * listening stops before the agent opens the microphone. Turning it off stops all microphone use.
- * In a loud room (see SpeechGate.loud) Iris acts only on requests that start with "Iris": any other
- * runs no tool, and the agent's reply to it is silent, so voices around the user do nothing.
+ * In a loud room (see SpeechGate.loud) Iris acts only on requests addressed to it (see
+ * addressedToIris): any other runs no tool, and the agent's reply to it is silent, so voices around
+ * the user do nothing. The user's own requests keep the conversation open; other voices do not.
  */
 export class HandsFree {
   private on = false;
@@ -62,6 +63,8 @@ export class HandsFree {
       [name, async (parameters: Record<string, unknown>) => (this.ignoring ? NOT_FOR_IRIS : run(parameters))]));
     this.controller = new VoiceController(deps.agent, (state) => this.onVoice(state), tools, (said) => {
       this.ignoring = this.loud && !addressedToIris(said);
+      // The user's own requests keep the conversation open, even when Iris answers them silently.
+      if (!this.ignoring) this.lastActive = this.now();
       return !this.ignoring;
     });
   }
