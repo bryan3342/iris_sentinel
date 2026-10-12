@@ -110,3 +110,9 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 | "did not accept the key", "cannot reach Presage" or "no Presage credit left" | Presage refused the key, could not be reached, or has no credit left. Check the key, the network or the Presage developer portal. |
 | "Body signals: the camera is not available" | No camera frame reached Presage within 15 seconds. Either another app holds the camera (quit it and start again), or macOS has not let Iris Companion use it: turn on **Iris Companion** in System Settings, Privacy & Security, Camera, then start again. |
 | Stays on "starting the camera measurement" | Presage waits for your face and upper chest to be in view before it measures. Follow the **Camera:** hint below it: usually lean back so your shoulders show, and keep the light in front of you. |
+
+## Landing page
+
+`site/` is a static page with no build step. Cloudflare Workers Builds deploys it from the
+repo root using `wrangler.jsonc`: pushes to `main` go live, and every other branch gets its
+own Preview URL. The API Worker in `server/` has a separate config.
