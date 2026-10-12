@@ -1,8 +1,11 @@
 // Local setup only. Makes the ElevenLabs agent match voice-agent.json: creates or updates Iris's
 // client tools (waiting for Iris's answer), attaches exactly those to the agent, switches on the
 // system tools Iris uses (skip_turn, so a command that worked gets no reply) and sets its system
-// prompt. The agent's own first message is empty, so it waits for the user when Iris connects on
-// speech, and Iris may set a first message only to check in when the user seems tired. Safe to run again; the agent's voice, language model and other settings are left as they are.
+// prompt. For loud rooms it boosts recognition of "Iris" and keeps background voice detection off:
+// in a noisy test it kept a nearby speaker's words and dropped the user's request. The agent's own
+// first message is empty, so it waits for the user when Iris connects on speech, and Iris may set a
+// first message only to check in when the user seems tired. Safe to run again; the agent's voice,
+// language model and other settings are left as they are.
 import { convai, elevenLabsEnv, missingTools, voiceAgent } from "./elevenlabs.mjs";
 
 const { key, agent } = elevenLabsEnv();
@@ -29,10 +32,15 @@ try {
   const overrides = platform.overrides ?? {};
   const allowed = overrides.conversation_config_override ?? {};
   await convai(key, "PATCH", `/agents/${agent}`, {
-    conversation_config: { agent: { first_message: voiceAgent.first_message, prompt: {
-      ...prompt, prompt: voiceAgent.prompt, tool_ids: ids,
-      built_in_tools: { ...prompt.built_in_tools, ...voiceAgent.built_in_tools }, // other system tools are left as they are
-    } } },
+    conversation_config: {
+      agent: { first_message: voiceAgent.first_message, prompt: {
+        ...prompt, prompt: voiceAgent.prompt, tool_ids: ids,
+        built_in_tools: { ...prompt.built_in_tools, ...voiceAgent.built_in_tools }, // other system tools are left as they are
+      } },
+      // Other speech recognition and voice detection settings are left as they are.
+      asr: { ...config.asr, ...voiceAgent.asr },
+      vad: { ...config.vad, ...voiceAgent.vad },
+    },
     platform_settings: { overrides: { ...overrides, conversation_config_override: { ...allowed, agent: { ...allowed.agent, first_message: true } } } },
   });
   const missing = await missingTools(key, agent);

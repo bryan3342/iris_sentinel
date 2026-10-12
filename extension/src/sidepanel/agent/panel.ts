@@ -56,7 +56,7 @@ export function conversationPanel(page: { coordinator: PageCoordinator; marks: P
   label.append(listening, ' Listening');
   const status = document.createElement('p'); status.setAttribute('role', 'status');
   const loudRoom = document.createElement('p'); loudRoom.setAttribute('aria-live', 'polite'); loudRoom.hidden = true;
-  loudRoom.textContent = 'Loud room: start with "Iris", as in "Iris, scroll down".';
+  loudRoom.textContent = 'Loud room: say "Hey Iris" first, as in "Hey Iris, scroll down".';
   const action = document.createElement('p'); action.setAttribute('aria-live', 'polite');
   const report = (said: string) => { action.textContent = said; };
   const handsFree = new HandsFree({
