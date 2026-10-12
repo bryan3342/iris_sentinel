@@ -1,0 +1,15 @@
+// Landing page Worker (static assets in site/, no script).
+// Cloudflare Workers Builds runs from the repo root: `npx wrangler deploy` on main and
+// `npx wrangler preview` on every other branch. The `previews` block is required for the
+// latter and stays empty because the page needs no per-branch settings.
+// The API Worker has its own config in server/wrangler.jsonc.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "iris-sentinel",
+  "compatibility_date": "2026-10-11",
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "none"
+  },
+  "previews": {}
+}

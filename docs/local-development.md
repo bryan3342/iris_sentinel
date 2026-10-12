@@ -113,7 +113,6 @@ Once the camera is on, the panel shows **Eye tracking on** and:
 
 ## Landing page
 
-`site/` is a static page with no build step. Cloudflare Workers Builds deploys it from that
-directory using `site/wrangler.jsonc`: pushes to `main` go live, and every other branch gets
-its own Preview URL. `site/.assetsignore` keeps the config and Wrangler's temp files out of
-the served assets.
+`site/` is a static page with no build step. Cloudflare Workers Builds deploys it from the
+repo root using `wrangler.jsonc`: pushes to `main` go live, and every other branch gets its
+own Preview URL. The API Worker in `server/` has a separate config.
