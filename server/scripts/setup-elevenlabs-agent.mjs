@@ -2,8 +2,10 @@
 // client tools (waiting for Iris's answer), attaches exactly those to the agent, switches on the
 // system tools Iris uses (skip_turn, so a command that worked gets no reply) and sets its system
 // prompt. For loud rooms it boosts recognition of "Iris" and keeps background voice detection off:
-// in a noisy test it kept a nearby speaker's words and dropped the user's request. The agent's own first message is empty, so it waits for the user when Iris connects on
-// speech, and Iris may set a first message only to check in when the user seems tired. Safe to run again; the agent's voice, language model and other settings are left as they are.
+// in a noisy test it kept a nearby speaker's words and dropped the user's request. The agent's own
+// first message is empty, so it waits for the user when Iris connects on speech, and Iris may set a
+// first message only to check in when the user seems tired. Safe to run again; the agent's voice,
+// language model and other settings are left as they are.
 import { convai, elevenLabsEnv, missingTools, voiceAgent } from "./elevenlabs.mjs";
 
 const { key, agent } = elevenLabsEnv();
